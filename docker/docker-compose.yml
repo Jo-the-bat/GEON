@@ -1,5 +1,5 @@
 # =============================================================================
-# NEGO Docker Compose — n8n, Elasticsearch, GDELT, OpenCTI
+# GEON Docker Compose — n8n, Elasticsearch, GDELT, OpenCTI
 # Geopolitical & Cyber Threat Intelligence Platform
 # =============================================================================
 # Usage:
@@ -11,33 +11,35 @@
 # =============================================================================
 
 networks:
-  nego_net:
+  geon_net:
     external: true
 
 volumes:
   # Map to existing Docker volumes to preserve data across rename
-  nego_elasticsearch_data:
+  geon_elasticsearch_data:
     name: docker_hego_elasticsearch_data
     external: true
-  nego_redis_data:
+  geon_redis_data:
     name: docker_hego_redis_data
     external: true
-  nego_rabbitmq_data:
+  geon_rabbitmq_data:
     name: docker_hego_rabbitmq_data
     external: true
-  nego_minio_data:
+  geon_minio_data:
     name: docker_hego_minio_data
     external: true
-  nego_prometheus_data:
+  geon_prometheus_data:
     name: docker_hego_prometheus_data
     external: true
-  nego_grafana_data:
+  geon_grafana_data:
     name: docker_hego_grafana_data
     external: true
-  nego_authelia_data:
+  geon_authelia_data:
     name: docker_hego_authelia_data
     external: true
-  nego_n8n_data:
+  geon_n8n_data:
+    name: docker_nego_n8n_data
+    external: true
 
 services:
   # ===========================================================================
@@ -45,14 +47,14 @@ services:
   # ===========================================================================
   nginx:
     image: nginx:alpine
-    container_name: nego-nginx
+    container_name: geon-nginx
     restart: unless-stopped
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
       - ../landing:/usr/share/nginx/html/landing:ro
     networks:
-      - nego_net
+      - geon_net
     depends_on:
       authelia:
         condition: service_healthy
@@ -63,18 +65,18 @@ services:
       retries: 3
       start_period: 10s
     labels:
-      - "nego.service=nginx"
-      - "nego.role=reverse-proxy"
+      - "geon.service=nginx"
+      - "geon.role=reverse-proxy"
 
   # ===========================================================================
   # ELASTICSEARCH — Storage for OpenCTI + Ingestors + Grafana
   # ===========================================================================
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:${ELASTIC_VERSION}
-    container_name: nego-elasticsearch
+    container_name: geon-elasticsearch
     restart: unless-stopped
     environment:
-      - cluster.name=${ELASTIC_CLUSTER_NAME:-nego}
+      - cluster.name=${ELASTIC_CLUSTER_NAME:-geon}
       - discovery.type=single-node
       - xpack.security.enabled=true
       - xpack.security.http.ssl.enabled=false
@@ -90,10 +92,10 @@ services:
         soft: 65536
         hard: 65536
     volumes:
-      - nego_elasticsearch_data:/usr/share/elasticsearch/data
+      - geon_elasticsearch_data:/usr/share/elasticsearch/data
       - ./elasticsearch/elasticsearch.yml:/usr/share/elasticsearch/config/elasticsearch.yml:ro
     networks:
-      - nego_net
+      - geon_net
     healthcheck:
       test:
         [
@@ -105,21 +107,21 @@ services:
       retries: 10
       start_period: 60s
     labels:
-      - "nego.service=elasticsearch"
-      - "nego.role=storage"
+      - "geon.service=elasticsearch"
+      - "geon.role=storage"
 
   # ===========================================================================
   # REDIS — Cache for OpenCTI
   # ===========================================================================
   redis:
     image: redis:7-alpine
-    container_name: nego-redis
+    container_name: geon-redis
     restart: unless-stopped
     command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
     volumes:
-      - nego_redis_data:/data
+      - geon_redis_data:/data
     networks:
-      - nego_net
+      - geon_net
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 15s
@@ -127,24 +129,24 @@ services:
       retries: 5
       start_period: 10s
     labels:
-      - "nego.service=redis"
-      - "nego.role=cache"
+      - "geon.service=redis"
+      - "geon.role=cache"
 
   # ===========================================================================
   # RABBITMQ — Message Broker for OpenCTI
   # ===========================================================================
   rabbitmq:
     image: rabbitmq:3-management-alpine
-    container_name: nego-rabbitmq
+    container_name: geon-rabbitmq
     restart: unless-stopped
     environment:
       - RABBITMQ_DEFAULT_USER=${RABBITMQ_DEFAULT_USER}
       - RABBITMQ_DEFAULT_PASS=${RABBITMQ_DEFAULT_PASS}
       - RABBITMQ_NODENAME=rabbit@rabbitmq
     volumes:
-      - nego_rabbitmq_data:/var/lib/rabbitmq
+      - geon_rabbitmq_data:/var/lib/rabbitmq
     networks:
-      - nego_net
+      - geon_net
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 30s
@@ -152,24 +154,24 @@ services:
       retries: 5
       start_period: 30s
     labels:
-      - "nego.service=rabbitmq"
-      - "nego.role=broker"
+      - "geon.service=rabbitmq"
+      - "geon.role=broker"
 
   # ===========================================================================
   # MINIO — Object Storage for OpenCTI
   # ===========================================================================
   minio:
     image: minio/minio
-    container_name: nego-minio
+    container_name: geon-minio
     restart: unless-stopped
     command: server /data --console-address ":9001"
     environment:
       - MINIO_ROOT_USER=${MINIO_ROOT_USER}
       - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
     volumes:
-      - nego_minio_data:/data
+      - geon_minio_data:/data
     networks:
-      - nego_net
+      - geon_net
     healthcheck:
       test: ["CMD", "mc", "ready", "local"]
       interval: 30s
@@ -177,20 +179,20 @@ services:
       retries: 5
       start_period: 15s
     labels:
-      - "nego.service=minio"
-      - "nego.role=object-storage"
+      - "geon.service=minio"
+      - "geon.role=object-storage"
 
   # ===========================================================================
   # OPENCTI — Cyber Threat Intelligence Platform
   # ===========================================================================
   opencti:
     image: opencti/platform:${OPENCTI_VERSION}
-    container_name: nego-opencti
+    container_name: geon-opencti
     restart: unless-stopped
     environment:
       - NODE_OPTIONS=--max-old-space-size=8096
       - APP__PORT=8080
-      - APP__BASE_URL=https://${NEGO_DOMAIN}/opencti
+      - APP__BASE_URL=https://${GEON_DOMAIN}/opencti
       - APP__BASE_PATH=/opencti
       - APP__ADMIN__EMAIL=${OPENCTI_ADMIN_EMAIL}
       - APP__ADMIN__PASSWORD=${OPENCTI_ADMIN_PASSWORD}
@@ -217,7 +219,7 @@ services:
       - RABBITMQ__PASSWORD=${RABBITMQ_DEFAULT_PASS}
       - PROVIDERS__LOCAL__STRATEGY=LocalStrategy
     networks:
-      - nego_net
+      - geon_net
     depends_on:
       elasticsearch:
         condition: service_healthy
@@ -238,22 +240,22 @@ services:
       retries: 15
       start_period: 120s
     labels:
-      - "nego.service=opencti"
-      - "nego.role=cti-platform"
+      - "geon.service=opencti"
+      - "geon.role=cti-platform"
 
   # ===========================================================================
   # OPENCTI WORKERS — Background Processing
   # ===========================================================================
   opencti-worker-1:
     image: opencti/worker:${OPENCTI_VERSION}
-    container_name: nego-opencti-worker-1
+    container_name: geon-opencti-worker-1
     restart: unless-stopped
     environment:
       - OPENCTI_URL=http://opencti:8080/opencti
       - OPENCTI_TOKEN=${OPENCTI_ADMIN_TOKEN}
       - WORKER_LOG_LEVEL=info
     networks:
-      - nego_net
+      - geon_net
     depends_on:
       opencti:
         condition: service_healthy
@@ -264,19 +266,19 @@ services:
       retries: 5
       start_period: 30s
     labels:
-      - "nego.service=opencti-worker"
-      - "nego.role=cti-worker"
+      - "geon.service=opencti-worker"
+      - "geon.role=cti-worker"
 
   opencti-worker-2:
     image: opencti/worker:${OPENCTI_VERSION}
-    container_name: nego-opencti-worker-2
+    container_name: geon-opencti-worker-2
     restart: unless-stopped
     environment:
       - OPENCTI_URL=http://opencti:8080/opencti
       - OPENCTI_TOKEN=${OPENCTI_ADMIN_TOKEN}
       - WORKER_LOG_LEVEL=info
     networks:
-      - nego_net
+      - geon_net
     depends_on:
       opencti:
         condition: service_healthy
@@ -287,19 +289,19 @@ services:
       retries: 5
       start_period: 30s
     labels:
-      - "nego.service=opencti-worker"
-      - "nego.role=cti-worker"
+      - "geon.service=opencti-worker"
+      - "geon.role=cti-worker"
 
   opencti-worker-3:
     image: opencti/worker:${OPENCTI_VERSION}
-    container_name: nego-opencti-worker-3
+    container_name: geon-opencti-worker-3
     restart: unless-stopped
     environment:
       - OPENCTI_URL=http://opencti:8080/opencti
       - OPENCTI_TOKEN=${OPENCTI_ADMIN_TOKEN}
       - WORKER_LOG_LEVEL=info
     networks:
-      - nego_net
+      - geon_net
     depends_on:
       opencti:
         condition: service_healthy
@@ -310,15 +312,15 @@ services:
       retries: 5
       start_period: 30s
     labels:
-      - "nego.service=opencti-worker"
-      - "nego.role=cti-worker"
+      - "geon.service=opencti-worker"
+      - "geon.role=cti-worker"
 
   # ===========================================================================
   # OPENCTI CONNECTORS
   # ===========================================================================
   opencti-connector-mitre:
     image: opencti/connector-mitre:${OPENCTI_VERSION}
-    container_name: nego-connector-mitre
+    container_name: geon-connector-mitre
     restart: unless-stopped
     environment:
       - OPENCTI_URL=http://opencti:8080/opencti
@@ -334,7 +336,7 @@ services:
       - MITRE_ICS_ATTACK_FILE_URL=https://raw.githubusercontent.com/mitre-attack/attack-stix-data/master/ics-attack/ics-attack.json
       - MITRE_INTERVAL=7
     networks:
-      - nego_net
+      - geon_net
     depends_on:
       opencti:
         condition: service_healthy
@@ -347,7 +349,7 @@ services:
 
   opencti-connector-alienvault:
     image: opencti/connector-alienvault:${OPENCTI_VERSION}
-    container_name: nego-connector-alienvault
+    container_name: geon-connector-alienvault
     restart: unless-stopped
     environment:
       - OPENCTI_URL=http://opencti:8080/opencti
@@ -373,7 +375,7 @@ services:
       - ALIENVAULT_ENABLE_ATTACK_PATTERNS_INDICATES=true
       - ALIENVAULT_INTERVAL=360
     networks:
-      - nego_net
+      - geon_net
     depends_on:
       opencti:
         condition: service_healthy
@@ -386,7 +388,7 @@ services:
 
   opencti-connector-cisa-kev:
     image: opencti/connector-cisa-known-exploited-vulnerabilities:${OPENCTI_VERSION}
-    container_name: nego-connector-cisa-kev
+    container_name: geon-connector-cisa-kev
     restart: unless-stopped
     environment:
       - OPENCTI_URL=http://opencti:8080/opencti
@@ -402,7 +404,7 @@ services:
       - CISA_CREATE_INFRASTRUCTURES=false
       - CISA_TLP=TLP:CLEAR
     networks:
-      - nego_net
+      - geon_net
     depends_on:
       opencti:
         condition: service_healthy
@@ -415,7 +417,7 @@ services:
 
   opencti-connector-cve:
     image: opencti/connector-cve:${OPENCTI_VERSION}
-    container_name: nego-connector-cve
+    container_name: geon-connector-cve
     restart: unless-stopped
     environment:
       - OPENCTI_URL=http://opencti:8080/opencti
@@ -430,7 +432,7 @@ services:
       - CVE_INTERVAL=24
       - CVE_MAX_DATE_RANGE=120
     networks:
-      - nego_net
+      - geon_net
     depends_on:
       opencti:
         condition: service_healthy
@@ -443,7 +445,7 @@ services:
 
   opencti-connector-datasets:
     image: opencti/connector-opencti:${OPENCTI_VERSION}
-    container_name: nego-connector-datasets
+    container_name: geon-connector-datasets
     restart: unless-stopped
     environment:
       - OPENCTI_URL=http://opencti:8080/opencti
@@ -459,7 +461,7 @@ services:
       - CONFIG_COMPANIES_FILE_URL=https://raw.githubusercontent.com/OpenCTI-Platform/datasets/master/data/companies.json
       - CONFIG_INTERVAL=7
     networks:
-      - nego_net
+      - geon_net
     depends_on:
       opencti:
         condition: service_healthy
@@ -475,13 +477,13 @@ services:
   # ===========================================================================
   n8n:
     image: docker.n8n.io/n8nio/n8n:1.70.3
-    container_name: nego-n8n
+    container_name: geon-n8n
     restart: unless-stopped
     environment:
-      - N8N_HOST=${NEGO_DOMAIN}
+      - N8N_HOST=${GEON_DOMAIN}
       - N8N_PORT=5678
       - N8N_PROTOCOL=https
-      - WEBHOOK_URL=https://${NEGO_DOMAIN}/n8n/
+      - WEBHOOK_URL=https://${GEON_DOMAIN}/n8n/
       - N8N_PATH=/n8n/
       - N8N_DIAGNOSTICS_ENABLED=false
       - N8N_PERSONALIZATION_ENABLED=false
@@ -490,9 +492,9 @@ services:
       - DB_TYPE=sqlite
       - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
     volumes:
-      - nego_n8n_data:/home/node/.n8n
+      - geon_n8n_data:/home/node/.n8n
     networks:
-      - nego_net
+      - geon_net
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://localhost:5678/n8n/healthz"]
       interval: 30s
@@ -500,15 +502,15 @@ services:
       retries: 3
       start_period: 30s
     labels:
-      - "nego.service=n8n"
-      - "nego.role=automation"
+      - "geon.service=n8n"
+      - "geon.role=automation"
 
   # ===========================================================================
   # AUTHELIA — Authentication & MFA
   # ===========================================================================
   authelia:
     image: authelia/authelia
-    container_name: nego-authelia
+    container_name: geon-authelia
     restart: unless-stopped
     environment:
       - AUTHELIA_IDENTITY_VALIDATION_RESET_PASSWORD_JWT_SECRET=${AUTHELIA_JWT_SECRET}
@@ -517,9 +519,9 @@ services:
     volumes:
       - ./authelia/configuration.yml:/config/configuration.yml:ro
       - ./authelia/users_database.yml:/config/users_database.yml:ro
-      - nego_authelia_data:/config/data
+      - geon_authelia_data:/config/data
     networks:
-      - nego_net
+      - geon_net
     healthcheck:
       test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:9091/api/health || exit 1"]
       interval: 15s
@@ -527,15 +529,15 @@ services:
       retries: 5
       start_period: 10s
     labels:
-      - "nego.service=authelia"
-      - "nego.role=authentication"
+      - "geon.service=authelia"
+      - "geon.role=authentication"
 
   # ===========================================================================
   # PROMETHEUS — Monitoring & Metrics
   # ===========================================================================
   prometheus:
     image: prom/prometheus
-    container_name: nego-prometheus
+    container_name: geon-prometheus
     restart: unless-stopped
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
@@ -544,9 +546,9 @@ services:
       - "--web.enable-lifecycle"
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - nego_prometheus_data:/prometheus
+      - geon_prometheus_data:/prometheus
     networks:
-      - nego_net
+      - geon_net
     healthcheck:
       test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:9090/-/healthy || exit 1"]
       interval: 30s
@@ -554,18 +556,18 @@ services:
       retries: 3
       start_period: 15s
     labels:
-      - "nego.service=prometheus"
-      - "nego.role=monitoring"
+      - "geon.service=prometheus"
+      - "geon.role=monitoring"
 
   # ===========================================================================
   # GRAFANA — Dashboards (Geopolitical + CTI + Monitoring)
   # ===========================================================================
   grafana:
     image: grafana/grafana:10.4.15
-    container_name: nego-grafana
+    container_name: geon-grafana
     restart: unless-stopped
     environment:
-      - GF_SERVER_ROOT_URL=https://${NEGO_DOMAIN}/grafana
+      - GF_SERVER_ROOT_URL=https://${GEON_DOMAIN}/grafana
       - GF_SERVER_SERVE_FROM_SUB_PATH=true
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=${ELASTIC_PASSWORD}
@@ -575,10 +577,10 @@ services:
       - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
       - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
     volumes:
-      - nego_grafana_data:/var/lib/grafana
+      - geon_grafana_data:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
     networks:
-      - nego_net
+      - geon_net
     depends_on:
       prometheus:
         condition: service_healthy
@@ -591,5 +593,5 @@ services:
       retries: 5
       start_period: 20s
     labels:
-      - "nego.service=grafana"
-      - "nego.role=dashboards"
+      - "geon.service=grafana"
+      - "geon.role=dashboards"

@@ -141,12 +141,12 @@ class TestAcledElasticsearchIndexing:
     """Tests for indexing ACLED events into Elasticsearch."""
 
     def test_index_name_format(self) -> None:
-        """Index name should follow nego-acled-events-YYYY.MM pattern."""
+        """Index name should follow geon-acled-events-YYYY.MM pattern."""
         # TODO: Import ingestor once implemented
         # from ingestors.acled.ingestor import get_index_name
         #
         # name = get_index_name("2025-06-15")
-        # assert name == "nego-acled-events-2025.06"
+        # assert name == "geon-acled-events-2025.06"
         pass
 
     def test_mapping_valid_json(self) -> None:

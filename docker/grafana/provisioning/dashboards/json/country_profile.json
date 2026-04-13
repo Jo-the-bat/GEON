@@ -1,7 +1,7 @@
 {
-  "uid": "nego-country-profile",
-  "title": "NEGO \u2014 Country Profile",
-  "tags": ["nego", "country"],
+  "uid": "geon-country-profile",
+  "title": "GEON \u2014 Country Profile",
+  "tags": ["geon", "country"],
   "timezone": "browser",
   "editable": true,
   "fiscalYearStartMonth": 0,
@@ -19,7 +19,7 @@
         "label": "Country",
         "type": "query",
         "datasource": { "uid": "elasticsearch" },
-        "query": "{\"find\": \"terms\", \"field\": \"source_country\", \"query\": \"_index:nego-gdelt-*\"}",
+        "query": "{\"find\": \"terms\", \"field\": \"source_country\", \"query\": \"_index:geon-gdelt-*\"}",
         "refresh": 2,
         "sort": 1,
         "includeAll": false,
@@ -39,7 +39,7 @@
       "targets": [
         {
           "refId": "A",
-          "query": "_index:nego-gdelt-* AND source_country:\"$country\"",
+          "query": "_index:geon-gdelt-* AND source_country:\"$country\"",
           "alias": "GDELT Events",
           "metrics": [
             { "id": "1", "type": "count" }
@@ -56,7 +56,7 @@
         },
         {
           "refId": "B",
-          "query": "_index:nego-acled-* AND country:\"$country\"",
+          "query": "_index:geon-acled-* AND country:\"$country\"",
           "alias": "ACLED Events",
           "metrics": [
             { "id": "1", "type": "count" }
@@ -101,7 +101,7 @@
       "targets": [
         {
           "refId": "A",
-          "query": "_index:nego-cti-* AND country:\"$country\"",
+          "query": "_index:geon-cti-* AND country:\"$country\"",
           "alias": "",
           "metrics": [
             {
@@ -153,7 +153,7 @@
       "targets": [
         {
           "refId": "A",
-          "query": "_index:nego-sanctions AND country:\"$country\"",
+          "query": "_index:geon-sanctions AND country:\"$country\"",
           "alias": "",
           "metrics": [
             {
@@ -205,7 +205,7 @@
       "targets": [
         {
           "refId": "A",
-          "query": "_index:nego-gdelt-* AND source_country:\"$country\"",
+          "query": "_index:geon-gdelt-* AND source_country:\"$country\"",
           "alias": "GDELT Events",
           "metrics": [
             { "id": "1", "type": "count" }
@@ -215,7 +215,7 @@
         },
         {
           "refId": "B",
-          "query": "_index:nego-correlations AND countries_involved:\"$country\"",
+          "query": "_index:geon-correlations AND countries_involved:\"$country\"",
           "alias": "Correlations",
           "metrics": [
             { "id": "1", "type": "count" }
@@ -256,7 +256,7 @@
       "targets": [
         {
           "refId": "A",
-          "query": "_index:nego-articles-* AND country:\"$country\"",
+          "query": "_index:geon-articles-* AND country:\"$country\"",
           "alias": "",
           "metrics": [
             {

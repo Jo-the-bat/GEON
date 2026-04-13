@@ -1,8 +1,8 @@
-# NEGO n8n Workflows
+# GEON n8n Workflows
 
-This document describes the n8n workflows used by the NEGO platform for RSS
+This document describes the n8n workflows used by the GEON platform for RSS
 aggregation, alert dispatching, and OpenCTI enrichment. Each workflow should
-be recreated manually in the n8n web UI at `https://hego.joranbatty.fr/n8n/`.
+be recreated manually in the n8n web UI at `https://geon.joranbatty.fr/n8n/`.
 
 ---
 
@@ -75,7 +75,7 @@ Set node (Normalize fields)
    |
    v
 Elasticsearch Bulk node
-   Index:  nego-articles-{{ $now.format('yyyy.MM') }}
+   Index:  geon-articles-{{ $now.format('yyyy.MM') }}
    Action: index
    ID:     SHA256 of (url + published)
 ```
@@ -95,7 +95,7 @@ Elasticsearch Bulk node
 7. Add a **Set** node to normalize the fields into the target schema.
 8. Add an **Elasticsearch** node:
    - **Operation**: Index
-   - **Index**: `nego-articles-` followed by the current year-month
+   - **Index**: `geon-articles-` followed by the current year-month
    - **Document ID**: Use an expression to generate a SHA256 hash
    - **Connection**: Configure with Elasticsearch host credentials from
      the `.env` file.
@@ -128,7 +128,7 @@ Identical to Workflow 1:
 Schedule (every 1h) -> RSS nodes -> Merge -> Filter -> Normalize -> Elasticsearch
 ```
 
-Index target: `nego-articles-YYYY.MM` (same index as Workflow 1).
+Index target: `geon-articles-YYYY.MM` (same index as Workflow 1).
 
 ### Step-by-step setup
 
@@ -156,7 +156,7 @@ Webhook (POST /webhook/correlation-alert)
    v
 Set node (Build Discord embed)
    Map to Discord embed format:
-     - title:       "NEGO Correlation Detected"
+     - title:       "GEON Correlation Detected"
      - description: {{ $json.description }}
      - color:       based on severity (critical=0xFF0000, high=0xFF6600,
                     medium=0xFFCC00, low=0x00CC00)
@@ -164,7 +164,7 @@ Set node (Build Discord embed)
          - Rule:        {{ $json.rule_name }}
          - Severity:    {{ $json.severity }}
          - Countries:   {{ $json.countries_involved.join(' <-> ') }}
-         - Dashboard:   https://hego.joranbatty.fr/grafana/d/correlations
+         - Dashboard:   https://geon.joranbatty.fr/grafana/d/correlations
      - timestamp:   {{ $json.timestamp }}
    |
    v
@@ -182,7 +182,7 @@ HTTP Request node (Discord webhook)
    - **HTTP Method**: POST
    - **Path**: `correlation-alert`
    - Note the generated webhook URL (e.g.,
-     `https://hego.joranbatty.fr/n8n/webhook/correlation-alert`).
+     `https://geon.joranbatty.fr/n8n/webhook/correlation-alert`).
 3. Add a **Set** node to build the Discord embed JSON structure:
    - Use expressions to map `severity` to a color code.
    - Build the `fields` array from the incoming correlation data.
@@ -202,7 +202,7 @@ in addition to (or instead of) the direct Discord call. Add the webhook URL
 to `.env`:
 
 ```bash
-N8N_CORRELATION_WEBHOOK_URL=https://hego.joranbatty.fr/n8n/webhook/correlation-alert
+N8N_CORRELATION_WEBHOOK_URL=https://geon.joranbatty.fr/n8n/webhook/correlation-alert
 ```
 
 The correlation engine can then call:

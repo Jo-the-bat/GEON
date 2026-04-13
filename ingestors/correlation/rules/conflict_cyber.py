@@ -204,7 +204,7 @@ class ConflictCyberRule:
         # Primary APT match.
         primary_apt = cyber_matches[0]
         apt_name = primary_apt.get("name", "Unknown")
-        apt_type = primary_apt.get("_nego_type", "campaign")
+        apt_type = primary_apt.get("_geon_type", "campaign")
 
         # Build timeline.
         timeline: list[dict[str, str]] = []

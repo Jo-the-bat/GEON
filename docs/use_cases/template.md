@@ -2,7 +2,7 @@
 
 ## Summary
 
-One paragraph describing the scenario and what NEGO detected.
+One paragraph describing the scenario and what GEON detected.
 
 ## Context
 
@@ -50,9 +50,9 @@ Chronological sequence of events showing how the geopolitical and cyber dimensio
 
 Interpretation of the correlation. What does it suggest? What are the limitations? What additional investigation would be warranted?
 
-## NEGO Value
+## GEON Value
 
-How did NEGO add value compared to monitoring each domain separately? What would have been missed without cross-domain correlation?
+How did GEON add value compared to monitoring each domain separately? What would have been missed without cross-domain correlation?
 
 ## Dashboard Screenshots
 

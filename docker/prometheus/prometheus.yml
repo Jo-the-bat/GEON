@@ -1,5 +1,5 @@
 # =============================================================================
-# NEGO — Prometheus Configuration
+# GEON — Prometheus Configuration
 # Metrics collection for platform monitoring
 # =============================================================================
 
@@ -9,7 +9,7 @@ global:
   scrape_timeout: 10s
 
   external_labels:
-    cluster: 'nego'
+    cluster: 'geon'
     environment: 'production'
 
 # ---------------------------------------------------------------------------

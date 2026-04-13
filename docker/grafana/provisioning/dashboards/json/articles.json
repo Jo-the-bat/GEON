@@ -1,7 +1,7 @@
 {
-  "uid": "nego-articles",
-  "title": "NEGO \u2014 Article Feed",
-  "tags": ["nego", "articles", "rss"],
+  "uid": "geon-articles",
+  "title": "GEON \u2014 Article Feed",
+  "tags": ["geon", "articles", "rss"],
   "timezone": "browser",
   "editable": true,
   "fiscalYearStartMonth": 0,
@@ -25,7 +25,7 @@
       "targets": [
         {
           "refId": "A",
-          "query": "_index:nego-articles-*",
+          "query": "_index:geon-articles-*",
           "alias": "",
           "metrics": [
             {
@@ -75,7 +75,7 @@
       "targets": [
         {
           "refId": "A",
-          "query": "_index:nego-articles-*",
+          "query": "_index:geon-articles-*",
           "alias": "",
           "metrics": [
             { "id": "1", "type": "count" }
@@ -124,7 +124,7 @@
       "targets": [
         {
           "refId": "A",
-          "query": "_index:nego-articles-*",
+          "query": "_index:geon-articles-*",
           "alias": "Daily Articles",
           "metrics": [
             { "id": "1", "type": "count" }

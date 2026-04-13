@@ -1,1 +1,1 @@
-"""NEGO GDELT ingestor — fetches and indexes geopolitical events from GDELT."""
+"""GEON GDELT ingestor — fetches and indexes geopolitical events from GDELT."""

@@ -1,7 +1,7 @@
-"""NEGO alerting module.
+"""GEON alerting module.
 
 Dispatches correlation alerts to Discord (webhook) and/or email (SMTP).
-Alert format follows the NEGO notification template specification.
+Alert format follows the GEON notification template specification.
 """
 
 from __future__ import annotations
@@ -51,7 +51,7 @@ SEVERITY_EMOJI: dict[str, str] = {
     "low": "\U0001f7e2",       # Green circle
 }
 
-DASHBOARD_BASE_URL = "https://hego.joranbatty.fr/grafana/d/correlations"
+DASHBOARD_BASE_URL = "https://geon.joranbatty.fr/grafana/d/correlations"
 
 
 # ---------------------------------------------------------------------------
@@ -112,7 +112,7 @@ def _format_plain_alert(correlation: dict[str, Any]) -> str:
             cyber_line += f" -- Techniques: {techniques}"
 
     lines = [
-        f"{emoji} [NEGO ALERT] Correlation detected",
+        f"{emoji} [GEON ALERT] Correlation detected",
         f"Severity: {severity}",
         f"Rule: {rule}",
         f"Countries: {countries}",
@@ -193,7 +193,7 @@ def send_discord_alert(correlation: dict[str, Any]) -> bool:
 
     emoji = SEVERITY_EMOJI.get(severity, "\u26a0\ufe0f")
     embed = {
-        "title": f"{emoji} NEGO Correlation Detected",
+        "title": f"{emoji} GEON Correlation Detected",
         "description": description,
         "color": SEVERITY_COLORS.get(severity, 0xFFCC00),
         "fields": fields,
@@ -247,7 +247,7 @@ def send_email_alert(correlation: dict[str, Any]) -> bool:
     rule = correlation.get("rule_name", "Unknown rule")
     countries = _format_countries(correlation)
 
-    subject = f"[NEGO {severity}] {rule} -- {countries}"
+    subject = f"[GEON {severity}] {rule} -- {countries}"
     body_text = _format_plain_alert(correlation)
 
     # Build HTML body.
@@ -329,7 +329,7 @@ def _build_email_html(correlation: dict[str, Any]) -> str:
 <body style="font-family:Arial,sans-serif;margin:0;padding:20px;background:#f4f4f4;">
   <div style="max-width:600px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;">
     <div style="background:{color};padding:16px 20px;color:#fff;">
-      <h2 style="margin:0;">NEGO Correlation Alert</h2>
+      <h2 style="margin:0;">GEON Correlation Alert</h2>
       <p style="margin:4px 0 0;">Severity: {severity.upper()}</p>
     </div>
     <div style="padding:20px;">

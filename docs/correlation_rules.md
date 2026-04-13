@@ -1,8 +1,8 @@
-# NEGO Correlation Rules
+# GEON Correlation Rules
 
 ## Overview
 
-The NEGO correlation engine runs hourly and evaluates four rules that detect patterns spanning geopolitical events and cyber threat activity. When a rule matches, an alert is created in the `nego-correlations` Elasticsearch index and notifications are sent via Discord and email.
+The GEON correlation engine runs hourly and evaluates four rules that detect patterns spanning geopolitical events and cyber threat activity. When a rule matches, an alert is created in the `geon-correlations` Elasticsearch index and notifications are sent via Discord and email.
 
 Each correlation includes:
 - A severity level (low, medium, high, critical)
@@ -25,8 +25,8 @@ Detect when a diplomatic crisis between two countries coincides with a cyber cam
 
 ### Data Sources
 
-- `nego-gdelt-events-*` (Goldstein score, country pair)
-- `nego-cti-*` (intrusion sets, campaigns, country attribution)
+- `geon-gdelt-events-*` (Goldstein score, country pair)
+- `geon-cti-*` (intrusion sets, campaigns, country attribution)
 
 ### Severity Calculation
 
@@ -53,13 +53,13 @@ Detect when the imposition of sanctions against a country or entity is followed 
 
 ### Trigger Conditions
 
-1. **Sanction event**: New entry in `nego-sanctions` targeting a country or entity
-2. **Cyber spike**: More than 200% increase in the count of indicators of compromise (IoC) attributed to that country in `nego-cti-*` within 60 days after the sanction date, compared to the 60-day baseline before the sanction
+1. **Sanction event**: New entry in `geon-sanctions` targeting a country or entity
+2. **Cyber spike**: More than 200% increase in the count of indicators of compromise (IoC) attributed to that country in `geon-cti-*` within 60 days after the sanction date, compared to the 60-day baseline before the sanction
 
 ### Data Sources
 
-- `nego-sanctions` (new sanctions, country, date)
-- `nego-cti-*` (indicators, country attribution, creation date)
+- `geon-sanctions` (new sanctions, country, date)
+- `geon-cti-*` (indicators, country attribution, creation date)
 
 ### Severity Calculation
 
@@ -91,8 +91,8 @@ Detect when physical armed conflict in a region coincides with cyber operations 
 
 ### Data Sources
 
-- `nego-acled-events-*` (event type, country, location, date)
-- `nego-cti-*` (campaigns, intrusion sets, country attribution)
+- `geon-acled-events-*` (event type, country, location, date)
+- `geon-cti-*` (campaigns, intrusion sets, country attribution)
 
 ### Severity Calculation
 
@@ -125,7 +125,7 @@ Detect early warning signals by identifying unusual changes in media tone about 
 
 ### Data Sources
 
-- `nego-gdelt-events-*` (tone, country pair, date)
+- `geon-gdelt-events-*` (tone, country pair, date)
 
 ### Severity Calculation
 
@@ -148,7 +148,7 @@ Negative shifts receive higher severity because sudden tone deterioration more r
 
 ## Correlation Index Schema
 
-All detected correlations are stored in `nego-correlations`:
+All detected correlations are stored in `geon-correlations`:
 
 ```json
 {
@@ -184,18 +184,18 @@ When a correlation with severity >= high is detected, notifications are sent:
 ### Discord
 
 ```
-[NEGO ALERT] Correlation detected
+[GEON ALERT] Correlation detected
 Rule: Diplomatic Escalation + APT Activity
 Severity: CRITICAL
 Countries: Russia <-> Ukraine
 Diplomatic: Goldstein -8.3 -- "Military force deployment"
 Cyber: APT28 -- Phishing campaign targeting energy infrastructure
 Time gap: 12 days
-Dashboard: https://hego.joranbatty.fr/grafana/d/correlations
+Dashboard: https://geon.joranbatty.fr/grafana/d/correlations
 ```
 
 ### Email
 
-Subject: `[NEGO] CRITICAL: Diplomatic Escalation + APT Activity -- RUS/UKR`
+Subject: `[GEON] CRITICAL: Diplomatic Escalation + APT Activity -- RUS/UKR`
 
 Body includes the same information as the Discord notification plus direct links to the relevant OpenCTI campaign and GDELT event details.

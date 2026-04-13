@@ -1,17 +1,17 @@
-# NEGO
+# GEON
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Docker](https://img.shields.io/badge/Docker-rootless-2496ED?logo=docker&logoColor=white)](https://docs.docker.com/engine/security/rootless/)
 
 **Geopolitical & Cyber Threat Intelligence Platform**
 
-NEGO automatically correlates diplomatic events, armed conflicts, and sanctions with cyber threat activity from APT groups and malware campaigns. It bridges the gap between structured CTI (OpenCTI/STIX2) and geopolitical event data (GDELT/ACLED) that no existing open-source tool connects.
+GEON automatically correlates diplomatic events, armed conflicts, and sanctions with cyber threat activity from APT groups and malware campaigns. It bridges the gap between structured CTI (OpenCTI/STIX2) and geopolitical event data (GDELT/ACLED) that no existing open-source tool connects.
 
-The name is an acronym of the core stack -- **n**8n, **E**lasticsearch, **G**DELT, **O**penCTI -- and evokes *negotiation*, a central concept in international relations.
+The name is an acronym of the core stack -- **n**8n, **E**lasticsearch, **G**DELT, **O**penCTI -- and evokes *geontiation*, a central concept in international relations.
 
 ---
 
-## Why NEGO?
+## Why GEON?
 
 Existing tools address one side of the picture but never both:
 
@@ -20,9 +20,9 @@ Existing tools address one side of the picture but never both:
 | [World Monitor](https://worldmonitor.app) | Yes | No | No |
 | [PizzINT GDELT](https://www.pizzint.watch/gdelt) | Yes | No | No |
 | OpenCTI + Elastic connector | No | Yes | No |
-| **NEGO** | **Yes** | **Yes** | **Yes** |
+| **GEON** | **Yes** | **Yes** | **Yes** |
 
-NEGO is the first platform that detects patterns like "diplomatic escalation between two countries followed by an APT campaign attributed to one of them" -- automatically.
+GEON is the first platform that detects patterns like "diplomatic escalation between two countries followed by an APT campaign attributed to one of them" -- automatically.
 
 ---
 
@@ -61,8 +61,8 @@ All services run behind Nginx with TLS termination and Authelia MFA. No internal
 
 ```bash
 # Clone the repository
-git clone https://github.com/Jo-the-bat/NEGO.git
-cd NEGO
+git clone https://github.com/Jo-the-bat/GEON.git
+cd GEON
 
 # Copy the environment template and fill in your secrets
 cp .env.example .env

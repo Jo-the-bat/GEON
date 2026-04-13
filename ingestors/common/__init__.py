@@ -1,1 +1,1 @@
-"""NEGO common utilities — shared clients, config, and helpers."""
+"""GEON common utilities — shared clients, config, and helpers."""

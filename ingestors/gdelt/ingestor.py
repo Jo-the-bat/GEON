@@ -1,4 +1,4 @@
-"""NEGO GDELT ingestor.
+"""GEON GDELT ingestor.
 
 Fetches geopolitical events from the GDELT Project APIs, normalizes them,
 and bulk-indexes them into Elasticsearch.  Designed to run via cron every

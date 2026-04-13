@@ -1,10 +1,10 @@
-# NEGO -- n8n, Elasticsearch, GDELT, OpenCTI
+# GEON -- n8n, Elasticsearch, GDELT, OpenCTI
 
 ## Identite du projet
 
-NEGO est une plateforme d'intelligence geopolitique et cyber qui correle automatiquement les evenements diplomatiques/militaires avec l'activite des menaces cyber (APT, campagnes, IoC). Le nom est un acronyme de la stack technique (**n**8n, **E**lasticsearch, **G**DELT, **O**penCTI) et evoque la negociation, concept central des relations internationales.
+GEON est une plateforme d'intelligence geopolitique et cyber qui correle automatiquement les evenements diplomatiques/militaires avec l'activite des menaces cyber (APT, campagnes, IoC). Le nom est un acronyme de la stack technique (**n**8n, **E**lasticsearch, **G**DELT, **O**penCTI) et evoque la geonciation, concept central des relations internationales.
 
-**Positionnement** : Aucun outil open source existant ne fait la convergence entre CTI structuree (OpenCTI/STIX2) et donnees geopolitiques (GDELT/ACLED). World Monitor fait du geopolitique sans CTI. Les integrations OpenCTI/Elastic existantes font de la CTI sans geopolitique. NEGO comble ce gap.
+**Positionnement** : Aucun outil open source existant ne fait la convergence entre CTI structuree (OpenCTI/STIX2) et donnees geopolitiques (GDELT/ACLED). World Monitor fait du geopolitique sans CTI. Les integrations OpenCTI/Elastic existantes font de la CTI sans geopolitique. GEON comble ce gap.
 
 **Contexte** : Projet personnel de Joran Batty, professionnel en cybersecurite (analyste SOC, administration Linux/Docker), destine a servir de portfolio pour une candidature en Master Relations Internationales. Le projet doit demontrer la capacite a croiser analyse technique et comprehension geopolitique.
 
@@ -21,7 +21,7 @@ Internet
 |  reverse proxy | :80  (redirect -> 443)
 +-------+--------+
         | reseau Docker interne uniquement
-        +---> /                -->  Landing page NEGO (statique)
+        +---> /                -->  Landing page GEON (statique)
         +---> /opencti         -->  opencti:8080
         +---> /grafana         -->  grafana:3000
         +---> /n8n             -->  n8n:5678
@@ -65,7 +65,7 @@ Internet
 **Flux de donnees** : Elasticsearch est le point central partage par trois consommateurs :
 - **Grafana** interroge Elasticsearch pour les dashboards geopolitiques et CTI
 - **OpenCTI** utilise Elasticsearch comme backend de stockage pour le graphe STIX2
-- **Les ingestors Python** ecrivent dans Elasticsearch (index `nego-*`)
+- **Les ingestors Python** ecrivent dans Elasticsearch (index `geon-*`)
 - **n8n** orchestre les workflows d'automatisation (RSS, enrichissement, webhooks)
 
 ---
@@ -112,7 +112,7 @@ echo "net.ipv4.ip_unprivileged_port_start=80" | sudo tee -a /etc/sysctl.d/99-unp
 - AUCUN service interne ne doit exposer de port sur l'interface publique, sauf Nginx (80/443)
 - Toute communication inter-services passe par le reseau Docker interne
 - Les services internes communiquent par leurs noms de service Docker (DNS interne)
-- Le domaine cible est `hego.joranbatty.fr` avec un certificat Let's Encrypt
+- Le domaine cible est `geon.joranbatty.fr` avec un certificat Let's Encrypt
 
 ### Securite
 
@@ -125,7 +125,7 @@ echo "net.ipv4.ip_unprivileged_port_start=80" | sudo tee -a /etc/sysctl.d/99-unp
 ### Volumes et persistance
 
 - Tous les services avec etat doivent avoir des volumes nommes Docker
-- Convention de nommage : `nego_<service>_data` (ex: `nego_elasticsearch_data`)
+- Convention de nommage : `geon_<service>_data` (ex: `geon_elasticsearch_data`)
 - Un script de backup qui snapshot les index Elasticsearch et exporte la base OpenCTI
 
 ---
@@ -149,7 +149,7 @@ echo "net.ipv4.ip_unprivileged_port_start=80" | sudo tee -a /etc/sysctl.d/99-unp
 **Ingestion** : Script Python avec cron toutes les 15 minutes.
 - Requete l'API GDELT
 - Parse et structure les evenements
-- Indexe dans Elasticsearch (index `nego-gdelt-events-YYYY.MM`)
+- Indexe dans Elasticsearch (index `geon-gdelt-events-YYYY.MM`)
 - Cree des entites dans OpenCTI si pertinent (pays, organisations)
 
 **Index Elasticsearch** :
@@ -182,7 +182,7 @@ echo "net.ipv4.ip_unprivileged_port_start=80" | sudo tee -a /etc/sysctl.d/99-unp
 - Evenements geolocalises avec types (batailles, violences contre civils, emeutes, etc.)
 
 **Ingestion** : Script Python avec cron quotidien.
-- Index : `nego-acled-events-YYYY.MM`
+- Index : `geon-acled-events-YYYY.MM`
 
 **Mapping** :
 ```json
@@ -212,7 +212,7 @@ echo "net.ipv4.ip_unprivileged_port_start=80" | sudo tee -a /etc/sysctl.d/99-unp
 - UN Security Council Sanctions : via l'API UN
 
 **Ingestion** : Script Python avec cron hebdomadaire.
-- Index : `nego-sanctions`
+- Index : `geon-sanctions`
 - Enrichit les entites dans OpenCTI (personnes, organisations, pays sanctionnes)
 
 ### 4. Flux RSS via n8n
@@ -228,7 +228,7 @@ echo "net.ipv4.ip_unprivileged_port_start=80" | sudo tee -a /etc/sysctl.d/99-unp
 1. Noeud RSS Feed Trigger -> recupere les articles a intervalles reguliers
 2. Noeud Function (filtrage) -> garde uniquement les articles pertinents (mots-cles geopolitique/cyber/defense)
 3. Noeud Function (extraction) -> extrait entites (pays, organisations, personnes) via regex/NLP basique
-4. Noeud Elasticsearch -> pousse dans Elasticsearch (index `nego-articles-YYYY.MM`)
+4. Noeud Elasticsearch -> pousse dans Elasticsearch (index `geon-articles-YYYY.MM`)
 5. Noeud HTTP Request -> cree des entites/rapports dans OpenCTI via l'API GraphQL si c'est du CTI
 
 ### 5. OpenCTI Feeds (CTI technique)
@@ -242,20 +242,20 @@ echo "net.ipv4.ip_unprivileged_port_start=80" | sudo tee -a /etc/sysctl.d/99-unp
 - CVE (NVD)
 - Red Flag Domains (optionnel, deja configure sur le serveur SOC)
 
-**Export vers Elasticsearch** : Utiliser le connecteur Elastic officiel ou un script custom qui interroge l'API GraphQL d'OpenCTI et indexe dans `nego-cti-*`.
+**Export vers Elasticsearch** : Utiliser le connecteur Elastic officiel ou un script custom qui interroge l'API GraphQL d'OpenCTI et indexe dans `geon-cti-*`.
 
 ---
 
 ## Moteur de correlation
 
-C'est le coeur de la valeur ajoutee de NEGO. Un script Python (ou ensemble de scripts) qui tourne en cron et cherche des patterns inter-sources.
+C'est le coeur de la valeur ajoutee de GEON. Un script Python (ou ensemble de scripts) qui tourne en cron et cherche des patterns inter-sources.
 
 ### Regles de correlation
 
 **Regle 1 : Escalade diplomatique + activite APT**
 - Declencheur : score Goldstein < -5 (tension forte) sur une paire de pays dans GDELT
 - ET : campagne APT attribuee a l'un des deux pays dans OpenCTI dans une fenetre de +/-30 jours
-- Action : creer une alerte dans `nego-correlations`, enrichir le rapport OpenCTI
+- Action : creer une alerte dans `geon-correlations`, enrichir le rapport OpenCTI
 
 **Regle 2 : Sanction + pic cyber**
 - Declencheur : nouvelle sanction contre un pays/entite
@@ -269,7 +269,7 @@ C'est le coeur de la valeur ajoutee de NEGO. Un script Python (ou ensemble de sc
 
 **Regle 4 : Changement de rhetorique**
 - Declencheur : variation de tonalite GDELT > 2 ecarts-types sur 7 jours pour une paire de pays
-- Action : alerte "signal faible" dans `nego-correlations`
+- Action : alerte "signal faible" dans `geon-correlations`
 
 ### Index de correlation
 
@@ -294,7 +294,7 @@ C'est le coeur de la valeur ajoutee de NEGO. Un script Python (ou ensemble de sc
 ### Grafana Alerting
 
 Configurer des regles d'alerte Grafana qui se declenchent sur :
-- Nouvelle entree dans `nego-correlations` avec severity >= high
+- Nouvelle entree dans `geon-correlations` avec severity >= high
 - Plus de N articles negatifs (tone < -5) sur un pays en 24h
 - Nouveau groupe APT detecte dans OpenCTI lie a un pays en conflit actif dans ACLED
 - Nouvelle sanction ingeree
@@ -311,18 +311,18 @@ n8n peut egalement declencher des alertes via des workflows dedies :
 ### Notifications
 
 Les alertes sont envoyees via :
-- **Discord webhook** (canal dedie NEGO)
+- **Discord webhook** (canal dedie GEON)
 - **Email** (via n8n workflows ou Grafana contact points)
 
 Format de notification :
 ```
-[NEGO ALERT] Correlation detectee
+[GEON ALERT] Correlation detectee
 Regle: Escalade diplomatique + activite APT
 Pays: Russie <-> Ukraine
 Evenement diplo: Goldstein -8.3 -- "Military force deployment"
 Evenement cyber: APT28 -- Campagne phishing ciblant infrastructure energetique
 Fenetre: 12 jours
-Dashboard: https://hego.joranbatty.fr/grafana/d/correlations
+Dashboard: https://geon.joranbatty.fr/grafana/d/correlations
 ```
 
 ---
@@ -357,7 +357,7 @@ Grafana se connecte a Elasticsearch en tant que datasource pour visualiser toute
 - Nuage de mots-cles (via panel Word cloud)
 - Tendances sur 7/30 jours
 
-### Dashboard 5 : Monitoring NEGO
+### Dashboard 5 : Monitoring GEON
 - Sante des services (via Prometheus datasource)
 - Derniere ingestion par source (GDELT, ACLED, RSS, OpenCTI)
 - Volume d'index Elasticsearch
@@ -368,7 +368,7 @@ Grafana se connecte a Elasticsearch en tant que datasource pour visualiser toute
 ## Structure du repository
 
 ```
-nego/
+geon/
 +-- CLAUDE.md                          # Ce fichier
 +-- README.md                          # Documentation publique
 +-- LICENSE                            # MIT ou Apache 2.0
@@ -381,7 +381,7 @@ nego/
 |   +-- nginx/
 |   |   +-- nginx.conf                 # Config principale Nginx
 |   |   +-- conf.d/
-|   |   |   +-- nego.conf              # Vhost NEGO avec reverse proxy
+|   |   |   +-- geon.conf              # Vhost GEON avec reverse proxy
 |   |   +-- ssl/                       # Certificats (gitignore, genere par certbot)
 |   +-- authelia/
 |   |   +-- configuration.yml
@@ -457,7 +457,7 @@ nego/
 |   +-- restore.sh                      # Restauration
 |   +-- crontab.example                 # Exemple de crontab pour les ingestors
 |
-+-- landing/                            # Page d'accueil statique NEGO
++-- landing/                            # Page d'accueil statique GEON
 |   +-- index.html
 |   +-- style.css
 |   +-- assets/
@@ -488,18 +488,18 @@ nego/
 
 ```bash
 # === DOMAINE ===
-NEGO_DOMAIN=hego.joranbatty.fr
-NEGO_EMAIL=contact@joranbatty.fr
+GEON_DOMAIN=geon.joranbatty.fr
+GEON_EMAIL=contact@joranbatty.fr
 
 # === ELASTICSEARCH ===
 ELASTIC_VERSION=8.17.0
 ELASTIC_PASSWORD=<GENERATE>
-ELASTIC_CLUSTER_NAME=nego
+ELASTIC_CLUSTER_NAME=geon
 ELASTIC_HEAP_SIZE=2g
 
 # === OPENCTI ===
 OPENCTI_VERSION=latest
-OPENCTI_ADMIN_EMAIL=admin@nego.local
+OPENCTI_ADMIN_EMAIL=admin@geon.local
 OPENCTI_ADMIN_PASSWORD=<GENERATE>
 OPENCTI_ADMIN_TOKEN=<GENERATE_UUID>
 OPENCTI_HEALTHCHECK_KEY=<GENERATE_UUID>
@@ -520,7 +520,7 @@ N8N_BASIC_AUTH_PASSWORD=<GENERATE>
 # === GRAFANA ===
 GF_SECURITY_ADMIN_USER=admin
 GF_SECURITY_ADMIN_PASSWORD=<GENERATE>
-GF_SERVER_ROOT_URL=https://hego.joranbatty.fr/grafana
+GF_SERVER_ROOT_URL=https://geon.joranbatty.fr/grafana
 GF_SERVER_SERVE_FROM_SUB_PATH=true
 
 # === AUTHELIA ===
@@ -536,7 +536,7 @@ ACLED_EMAIL=<YOUR_ACLED_EMAIL>
 DISCORD_WEBHOOK_URL=<YOUR_DISCORD_WEBHOOK>
 ALERT_EMAIL_SMTP_HOST=<SMTP_HOST>
 ALERT_EMAIL_SMTP_PORT=587
-ALERT_EMAIL_FROM=nego@joranbatty.fr
+ALERT_EMAIL_FROM=geon@joranbatty.fr
 ALERT_EMAIL_TO=joran@joranbatty.fr
 ALERT_EMAIL_PASSWORD=<SMTP_PASSWORD>
 
@@ -558,9 +558,9 @@ OPENCTI_DATASETS_CONNECTOR_ID=<GENERATE_UUID>
 ### Phase 1 -- Socle infrastructure
 1. Docker Compose avec Nginx + Elasticsearch + Grafana + Authelia
 2. Configuration rootless Docker
-3. TLS via Certbot pour hego.joranbatty.fr
+3. TLS via Certbot pour geon.joranbatty.fr
 4. Verifier que tout boot proprement et que Grafana est accessible derriere Authelia
-5. Landing page NEGO
+5. Landing page GEON
 
 ### Phase 2 -- OpenCTI
 1. Ajouter OpenCTI + Redis + RabbitMQ + MinIO au compose
@@ -587,13 +587,13 @@ OPENCTI_DATASETS_CONNECTOR_ID=<GENERATE_UUID>
 
 ### Phase 6 -- Moteur de correlation
 1. Implementer les 4 regles de correlation
-2. Index `nego-correlations`
+2. Index `geon-correlations`
 3. Alerting Discord + email (via n8n workflows et Grafana alerting)
 4. Dashboard correlations dans Grafana
 
 ### Phase 7 -- Monitoring + backup
 1. Prometheus + Grafana (monitoring unifie avec les dashboards geopolitiques)
-2. Dashboard monitoring NEGO
+2. Dashboard monitoring GEON
 3. Script de backup automatise
 4. Crontab complete
 
@@ -622,12 +622,12 @@ OPENCTI_DATASETS_CONNECTOR_ID=<GENERATE_UUID>
 - Healthchecks sur tous les services
 - Labels clairs sur chaque service
 - Pas de `privileged: true` ni de `network_mode: host`
-- Tous les services sur un reseau bridge custom (`nego_net`)
+- Tous les services sur un reseau bridge custom (`geon_net`)
 
 ### Elasticsearch
 - Index Lifecycle Management (ILM) pour la rotation des index
-- Convention de nommage : `nego-<source>-<type>-YYYY.MM`
-- Alias pour les requetes : `nego-gdelt` -> pointe vers tous les `nego-gdelt-events-*`
+- Convention de nommage : `geon-<source>-<type>-YYYY.MM`
+- Alias pour les requetes : `geon-gdelt` -> pointe vers tous les `geon-gdelt-events-*`
 - Mapping explicite (pas de dynamic mapping en production)
 - Shards : 1 primary, 0 replica (single node)
 
@@ -635,7 +635,7 @@ OPENCTI_DATASETS_CONNECTOR_ID=<GENERATE_UUID>
 - Commits conventionnels : `feat:`, `fix:`, `docs:`, `infra:`, `ingest:`, `corr:`
 - Branches : `main` (stable), `dev` (developpement), `feature/<nom>`
 - `.env` et tous les secrets dans `.gitignore`
-- GitHub repo : `Jo-the-bat/NEGO`
+- GitHub repo : `Jo-the-bat/GEON`
 
 ---
 
@@ -647,7 +647,7 @@ docker compose -f docker/docker-compose.yml up -d
 
 # Verifier la sante
 docker compose -f docker/docker-compose.yml ps
-curl -sk https://hego.joranbatty.fr/grafana/api/health | jq .
+curl -sk https://geon.joranbatty.fr/grafana/api/health | jq .
 
 # Lancer une ingestion manuellement
 cd ingestors && python -m gdelt.ingestor
@@ -663,7 +663,7 @@ docker compose -f docker/docker-compose.yml logs -f --tail=100 n8n
 ./scripts/backup.sh
 
 # Consulter les index
-curl -s localhost:9200/_cat/indices?v | grep nego
+curl -s localhost:9200/_cat/indices?v | grep geon
 ```
 
 ---

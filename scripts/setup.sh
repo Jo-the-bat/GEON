@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# NEGO — Initial Setup Script
+# GEON — Initial Setup Script
 # Checks prerequisites, prepares the environment, and pulls Docker images.
 
 set -euo pipefail
@@ -23,7 +23,7 @@ ERRORS=0
 
 echo ""
 echo -e "${CYAN}============================================${NC}"
-echo -e "${CYAN}   NEGO — Setup Script${NC}"
+echo -e "${CYAN}   GEON — Setup Script${NC}"
 echo -e "${CYAN}============================================${NC}"
 echo ""
 
@@ -42,7 +42,7 @@ else
         ok "Docker is running in rootless mode."
     else
         warn "Docker does not appear to be running in rootless mode."
-        echo "      NEGO is designed for rootless Docker. See: https://docs.docker.com/engine/security/rootless/"
+        echo "      GEON is designed for rootless Docker. See: https://docs.docker.com/engine/security/rootless/"
     fi
 fi
 
@@ -88,7 +88,7 @@ if [ -n "$TOTAL_MEM_KB" ]; then
     if [ "$TOTAL_MEM_GB" -ge 8 ]; then
         ok "Available RAM: ${TOTAL_MEM_GB} GB (>= 8 GB)"
     else
-        warn "Available RAM: ${TOTAL_MEM_GB} GB. NEGO recommends at least 8 GB (16 GB ideal)."
+        warn "Available RAM: ${TOTAL_MEM_GB} GB. GEON recommends at least 8 GB (16 GB ideal)."
     fi
 fi
 
@@ -169,7 +169,7 @@ else
     echo "  3. Verify services:"
     echo "     docker compose -f docker/docker-compose.yml ps"
     echo ""
-    echo "  4. Access NEGO:"
-    echo "     https://hego.joranbatty.fr/"
+    echo "  4. Access GEON:"
+    echo "     https://geon.joranbatty.fr/"
     echo ""
 fi

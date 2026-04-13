@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# NEGO — Restore Script
+# GEON — Restore Script
 # Restores an Elasticsearch snapshot and OpenCTI data from a backup archive.
 #
 # Usage: ./scripts/restore.sh <backup_archive.tar.gz>
-# Example: ./scripts/restore.sh backups/nego_backup_20250615_040000.tar.gz
+# Example: ./scripts/restore.sh backups/geon_backup_20250615_040000.tar.gz
 
 set -euo pipefail
 
@@ -22,7 +22,7 @@ fi
 ES_HOST="${ES_HOST:-http://localhost:9200}"
 ES_USER="${ES_USER:-elastic}"
 ES_PASS="${ELASTIC_PASSWORD:-changeme}"
-SNAPSHOT_REPO="nego_backup"
+SNAPSHOT_REPO="geon_backup"
 
 OPENCTI_URL="${OPENCTI_URL:-http://localhost:8080}"
 OPENCTI_TOKEN="${OPENCTI_ADMIN_TOKEN:-}"
@@ -44,7 +44,7 @@ if [ $# -lt 1 ]; then
     echo "Usage: $0 <backup_archive.tar.gz>"
     echo ""
     echo "Available backups:"
-    ls -1t "${PROJECT_DIR}/backups"/nego_backup_*.tar.gz 2>/dev/null || echo "  (none found)"
+    ls -1t "${PROJECT_DIR}/backups"/geon_backup_*.tar.gz 2>/dev/null || echo "  (none found)"
     exit 1
 fi
 
@@ -109,16 +109,16 @@ fi
 info "Snapshot to restore: ${SNAPSHOT_NAME}"
 
 # Close indices that will be restored (to avoid conflicts)
-warn "This will close and overwrite existing nego-* indices."
+warn "This will close and overwrite existing geon-* indices."
 read -rp "Continue? [y/N] " CONFIRM
 if [[ ! "$CONFIRM" =~ ^[Yy]$ ]]; then
     info "Restore cancelled."
     exit 0
 fi
 
-info "Closing existing nego-* indices..."
+info "Closing existing geon-* indices..."
 curl -s -u "${ES_USER}:${ES_PASS}" \
-    -X POST "${ES_HOST}/nego-*/_close?ignore_unavailable=true" 2>/dev/null || true
+    -X POST "${ES_HOST}/geon-*/_close?ignore_unavailable=true" 2>/dev/null || true
 
 # Restore the snapshot
 info "Restoring snapshot ${SNAPSHOT_NAME}..."
@@ -127,7 +127,7 @@ RESTORE_RESULT=$(curl -s -w "\n%{http_code}" \
     -X POST "${ES_HOST}/_snapshot/${SNAPSHOT_REPO}/${SNAPSHOT_NAME}/_restore?wait_for_completion=true" \
     -H "Content-Type: application/json" \
     -d '{
-        "indices": "nego-*",
+        "indices": "geon-*",
         "ignore_unavailable": true,
         "include_global_state": false
     }' 2>/dev/null)
@@ -211,5 +211,5 @@ echo ""
 ok "Restore complete."
 echo ""
 info "  Elasticsearch snapshot: ${SNAPSHOT_NAME}"
-info "  Verify indices: curl -s -u ${ES_USER}:*** ${ES_HOST}/_cat/indices/nego-*?v"
+info "  Verify indices: curl -s -u ${ES_USER}:*** ${ES_HOST}/_cat/indices/geon-*?v"
 echo ""

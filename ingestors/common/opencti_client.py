@@ -1,4 +1,4 @@
-"""NEGO OpenCTI client wrapper.
+"""GEON OpenCTI client wrapper.
 
 Provides helper functions for interacting with the OpenCTI platform via its
 Python SDK (pycti).  Used by ingestors to create entities and by the
@@ -194,7 +194,7 @@ def get_campaigns_by_country(
         )
         if intrusion_sets:
             for item in intrusion_sets:
-                item["_nego_type"] = "intrusion-set"
+                item["_geon_type"] = "intrusion-set"
             results.extend(intrusion_sets)
 
         # --- Campaigns ---
@@ -214,7 +214,7 @@ def get_campaigns_by_country(
         )
         if campaigns:
             for item in campaigns:
-                item["_nego_type"] = "campaign"
+                item["_geon_type"] = "campaign"
             results.extend(campaigns)
 
     except Exception:

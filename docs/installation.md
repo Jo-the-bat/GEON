@@ -1,4 +1,4 @@
-# NEGO Installation Guide
+# GEON Installation Guide
 
 ## Prerequisites
 
@@ -74,8 +74,8 @@ docker info 2>/dev/null | grep -i rootless
 ## Step 2: Clone the Repository
 
 ```bash
-git clone https://github.com/Jo-the-bat/NEGO.git
-cd NEGO
+git clone https://github.com/Jo-the-bat/GEON.git
+cd GEON
 ```
 
 ---
@@ -89,8 +89,8 @@ nano .env
 
 At minimum, set the following:
 
-1. **NEGO_DOMAIN** -- your domain name (e.g., `hego.joranbatty.fr`)
-2. **NEGO_EMAIL** -- email for Let's Encrypt certificate notifications
+1. **GEON_DOMAIN** -- your domain name (e.g., `geon.joranbatty.fr`)
+2. **GEON_EMAIL** -- email for Let's Encrypt certificate notifications
 3. **ELASTIC_PASSWORD** -- a strong password for Elasticsearch
 4. **OPENCTI_ADMIN_PASSWORD** -- a strong password for the OpenCTI admin
 5. **OPENCTI_ADMIN_TOKEN** -- generate a UUID: `python3 -c "import uuid; print(uuid.uuid4())"`
@@ -158,10 +158,10 @@ docker compose -f docker/docker-compose.yml ps
 curl -sk -u elastic:${ELASTIC_PASSWORD} https://localhost:9200/_cluster/health | python3 -m json.tool
 
 # Test Grafana
-curl -sk https://hego.joranbatty.fr/grafana/api/health | python3 -m json.tool
+curl -sk https://geon.joranbatty.fr/grafana/api/health | python3 -m json.tool
 
 # Test OpenCTI
-curl -sk https://hego.joranbatty.fr/opencti/health
+curl -sk https://geon.joranbatty.fr/opencti/health
 ```
 
 ---
@@ -170,11 +170,11 @@ curl -sk https://hego.joranbatty.fr/opencti/health
 
 Grafana datasources are provisioned automatically via `docker/grafana/datasources.yml`. If you need to verify or adjust them:
 
-1. Open Grafana at `https://hego.joranbatty.fr/grafana`
+1. Open Grafana at `https://geon.joranbatty.fr/grafana`
 2. Navigate to **Configuration > Data sources**
 3. Verify the Elasticsearch datasource points to `http://elasticsearch:9200` and the Prometheus datasource points to `http://prometheus:9090`
 
-The Elasticsearch datasource should be configured with index patterns matching `nego-*` to discover all NEGO indices.
+The Elasticsearch datasource should be configured with index patterns matching `geon-*` to discover all GEON indices.
 
 ---
 
@@ -216,7 +216,7 @@ crontab scripts/crontab.example
 
 ## Step 9: Import n8n Workflows
 
-1. Open n8n at `https://hego.joranbatty.fr/n8n`
+1. Open n8n at `https://geon.joranbatty.fr/n8n`
 2. Log in with the credentials set in `.env` (`N8N_BASIC_AUTH_USER` / `N8N_BASIC_AUTH_PASSWORD`)
 3. Go to **Workflows > Import from File**
 4. Import each JSON file from `n8n/workflows/`:
@@ -236,7 +236,7 @@ If using Let's Encrypt with Certbot:
 # Initial certificate request (Nginx must be running and port 80 reachable)
 docker compose -f docker/docker-compose.yml run --rm certbot certonly \
     --webroot -w /var/www/certbot \
-    -d hego.joranbatty.fr \
+    -d geon.joranbatty.fr \
     --email contact@joranbatty.fr \
     --agree-tos --no-eff-email
 
@@ -269,7 +269,7 @@ Certbot auto-renewal is handled by the Certbot sidecar container.
 ### Grafana shows "No data" on dashboards
 
 - Verify the Elasticsearch datasource is configured and reachable
-- Ensure at least one ingestor has run to populate the `nego-*` indices
+- Ensure at least one ingestor has run to populate the `geon-*` indices
 - Check that the index pattern in the dashboard panels matches your indices
 
 ### n8n workflows fail to execute

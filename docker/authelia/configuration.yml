@@ -1,5 +1,5 @@
 # =============================================================================
-# NEGO — Authelia Configuration
+# GEON — Authelia Configuration
 # Centralized authentication with MFA (TOTP)
 # =============================================================================
 
@@ -37,7 +37,7 @@ theme: 'dark'
 # ---------------------------------------------------------------------------
 totp:
   disable: false
-  issuer: 'NEGO'
+  issuer: 'GEON'
   algorithm: 'sha1'
   digits: 6
   period: 30
@@ -72,13 +72,13 @@ access_control:
 
   rules:
     # Authelia portal itself must be accessible
-    - domain: 'hego.joranbatty.fr'
+    - domain: 'geon.joranbatty.fr'
       policy: 'bypass'
       resources:
         - '^/auth([/?].*)?$'
 
     # Landing page is public
-    - domain: 'hego.joranbatty.fr'
+    - domain: 'geon.joranbatty.fr'
       policy: 'bypass'
       resources:
         - '^/$'
@@ -88,25 +88,25 @@ access_control:
         - '^/favicon\.ico$'
 
     # ACME challenge for Let's Encrypt
-    - domain: 'hego.joranbatty.fr'
+    - domain: 'geon.joranbatty.fr'
       policy: 'bypass'
       resources:
         - '^/\.well-known(/.*)?$'
 
     # OpenCTI — requires two-factor authentication
-    - domain: 'hego.joranbatty.fr'
+    - domain: 'geon.joranbatty.fr'
       policy: 'two_factor'
       resources:
         - '^/opencti([/?].*)?$'
 
     # n8n — requires two-factor authentication
-    - domain: 'hego.joranbatty.fr'
+    - domain: 'geon.joranbatty.fr'
       policy: 'two_factor'
       resources:
         - '^/n8n([/?].*)?$'
 
     # Grafana — requires two-factor authentication
-    - domain: 'hego.joranbatty.fr'
+    - domain: 'geon.joranbatty.fr'
       policy: 'two_factor'
       resources:
         - '^/grafana([/?].*)?$'
@@ -115,15 +115,15 @@ access_control:
 # Session
 # ---------------------------------------------------------------------------
 session:
-  name: 'nego_session'
+  name: 'geon_session'
   same_site: 'lax'
   expiration: '1h'
   inactivity: '5m'
   remember_me: '1M'
   cookies:
-    - domain: 'hego.joranbatty.fr'
-      authelia_url: 'https://hego.joranbatty.fr/auth'
-      default_redirection_url: 'https://hego.joranbatty.fr'
+    - domain: 'geon.joranbatty.fr'
+      authelia_url: 'https://geon.joranbatty.fr/auth'
+      default_redirection_url: 'https://geon.joranbatty.fr'
 
 # ---------------------------------------------------------------------------
 # Regulation — Brute Force Protection
@@ -146,10 +146,10 @@ storage:
 #   notifier:
 #     smtp:
 #       address: 'smtp://smtp.example.com:587'
-#       username: 'hego@joranbatty.fr'
+#       username: 'geon@joranbatty.fr'
 #       password: 'smtp_password'
-#       sender: 'NEGO Auth <hego@joranbatty.fr>'
-#       subject: '[NEGO] {title}'
+#       sender: 'GEON Auth <geon@joranbatty.fr>'
+#       subject: '[GEON] {title}'
 # ---------------------------------------------------------------------------
 notifier:
   filesystem:
