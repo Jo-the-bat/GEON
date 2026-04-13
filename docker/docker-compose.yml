@@ -14,7 +14,7 @@
 
 networks:
   hego_net:
-    driver: bridge
+    external: true
 
 volumes:
   hego_elasticsearch_data:
@@ -24,8 +24,6 @@ volumes:
   hego_huginn_data:
   hego_prometheus_data:
   hego_grafana_data:
-  hego_certbot_conf:
-  hego_certbot_www:
   hego_authelia_data:
 
 services:
@@ -36,27 +34,16 @@ services:
     image: nginx:alpine
     container_name: hego-nginx
     restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
       - ../landing:/usr/share/nginx/html/landing:ro
-      - hego_certbot_conf:/etc/letsencrypt:ro
-      - hego_certbot_www:/var/www/certbot:ro
     networks:
       - hego_net
     depends_on:
-      elasticsearch:
-        condition: service_healthy
-      kibana:
-        condition: service_healthy
-      opencti:
-        condition: service_healthy
       authelia:
         condition: service_healthy
-      huginn:
+      kibana:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:80/"]
@@ -67,23 +54,6 @@ services:
     labels:
       - "hego.service=nginx"
       - "hego.role=reverse-proxy"
-
-  # ===========================================================================
-  # CERTBOT — Let's Encrypt Certificate Renewal
-  # ===========================================================================
-  certbot:
-    image: certbot/certbot
-    container_name: hego-certbot
-    restart: unless-stopped
-    volumes:
-      - hego_certbot_conf:/etc/letsencrypt
-      - hego_certbot_www:/var/www/certbot
-    networks:
-      - hego_net
-    entrypoint: /bin/sh -c 'trap exit TERM; while :; do certbot renew --quiet; sleep 12h & wait $${!}; done'
-    labels:
-      - "hego.service=certbot"
-      - "hego.role=tls"
 
   # ===========================================================================
   # ELASTICSEARCH — Search & Analytics Engine
@@ -286,7 +256,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "curl -sf http://localhost:8080/opencti/health?health_access_key=${OPENCTI_HEALTHCHECK_KEY} || exit 1"
+          "wget -qO- http://localhost:8080/opencti/health?health_access_key=${OPENCTI_HEALTHCHECK_KEY} || exit 1"
         ]
       interval: 30s
       timeout: 10s
@@ -372,7 +342,7 @@ services:
   # OPENCTI CONNECTOR — MITRE ATT&CK
   # ===========================================================================
   opencti-connector-mitre:
-    image: opencti/connector-mitre-attack:${OPENCTI_VERSION}
+    image: opencti/connector-mitre:${OPENCTI_VERSION}
     container_name: hego-connector-mitre
     restart: unless-stopped
     environment:
@@ -521,7 +491,7 @@ services:
   # OPENCTI CONNECTOR — OpenCTI Datasets
   # ===========================================================================
   opencti-connector-datasets:
-    image: opencti/connector-dataset:${OPENCTI_VERSION}
+    image: opencti/connector-opencti:${OPENCTI_VERSION}
     container_name: hego-connector-datasets
     restart: unless-stopped
     environment:
@@ -562,8 +532,12 @@ services:
     environment:
       - DOMAIN=${HEGO_DOMAIN}
       - PORT=3000
-      - DATABASE_ADAPTER=sqlite3
-      - HUGINN_DATABASE_NAME=/data/huginn.sqlite3
+      - DATABASE_ADAPTER=mysql2
+      - DATABASE_HOST=127.0.0.1
+      - HUGINN_DATABASE_NAME=huginn
+      - HUGINN_DATABASE_USERNAME=root
+      - HUGINN_DATABASE_PASSWORD=
+      - START_MYSQL=true
       - INVITATION_CODE=${HUGINN_INVITATION_CODE}
       - FORCE_SSL=false
       - ENABLE_INSECURE_ASSETS=true
@@ -590,7 +564,7 @@ services:
     container_name: hego-authelia
     restart: unless-stopped
     environment:
-      - AUTHELIA_JWT_SECRET=${AUTHELIA_JWT_SECRET}
+      - AUTHELIA_IDENTITY_VALIDATION_RESET_PASSWORD_JWT_SECRET=${AUTHELIA_JWT_SECRET}
       - AUTHELIA_SESSION_SECRET=${AUTHELIA_SESSION_SECRET}
       - AUTHELIA_STORAGE_ENCRYPTION_KEY=${AUTHELIA_STORAGE_ENCRYPTION_KEY}
     volumes:
@@ -600,7 +574,7 @@ services:
     networks:
       - hego_net
     healthcheck:
-      test: ["CMD", "authelia", "healthcheck"]
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:9091/api/health || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 5
