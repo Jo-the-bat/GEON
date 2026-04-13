@@ -1,0 +1,26 @@
+# HEGO Ingestion Schedule
+# Install with: crontab scripts/crontab.example
+#
+# Adjust /path/to/hego to your actual installation directory.
+# Ensure the Python virtual environment is activated or use the full path to python.
+
+HEGO_DIR=/path/to/hego
+PYTHON=/path/to/hego/venv/bin/python
+
+# GDELT events — every 15 minutes
+*/15 * * * * cd $HEGO_DIR && $PYTHON -m ingestors.gdelt.ingestor >> logs/gdelt.log 2>&1
+
+# ACLED events — daily at 2:00 AM
+0 2 * * * cd $HEGO_DIR && $PYTHON -m ingestors.acled.ingestor >> logs/acled.log 2>&1
+
+# Sanctions — weekly on Sunday at 3:00 AM
+0 3 * * 0 cd $HEGO_DIR && $PYTHON -m ingestors.sanctions.ingestor >> logs/sanctions.log 2>&1
+
+# OpenCTI export to Elasticsearch — every 6 hours
+0 */6 * * * cd $HEGO_DIR && $PYTHON -m ingestors.opencti_export.exporter >> logs/opencti_export.log 2>&1
+
+# Correlation engine — every hour
+0 * * * * cd $HEGO_DIR && $PYTHON -m ingestors.correlation.engine >> logs/correlation.log 2>&1
+
+# Elasticsearch backup — daily at 4:00 AM
+0 4 * * * cd $HEGO_DIR && scripts/backup.sh >> logs/backup.log 2>&1

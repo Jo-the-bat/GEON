@@ -1,0 +1,167 @@
+# =============================================================================
+# HEGO — Authelia Configuration
+# Centralized authentication with MFA (TOTP)
+# =============================================================================
+
+# ---------------------------------------------------------------------------
+# Server
+# ---------------------------------------------------------------------------
+server:
+  address: 'tcp://0.0.0.0:9091/'
+  buffers:
+    read: 4096
+    write: 4096
+  timeouts:
+    read: '6s'
+    write: '6s'
+    idle: '30s'
+
+# ---------------------------------------------------------------------------
+# Logging
+# ---------------------------------------------------------------------------
+log:
+  level: 'info'
+  format: 'text'
+
+# ---------------------------------------------------------------------------
+# Theme
+# ---------------------------------------------------------------------------
+theme: 'dark'
+
+# ---------------------------------------------------------------------------
+# JWT Secret (injected via environment variable AUTHELIA_JWT_SECRET)
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Default Redirect URL
+# ---------------------------------------------------------------------------
+default_redirection_url: 'https://hego.joranbatty.fr'
+
+# ---------------------------------------------------------------------------
+# TOTP — Time-based One-Time Password
+# ---------------------------------------------------------------------------
+totp:
+  disable: false
+  issuer: 'HEGO'
+  algorithm: 'sha1'
+  digits: 6
+  period: 30
+  skew: 1
+
+# ---------------------------------------------------------------------------
+# WebAuthn (disabled, TOTP only)
+# ---------------------------------------------------------------------------
+webauthn:
+  disable: true
+
+# ---------------------------------------------------------------------------
+# Authentication Backend — File Provider
+# ---------------------------------------------------------------------------
+authentication_backend:
+  file:
+    path: '/config/users_database.yml'
+    watch: true
+    password:
+      algorithm: 'argon2id'
+      iterations: 3
+      memory: 65536
+      parallelism: 4
+      key_length: 32
+      salt_length: 16
+
+# ---------------------------------------------------------------------------
+# Access Control
+# ---------------------------------------------------------------------------
+access_control:
+  default_policy: 'deny'
+
+  rules:
+    # Authelia portal itself must be accessible
+    - domain: 'hego.joranbatty.fr'
+      policy: 'bypass'
+      resources:
+        - '^/auth([/?].*)?$'
+
+    # Landing page is public
+    - domain: 'hego.joranbatty.fr'
+      policy: 'bypass'
+      resources:
+        - '^/$'
+        - '^/index\.html$'
+        - '^/style\.css$'
+        - '^/assets(/.*)?$'
+        - '^/favicon\.ico$'
+
+    # ACME challenge for Let's Encrypt
+    - domain: 'hego.joranbatty.fr'
+      policy: 'bypass'
+      resources:
+        - '^/\.well-known(/.*)?$'
+
+    # Kibana — requires two-factor authentication
+    - domain: 'hego.joranbatty.fr'
+      policy: 'two_factor'
+      resources:
+        - '^/kibana([/?].*)?$'
+
+    # OpenCTI — requires two-factor authentication
+    - domain: 'hego.joranbatty.fr'
+      policy: 'two_factor'
+      resources:
+        - '^/opencti([/?].*)?$'
+
+    # Huginn — requires two-factor authentication
+    - domain: 'hego.joranbatty.fr'
+      policy: 'two_factor'
+      resources:
+        - '^/huginn([/?].*)?$'
+
+    # Grafana — requires two-factor authentication
+    - domain: 'hego.joranbatty.fr'
+      policy: 'two_factor'
+      resources:
+        - '^/grafana([/?].*)?$'
+
+# ---------------------------------------------------------------------------
+# Session
+# ---------------------------------------------------------------------------
+session:
+  name: 'hego_session'
+  same_site: 'lax'
+  expiration: '1h'
+  inactivity: '5m'
+  remember_me: '1M'
+  cookies:
+    - domain: 'hego.joranbatty.fr'
+      authelia_url: 'https://hego.joranbatty.fr/auth'
+      default_redirection_url: 'https://hego.joranbatty.fr'
+
+# ---------------------------------------------------------------------------
+# Regulation — Brute Force Protection
+# ---------------------------------------------------------------------------
+regulation:
+  max_retries: 3
+  find_time: '2m'
+  ban_time: '5m'
+
+# ---------------------------------------------------------------------------
+# Storage — Local SQLite3
+# ---------------------------------------------------------------------------
+storage:
+  local:
+    path: '/config/data/db.sqlite3'
+
+# ---------------------------------------------------------------------------
+# Notifier — Filesystem (dev mode)
+# For production, replace with SMTP:
+#   notifier:
+#     smtp:
+#       address: 'smtp://smtp.example.com:587'
+#       username: 'hego@joranbatty.fr'
+#       password: 'smtp_password'
+#       sender: 'HEGO Auth <hego@joranbatty.fr>'
+#       subject: '[HEGO] {title}'
+# ---------------------------------------------------------------------------
+notifier:
+  filesystem:
+    filename: '/config/data/notification.txt'

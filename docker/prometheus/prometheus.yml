@@ -1,0 +1,133 @@
+# =============================================================================
+# HEGO — Prometheus Configuration
+# Metrics collection for platform monitoring
+# =============================================================================
+
+global:
+  scrape_interval: 30s
+  evaluation_interval: 30s
+  scrape_timeout: 10s
+
+  external_labels:
+    cluster: 'hego'
+    environment: 'production'
+
+# ---------------------------------------------------------------------------
+# Scrape Configurations
+# ---------------------------------------------------------------------------
+scrape_configs:
+
+  # -------------------------------------------------------------------------
+  # Prometheus self-monitoring
+  # -------------------------------------------------------------------------
+  - job_name: 'prometheus'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['localhost:9090']
+        labels:
+          service: 'prometheus'
+
+  # -------------------------------------------------------------------------
+  # Elasticsearch — cluster and node metrics
+  # Elasticsearch exposes metrics at /_prometheus/metrics with the plugin,
+  # or we scrape the REST API via elasticsearch-exporter if deployed.
+  # For now, we use basic health checks via the REST API.
+  # -------------------------------------------------------------------------
+  - job_name: 'elasticsearch'
+    metrics_path: '/_prometheus/metrics'
+    basic_auth:
+      username: 'elastic'
+      password_file: '/etc/prometheus/es_password'
+    static_configs:
+      - targets: ['elasticsearch:9200']
+        labels:
+          service: 'elasticsearch'
+    # Fallback: if the prometheus endpoint is not available, this job
+    # will simply fail gracefully and report target as down.
+
+  # -------------------------------------------------------------------------
+  # Kibana — server metrics
+  # -------------------------------------------------------------------------
+  - job_name: 'kibana'
+    metrics_path: '/kibana/api/stats'
+    params:
+      extended: ['true']
+    basic_auth:
+      username: 'elastic'
+      password_file: '/etc/prometheus/es_password'
+    static_configs:
+      - targets: ['kibana:5601']
+        labels:
+          service: 'kibana'
+
+  # -------------------------------------------------------------------------
+  # OpenCTI — health metrics
+  # -------------------------------------------------------------------------
+  - job_name: 'opencti'
+    metrics_path: '/opencti/metrics'
+    static_configs:
+      - targets: ['opencti:8080']
+        labels:
+          service: 'opencti'
+
+  # -------------------------------------------------------------------------
+  # RabbitMQ — management metrics (Prometheus plugin)
+  # -------------------------------------------------------------------------
+  - job_name: 'rabbitmq'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['rabbitmq:15692']
+        labels:
+          service: 'rabbitmq'
+
+  # -------------------------------------------------------------------------
+  # MinIO — built-in Prometheus metrics
+  # -------------------------------------------------------------------------
+  - job_name: 'minio'
+    metrics_path: '/minio/v2/metrics/cluster'
+    static_configs:
+      - targets: ['minio:9000']
+        labels:
+          service: 'minio'
+
+  # -------------------------------------------------------------------------
+  # Redis — metrics via INFO command (requires redis_exporter sidecar)
+  # If redis_exporter is not deployed, this target will report as down.
+  # -------------------------------------------------------------------------
+  - job_name: 'redis'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['redis:9121']
+        labels:
+          service: 'redis'
+
+  # -------------------------------------------------------------------------
+  # Grafana — built-in metrics
+  # -------------------------------------------------------------------------
+  - job_name: 'grafana'
+    metrics_path: '/grafana/metrics'
+    static_configs:
+      - targets: ['grafana:3000']
+        labels:
+          service: 'grafana'
+
+  # -------------------------------------------------------------------------
+  # Authelia — built-in metrics
+  # -------------------------------------------------------------------------
+  - job_name: 'authelia'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['authelia:9959']
+        labels:
+          service: 'authelia'
+
+  # -------------------------------------------------------------------------
+  # Nginx — stub_status (requires ngx_http_stub_status_module)
+  # Add to nginx config: location /nginx_status { stub_status; }
+  # -------------------------------------------------------------------------
+  - job_name: 'nginx'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['nginx:9113']
+        labels:
+          service: 'nginx'

@@ -1,0 +1,63 @@
+# =============================================================================
+# HEGO — Kibana Configuration
+# Served behind Nginx reverse proxy at /kibana
+# =============================================================================
+
+# ---------------------------------------------------------------------------
+# Server
+# ---------------------------------------------------------------------------
+server.host: "0.0.0.0"
+server.port: 5601
+server.name: "hego-kibana"
+
+# Base path for reverse proxy
+server.basePath: "/kibana"
+server.rewriteBasePath: true
+
+# Public URL
+server.publicBaseUrl: "https://hego.joranbatty.fr/kibana"
+
+# ---------------------------------------------------------------------------
+# Elasticsearch Connection
+# ---------------------------------------------------------------------------
+elasticsearch.hosts: ["http://elasticsearch:9200"]
+elasticsearch.username: "kibana_system"
+elasticsearch.password: "${ELASTICSEARCH_PASSWORD}"
+
+# Request timeout
+elasticsearch.requestTimeout: 60000
+
+# Ping timeout
+elasticsearch.pingTimeout: 30000
+
+# ---------------------------------------------------------------------------
+# Encryption Keys
+# ---------------------------------------------------------------------------
+xpack.encryptedSavedObjects.encryptionKey: "${XPACK_ENCRYPTEDSAVEDOBJECTS_ENCRYPTIONKEY}"
+xpack.reporting.encryptionKey: "${XPACK_ENCRYPTEDSAVEDOBJECTS_ENCRYPTIONKEY}"
+xpack.security.encryptionKey: "${XPACK_ENCRYPTEDSAVEDOBJECTS_ENCRYPTIONKEY}"
+
+# ---------------------------------------------------------------------------
+# Monitoring
+# ---------------------------------------------------------------------------
+monitoring.ui.enabled: true
+monitoring.ui.ccs.enabled: false
+
+# ---------------------------------------------------------------------------
+# Telemetry (disabled for privacy)
+# ---------------------------------------------------------------------------
+telemetry.enabled: false
+telemetry.optIn: false
+
+# ---------------------------------------------------------------------------
+# Logging
+# ---------------------------------------------------------------------------
+logging:
+  appenders:
+    default:
+      type: console
+      layout:
+        type: pattern
+  root:
+    level: warn
+    appenders: [default]

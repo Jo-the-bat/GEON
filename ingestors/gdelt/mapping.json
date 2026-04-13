@@ -1,0 +1,39 @@
+{
+  "mappings": {
+    "properties": {
+      "event_id": { "type": "keyword" },
+      "date": { "type": "date" },
+      "source_country": { "type": "keyword" },
+      "target_country": { "type": "keyword" },
+      "cameo_code": { "type": "keyword" },
+      "cameo_description": {
+        "type": "text",
+        "fields": { "keyword": { "type": "keyword" } }
+      },
+      "goldstein_scale": { "type": "float" },
+      "tone": { "type": "float" },
+      "num_articles": { "type": "integer" },
+      "geo_lat": { "type": "float" },
+      "geo_lon": { "type": "float" },
+      "geo_location": { "type": "geo_point" },
+      "source_url": { "type": "keyword" },
+      "themes": { "type": "keyword" },
+      "persons": {
+        "type": "text",
+        "fields": { "keyword": { "type": "keyword" } }
+      },
+      "organizations": {
+        "type": "text",
+        "fields": { "keyword": { "type": "keyword" } }
+      },
+      "severity": { "type": "keyword" },
+      "ingested_at": { "type": "date" }
+    }
+  },
+  "settings": {
+    "number_of_shards": 1,
+    "number_of_replicas": 0,
+    "index.lifecycle.name": "hego-ilm-policy",
+    "index.lifecycle.rollover_alias": "hego-gdelt"
+  }
+}

@@ -1,0 +1,21 @@
+# =============================================================================
+# HEGO — Authelia Users Database
+# =============================================================================
+#
+# To generate a password hash, run:
+#   docker run --rm authelia/authelia:latest authelia crypto hash generate argon2 --password 'YOUR_PASSWORD'
+#
+# Then replace the hash below with the output.
+# =============================================================================
+
+users:
+  admin:
+    disabled: false
+    displayname: 'HEGO Administrator'
+    # Default password: changeme (REPLACE THIS HASH before deploying)
+    # Generate with: docker run --rm authelia/authelia:latest authelia crypto hash generate argon2 --password 'YOUR_SECURE_PASSWORD'
+    password: '$argon2id$v=19$m=65536,t=3,p=4$REPLACE_WITH_GENERATED_SALT$REPLACE_WITH_GENERATED_HASH'
+    email: 'admin@hego.local'
+    groups:
+      - 'admins'
+      - 'hego-users'

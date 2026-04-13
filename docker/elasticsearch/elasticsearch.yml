@@ -1,0 +1,62 @@
+# =============================================================================
+# HEGO — Elasticsearch Configuration
+# Single-node deployment with security enabled
+# =============================================================================
+
+# ---------------------------------------------------------------------------
+# Cluster
+# ---------------------------------------------------------------------------
+cluster.name: ${ELASTIC_CLUSTER_NAME:hego}
+
+# ---------------------------------------------------------------------------
+# Node
+# ---------------------------------------------------------------------------
+node.name: hego-es-01
+node.roles: [master, data, ingest]
+
+# ---------------------------------------------------------------------------
+# Paths
+# ---------------------------------------------------------------------------
+path.data: /usr/share/elasticsearch/data
+path.logs: /usr/share/elasticsearch/logs
+
+# ---------------------------------------------------------------------------
+# Network
+# ---------------------------------------------------------------------------
+network.host: 0.0.0.0
+http.port: 9200
+
+# ---------------------------------------------------------------------------
+# Discovery — Single Node
+# ---------------------------------------------------------------------------
+discovery.type: single-node
+
+# ---------------------------------------------------------------------------
+# Security (X-Pack)
+# ---------------------------------------------------------------------------
+xpack.security.enabled: true
+
+# HTTP SSL disabled — TLS termination handled by Nginx reverse proxy
+xpack.security.http.ssl.enabled: false
+
+# Transport SSL disabled — single node, no inter-node communication
+xpack.security.transport.ssl.enabled: false
+
+# ---------------------------------------------------------------------------
+# License
+# ---------------------------------------------------------------------------
+xpack.license.self_generated.type: basic
+
+# ---------------------------------------------------------------------------
+# Performance
+# ---------------------------------------------------------------------------
+# Disable swap for stable performance
+bootstrap.memory_lock: true
+
+# Index defaults
+action.auto_create_index: "+hego-*,+.kibana*,+.security*,+.apm*,+opencti*,+.internal*,+.transform*,+.async*,+.reporting*"
+
+# ---------------------------------------------------------------------------
+# ILM — Index Lifecycle Management
+# ---------------------------------------------------------------------------
+xpack.monitoring.collection.enabled: true

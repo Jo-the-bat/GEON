@@ -1,0 +1,669 @@
+# =============================================================================
+# HEGO Docker Compose — Huginn, Elasticsearch, GDELT, OpenCTI
+# Geopolitical & Cyber Threat Intelligence Platform
+# =============================================================================
+# Usage:
+#   docker compose -f docker/docker-compose.yml up -d
+#
+# Prerequisites:
+#   - Docker rootless mode configured
+#   - .env file at project root (copy from .env.example)
+#   - sudo sysctl -w vm.max_map_count=262144
+#   - sudo sysctl -w net.ipv4.ip_unprivileged_port_start=80
+# =============================================================================
+
+networks:
+  hego_net:
+    driver: bridge
+
+volumes:
+  hego_elasticsearch_data:
+  hego_redis_data:
+  hego_rabbitmq_data:
+  hego_minio_data:
+  hego_huginn_data:
+  hego_prometheus_data:
+  hego_grafana_data:
+  hego_certbot_conf:
+  hego_certbot_www:
+  hego_authelia_data:
+
+services:
+  # ===========================================================================
+  # NGINX — Reverse Proxy & TLS Termination
+  # ===========================================================================
+  nginx:
+    image: nginx:alpine
+    container_name: hego-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ../landing:/usr/share/nginx/html/landing:ro
+      - hego_certbot_conf:/etc/letsencrypt:ro
+      - hego_certbot_www:/var/www/certbot:ro
+    networks:
+      - hego_net
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+      kibana:
+        condition: service_healthy
+      opencti:
+        condition: service_healthy
+      authelia:
+        condition: service_healthy
+      huginn:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:80/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    labels:
+      - "hego.service=nginx"
+      - "hego.role=reverse-proxy"
+
+  # ===========================================================================
+  # CERTBOT — Let's Encrypt Certificate Renewal
+  # ===========================================================================
+  certbot:
+    image: certbot/certbot
+    container_name: hego-certbot
+    restart: unless-stopped
+    volumes:
+      - hego_certbot_conf:/etc/letsencrypt
+      - hego_certbot_www:/var/www/certbot
+    networks:
+      - hego_net
+    entrypoint: /bin/sh -c 'trap exit TERM; while :; do certbot renew --quiet; sleep 12h & wait $${!}; done'
+    labels:
+      - "hego.service=certbot"
+      - "hego.role=tls"
+
+  # ===========================================================================
+  # ELASTICSEARCH — Search & Analytics Engine
+  # ===========================================================================
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:${ELASTIC_VERSION}
+    container_name: hego-elasticsearch
+    restart: unless-stopped
+    environment:
+      - cluster.name=${ELASTIC_CLUSTER_NAME:-hego}
+      - discovery.type=single-node
+      - xpack.security.enabled=true
+      - xpack.security.http.ssl.enabled=false
+      - xpack.license.self_generated.type=basic
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
+      - "ES_JAVA_OPTS=-Xms${ELASTIC_HEAP_SIZE:-2g} -Xmx${ELASTIC_HEAP_SIZE:-2g}"
+      - bootstrap.memory_lock=true
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    volumes:
+      - hego_elasticsearch_data:/usr/share/elasticsearch/data
+      - ./elasticsearch/elasticsearch.yml:/usr/share/elasticsearch/config/elasticsearch.yml:ro
+    networks:
+      - hego_net
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -sf -u elastic:${ELASTIC_PASSWORD} http://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=5s || exit 1"
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+    labels:
+      - "hego.service=elasticsearch"
+      - "hego.role=storage"
+
+  # ===========================================================================
+  # KIBANA — Visualization & Dashboards
+  # ===========================================================================
+  kibana:
+    image: docker.elastic.co/kibana/kibana:${ELASTIC_VERSION}
+    container_name: hego-kibana
+    restart: unless-stopped
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - ELASTICSEARCH_USERNAME=kibana_system
+      - ELASTICSEARCH_PASSWORD=${ELASTIC_PASSWORD}
+      - XPACK_ENCRYPTEDSAVEDOBJECTS_ENCRYPTIONKEY=${KIBANA_ENCRYPTION_KEY}
+      - SERVER_BASEPATH=/kibana
+      - SERVER_REWRITEBASEPATH=true
+      - SERVER_HOST=0.0.0.0
+    volumes:
+      - ./kibana/kibana.yml:/usr/share/kibana/config/kibana.yml:ro
+    networks:
+      - hego_net
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -sf http://localhost:5601/kibana/api/status | grep -q '\"overall\"' || exit 1"
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 90s
+    labels:
+      - "hego.service=kibana"
+      - "hego.role=visualization"
+
+  # ===========================================================================
+  # REDIS — Cache for OpenCTI & Huginn
+  # ===========================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: hego-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    volumes:
+      - hego_redis_data:/data
+    networks:
+      - hego_net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    labels:
+      - "hego.service=redis"
+      - "hego.role=cache"
+
+  # ===========================================================================
+  # RABBITMQ — Message Broker for OpenCTI
+  # ===========================================================================
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: hego-rabbitmq
+    restart: unless-stopped
+    environment:
+      - RABBITMQ_DEFAULT_USER=${RABBITMQ_DEFAULT_USER}
+      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_DEFAULT_PASS}
+      - RABBITMQ_NODENAME=rabbit@rabbitmq
+    volumes:
+      - hego_rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - hego_net
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    labels:
+      - "hego.service=rabbitmq"
+      - "hego.role=broker"
+
+  # ===========================================================================
+  # MINIO — Object Storage for OpenCTI
+  # ===========================================================================
+  minio:
+    image: minio/minio
+    container_name: hego-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
+    volumes:
+      - hego_minio_data:/data
+    networks:
+      - hego_net
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 15s
+    labels:
+      - "hego.service=minio"
+      - "hego.role=object-storage"
+
+  # ===========================================================================
+  # OPENCTI — Cyber Threat Intelligence Platform
+  # ===========================================================================
+  opencti:
+    image: opencti/platform:${OPENCTI_VERSION}
+    container_name: hego-opencti
+    restart: unless-stopped
+    environment:
+      - NODE_OPTIONS=--max-old-space-size=8096
+      - APP__PORT=8080
+      - APP__BASE_URL=https://${HEGO_DOMAIN}/opencti
+      - APP__BASE_PATH=/opencti
+      - APP__ADMIN__EMAIL=${OPENCTI_ADMIN_EMAIL}
+      - APP__ADMIN__PASSWORD=${OPENCTI_ADMIN_PASSWORD}
+      - APP__ADMIN__TOKEN=${OPENCTI_ADMIN_TOKEN}
+      - APP__HEALTH_ACCESS_KEY=${OPENCTI_HEALTHCHECK_KEY}
+      - APP__APP_LOGS__LOGS_LEVEL=error
+      - REDIS__HOSTNAME=redis
+      - REDIS__PORT=6379
+      - ELASTICSEARCH__URL=http://elasticsearch:9200
+      - ELASTICSEARCH__USERNAME=elastic
+      - ELASTICSEARCH__PASSWORD=${ELASTIC_PASSWORD}
+      - ELASTICSEARCH__NUMBER_OF_REPLICAS=0
+      - ELASTICSEARCH__NUMBER_OF_SHARDS=1
+      - MINIO__ENDPOINT=minio
+      - MINIO__PORT=9000
+      - MINIO__USE_SSL=false
+      - MINIO__ACCESS_KEY=${MINIO_ROOT_USER}
+      - MINIO__SECRET_KEY=${MINIO_ROOT_PASSWORD}
+      - RABBITMQ__HOSTNAME=rabbitmq
+      - RABBITMQ__PORT=5672
+      - RABBITMQ__PORT_MANAGEMENT=15672
+      - RABBITMQ__MANAGEMENT_SSL=false
+      - RABBITMQ__USERNAME=${RABBITMQ_DEFAULT_USER}
+      - RABBITMQ__PASSWORD=${RABBITMQ_DEFAULT_PASS}
+      - PROVIDERS__LOCAL__STRATEGY=LocalStrategy
+    networks:
+      - hego_net
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -sf http://localhost:8080/opencti/health?health_access_key=${OPENCTI_HEALTHCHECK_KEY} || exit 1"
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 15
+      start_period: 120s
+    labels:
+      - "hego.service=opencti"
+      - "hego.role=cti-platform"
+
+  # ===========================================================================
+  # OPENCTI WORKER — Background Processing
+  # ===========================================================================
+  opencti-worker-1:
+    image: opencti/worker:${OPENCTI_VERSION}
+    container_name: hego-opencti-worker-1
+    restart: unless-stopped
+    environment:
+      - OPENCTI_URL=http://opencti:8080/opencti
+      - OPENCTI_TOKEN=${OPENCTI_ADMIN_TOKEN}
+      - WORKER_LOG_LEVEL=info
+    networks:
+      - hego_net
+    depends_on:
+      opencti:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f worker || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    labels:
+      - "hego.service=opencti-worker"
+      - "hego.role=cti-worker"
+
+  opencti-worker-2:
+    image: opencti/worker:${OPENCTI_VERSION}
+    container_name: hego-opencti-worker-2
+    restart: unless-stopped
+    environment:
+      - OPENCTI_URL=http://opencti:8080/opencti
+      - OPENCTI_TOKEN=${OPENCTI_ADMIN_TOKEN}
+      - WORKER_LOG_LEVEL=info
+    networks:
+      - hego_net
+    depends_on:
+      opencti:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f worker || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    labels:
+      - "hego.service=opencti-worker"
+      - "hego.role=cti-worker"
+
+  opencti-worker-3:
+    image: opencti/worker:${OPENCTI_VERSION}
+    container_name: hego-opencti-worker-3
+    restart: unless-stopped
+    environment:
+      - OPENCTI_URL=http://opencti:8080/opencti
+      - OPENCTI_TOKEN=${OPENCTI_ADMIN_TOKEN}
+      - WORKER_LOG_LEVEL=info
+    networks:
+      - hego_net
+    depends_on:
+      opencti:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f worker || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    labels:
+      - "hego.service=opencti-worker"
+      - "hego.role=cti-worker"
+
+  # ===========================================================================
+  # OPENCTI CONNECTOR — MITRE ATT&CK
+  # ===========================================================================
+  opencti-connector-mitre:
+    image: opencti/connector-mitre-attack:${OPENCTI_VERSION}
+    container_name: hego-connector-mitre
+    restart: unless-stopped
+    environment:
+      - OPENCTI_URL=http://opencti:8080/opencti
+      - OPENCTI_TOKEN=${OPENCTI_ADMIN_TOKEN}
+      - CONNECTOR_ID=${MITRE_CONNECTOR_ID}
+      - CONNECTOR_NAME=MITRE ATT&CK
+      - CONNECTOR_SCOPE=marking-definition,identity,attack-pattern,course-of-action,intrusion-set,campaign,malware,tool,vulnerability,x-mitre-data-source,x-mitre-data-component,x-mitre-matrix,x-mitre-tactic,x-mitre-collection
+      - CONNECTOR_TYPE=EXTERNAL_IMPORT
+      - CONNECTOR_LOG_LEVEL=info
+      - CONNECTOR_RUN_AND_TERMINATE=false
+      - MITRE_ENTERPRISE_FILE_URL=https://raw.githubusercontent.com/mitre-attack/attack-stix-data/master/enterprise-attack/enterprise-attack.json
+      - MITRE_MOBILE_ATTACK_FILE_URL=https://raw.githubusercontent.com/mitre-attack/attack-stix-data/master/mobile-attack/mobile-attack.json
+      - MITRE_ICS_ATTACK_FILE_URL=https://raw.githubusercontent.com/mitre-attack/attack-stix-data/master/ics-attack/ics-attack.json
+      - MITRE_INTERVAL=7
+    networks:
+      - hego_net
+    depends_on:
+      opencti:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f connector || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    labels:
+      - "hego.service=opencti-connector-mitre"
+      - "hego.role=cti-connector"
+
+  # ===========================================================================
+  # OPENCTI CONNECTOR — AlienVault OTX
+  # ===========================================================================
+  opencti-connector-alienvault:
+    image: opencti/connector-alienvault:${OPENCTI_VERSION}
+    container_name: hego-connector-alienvault
+    restart: unless-stopped
+    environment:
+      - OPENCTI_URL=http://opencti:8080/opencti
+      - OPENCTI_TOKEN=${OPENCTI_ADMIN_TOKEN}
+      - CONNECTOR_ID=${ALIENVAULT_CONNECTOR_ID}
+      - CONNECTOR_NAME=AlienVault OTX
+      - CONNECTOR_SCOPE=alienvault
+      - CONNECTOR_TYPE=EXTERNAL_IMPORT
+      - CONNECTOR_LOG_LEVEL=info
+      - CONNECTOR_RUN_AND_TERMINATE=false
+      - ALIENVAULT_BASE_URL=https://otx.alienvault.com
+      - ALIENVAULT_API_KEY=${ALIENVAULT_API_KEY}
+      - ALIENVAULT_TLP=White
+      - ALIENVAULT_CREATE_OBSERVABLES=true
+      - ALIENVAULT_CREATE_INDICATORS=true
+      - ALIENVAULT_PULSE_START_TIMESTAMP=2024-01-01T00:00:00
+      - ALIENVAULT_REPORT_TYPE=threat-report
+      - ALIENVAULT_REPORT_STATUS=New
+      - ALIENVAULT_GUESS_MALWARE=false
+      - ALIENVAULT_GUESS_CVE=false
+      - ALIENVAULT_EXCLUDED_PULSE_INDICATOR_TYPES=FileHash-PEHASH,FileHash-IMPHASH
+      - ALIENVAULT_ENABLE_RELATIONSHIPS=true
+      - ALIENVAULT_ENABLE_ATTACK_PATTERNS_INDICATES=true
+      - ALIENVAULT_INTERVAL=360
+    networks:
+      - hego_net
+    depends_on:
+      opencti:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f connector || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    labels:
+      - "hego.service=opencti-connector-alienvault"
+      - "hego.role=cti-connector"
+
+  # ===========================================================================
+  # OPENCTI CONNECTOR — CISA Known Exploited Vulnerabilities
+  # ===========================================================================
+  opencti-connector-cisa-kev:
+    image: opencti/connector-cisa-known-exploited-vulnerabilities:${OPENCTI_VERSION}
+    container_name: hego-connector-cisa-kev
+    restart: unless-stopped
+    environment:
+      - OPENCTI_URL=http://opencti:8080/opencti
+      - OPENCTI_TOKEN=${OPENCTI_ADMIN_TOKEN}
+      - CONNECTOR_ID=${CISA_KEV_CONNECTOR_ID}
+      - CONNECTOR_NAME=CISA Known Exploited Vulnerabilities
+      - CONNECTOR_SCOPE=cisa
+      - CONNECTOR_TYPE=EXTERNAL_IMPORT
+      - CONNECTOR_LOG_LEVEL=info
+      - CONNECTOR_RUN_AND_TERMINATE=false
+      - CISA_CATALOG_URL=https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json
+      - CISA_INTERVAL=24
+      - CISA_CREATE_INFRASTRUCTURES=false
+      - CISA_TLP=TLP:CLEAR
+    networks:
+      - hego_net
+    depends_on:
+      opencti:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f connector || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    labels:
+      - "hego.service=opencti-connector-cisa-kev"
+      - "hego.role=cti-connector"
+
+  # ===========================================================================
+  # OPENCTI CONNECTOR — CVE (NVD)
+  # ===========================================================================
+  opencti-connector-cve:
+    image: opencti/connector-cve:${OPENCTI_VERSION}
+    container_name: hego-connector-cve
+    restart: unless-stopped
+    environment:
+      - OPENCTI_URL=http://opencti:8080/opencti
+      - OPENCTI_TOKEN=${OPENCTI_ADMIN_TOKEN}
+      - CONNECTOR_ID=${CVE_CONNECTOR_ID}
+      - CONNECTOR_NAME=Common Vulnerabilities and Exposures
+      - CONNECTOR_SCOPE=identity,vulnerability
+      - CONNECTOR_TYPE=EXTERNAL_IMPORT
+      - CONNECTOR_LOG_LEVEL=info
+      - CONNECTOR_RUN_AND_TERMINATE=false
+      - CVE_BASE_URL=https://services.nvd.nist.gov/rest/json/cves
+      - CVE_INTERVAL=24
+      - CVE_MAX_DATE_RANGE=120
+    networks:
+      - hego_net
+    depends_on:
+      opencti:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f connector || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    labels:
+      - "hego.service=opencti-connector-cve"
+      - "hego.role=cti-connector"
+
+  # ===========================================================================
+  # OPENCTI CONNECTOR — OpenCTI Datasets
+  # ===========================================================================
+  opencti-connector-datasets:
+    image: opencti/connector-dataset:${OPENCTI_VERSION}
+    container_name: hego-connector-datasets
+    restart: unless-stopped
+    environment:
+      - OPENCTI_URL=http://opencti:8080/opencti
+      - OPENCTI_TOKEN=${OPENCTI_ADMIN_TOKEN}
+      - CONNECTOR_ID=${OPENCTI_DATASETS_CONNECTOR_ID}
+      - CONNECTOR_NAME=OpenCTI Datasets
+      - CONNECTOR_SCOPE=marking-definition,identity,location
+      - CONNECTOR_TYPE=EXTERNAL_IMPORT
+      - CONNECTOR_LOG_LEVEL=info
+      - CONNECTOR_RUN_AND_TERMINATE=false
+      - CONFIG_SECTORS_FILE_URL=https://raw.githubusercontent.com/OpenCTI-Platform/datasets/master/data/sectors.json
+      - CONFIG_GEOGRAPHY_FILE_URL=https://raw.githubusercontent.com/OpenCTI-Platform/datasets/master/data/geography.json
+      - CONFIG_COMPANIES_FILE_URL=https://raw.githubusercontent.com/OpenCTI-Platform/datasets/master/data/companies.json
+      - CONFIG_INTERVAL=7
+    networks:
+      - hego_net
+    depends_on:
+      opencti:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f connector || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    labels:
+      - "hego.service=opencti-connector-datasets"
+      - "hego.role=cti-connector"
+
+  # ===========================================================================
+  # HUGINN — Automated Agents for RSS & Enrichment
+  # ===========================================================================
+  huginn:
+    image: ghcr.io/huginn/huginn
+    container_name: hego-huginn
+    restart: unless-stopped
+    environment:
+      - DOMAIN=${HEGO_DOMAIN}
+      - PORT=3000
+      - DATABASE_ADAPTER=sqlite3
+      - HUGINN_DATABASE_NAME=/data/huginn.sqlite3
+      - INVITATION_CODE=${HUGINN_INVITATION_CODE}
+      - FORCE_SSL=false
+      - ENABLE_INSECURE_ASSETS=true
+      - APP_SECRET_TOKEN=${AUTHELIA_SESSION_SECRET}
+    volumes:
+      - hego_huginn_data:/data
+    networks:
+      - hego_net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:3000/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+    labels:
+      - "hego.service=huginn"
+      - "hego.role=automation"
+
+  # ===========================================================================
+  # AUTHELIA — Authentication & MFA
+  # ===========================================================================
+  authelia:
+    image: authelia/authelia
+    container_name: hego-authelia
+    restart: unless-stopped
+    environment:
+      - AUTHELIA_JWT_SECRET=${AUTHELIA_JWT_SECRET}
+      - AUTHELIA_SESSION_SECRET=${AUTHELIA_SESSION_SECRET}
+      - AUTHELIA_STORAGE_ENCRYPTION_KEY=${AUTHELIA_STORAGE_ENCRYPTION_KEY}
+    volumes:
+      - ./authelia/configuration.yml:/config/configuration.yml:ro
+      - ./authelia/users_database.yml:/config/users_database.yml:ro
+      - hego_authelia_data:/config/data
+    networks:
+      - hego_net
+    healthcheck:
+      test: ["CMD", "authelia", "healthcheck"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    labels:
+      - "hego.service=authelia"
+      - "hego.role=authentication"
+
+  # ===========================================================================
+  # PROMETHEUS — Monitoring & Metrics
+  # ===========================================================================
+  prometheus:
+    image: prom/prometheus
+    container_name: hego-prometheus
+    restart: unless-stopped
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=30d"
+      - "--web.enable-lifecycle"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - hego_prometheus_data:/prometheus
+    networks:
+      - hego_net
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:9090/-/healthy || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    labels:
+      - "hego.service=prometheus"
+      - "hego.role=monitoring"
+
+  # ===========================================================================
+  # GRAFANA — Monitoring Dashboards
+  # ===========================================================================
+  grafana:
+    image: grafana/grafana
+    container_name: hego-grafana
+    restart: unless-stopped
+    environment:
+      - GF_SERVER_ROOT_URL=https://${HEGO_DOMAIN}/grafana
+      - GF_SERVER_SERVE_FROM_SUB_PATH=true
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=${ELASTIC_PASSWORD}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_AUTH_DISABLE_LOGIN_FORM=false
+    volumes:
+      - hego_grafana_data:/var/lib/grafana
+      - ./grafana/datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml:ro
+    networks:
+      - hego_net
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+    labels:
+      - "hego.service=grafana"
+      - "hego.role=monitoring"

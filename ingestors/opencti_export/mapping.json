@@ -1,0 +1,33 @@
+{
+  "mappings": {
+    "properties": {
+      "stix_id": { "type": "keyword" },
+      "type": { "type": "keyword" },
+      "name": {
+        "type": "text",
+        "fields": { "keyword": { "type": "keyword" } }
+      },
+      "description": { "type": "text" },
+      "aliases": { "type": "keyword" },
+      "country": { "type": "keyword" },
+      "first_seen": { "type": "date" },
+      "last_seen": { "type": "date" },
+      "confidence": { "type": "integer" },
+      "labels": { "type": "keyword" },
+      "kill_chain_phases": { "type": "keyword" },
+      "created_by": { "type": "keyword" },
+      "external_references": {
+        "type": "nested",
+        "properties": {
+          "source_name": { "type": "keyword" },
+          "url": { "type": "keyword" }
+        }
+      },
+      "ingested_at": { "type": "date" }
+    }
+  },
+  "settings": {
+    "number_of_shards": 1,
+    "number_of_replicas": 0
+  }
+}
