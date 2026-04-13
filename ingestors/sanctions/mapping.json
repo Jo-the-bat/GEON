@@ -1,0 +1,26 @@
+{
+  "mappings": {
+    "properties": {
+      "entity_id": { "type": "keyword" },
+      "entity_type": { "type": "keyword" },
+      "name": {
+        "type": "text",
+        "fields": { "keyword": { "type": "keyword" } }
+      },
+      "aliases": {
+        "type": "text",
+        "fields": { "keyword": { "type": "keyword" } }
+      },
+      "country": { "type": "keyword" },
+      "programs": { "type": "keyword" },
+      "sanctions_source": { "type": "keyword" },
+      "listed_date": { "type": "date", "format": "yyyy-MM-dd||epoch_millis" },
+      "notes": { "type": "text" },
+      "ingested_at": { "type": "date" }
+    }
+  },
+  "settings": {
+    "number_of_shards": 1,
+    "number_of_replicas": 0
+  }
+}

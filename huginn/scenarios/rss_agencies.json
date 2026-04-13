@@ -1,0 +1,133 @@
+{
+    "schema_version": 1,
+    "name": "HEGO - News Agency RSS Feeds",
+    "description": "Aggregates articles from major international news agencies (Reuters, AP, Al Jazeera, SCMP, Moscow Times) with geopolitical keyword filtering.",
+    "guid": "hego-rss-agencies-v1",
+    "exported_at": "2025-06-15T00:00:00Z",
+    "agents": [
+        {
+            "type": "Agents::RssAgent",
+            "name": "RSS - Reuters World",
+            "disabled": false,
+            "options": {
+                "url": "https://feeds.reuters.com/reuters/worldNews",
+                "expected_update_period_in_days": 1,
+                "clean": true,
+                "headers": {}
+            },
+            "schedule": "every_30m",
+            "keep_events_for": 604800,
+            "propagate_immediately": true
+        },
+        {
+            "type": "Agents::RssAgent",
+            "name": "RSS - AP News",
+            "disabled": false,
+            "options": {
+                "url": "https://apnews.com/rss",
+                "expected_update_period_in_days": 1,
+                "clean": true,
+                "headers": {}
+            },
+            "schedule": "every_30m",
+            "keep_events_for": 604800,
+            "propagate_immediately": true
+        },
+        {
+            "type": "Agents::RssAgent",
+            "name": "RSS - Al Jazeera",
+            "disabled": false,
+            "options": {
+                "url": "https://www.aljazeera.com/xml/rss/all.xml",
+                "expected_update_period_in_days": 1,
+                "clean": true,
+                "headers": {}
+            },
+            "schedule": "every_30m",
+            "keep_events_for": 604800,
+            "propagate_immediately": true
+        },
+        {
+            "type": "Agents::RssAgent",
+            "name": "RSS - SCMP (Asia)",
+            "disabled": false,
+            "options": {
+                "url": "https://www.scmp.com/rss/91/feed",
+                "expected_update_period_in_days": 1,
+                "clean": true,
+                "headers": {}
+            },
+            "schedule": "every_1h",
+            "keep_events_for": 604800,
+            "propagate_immediately": true
+        },
+        {
+            "type": "Agents::RssAgent",
+            "name": "RSS - Moscow Times",
+            "disabled": false,
+            "options": {
+                "url": "https://www.themoscowtimes.com/rss/news",
+                "expected_update_period_in_days": 1,
+                "clean": true,
+                "headers": {}
+            },
+            "schedule": "every_1h",
+            "keep_events_for": 604800,
+            "propagate_immediately": true
+        },
+        {
+            "type": "Agents::TriggerAgent",
+            "name": "Filter - Geopolitics & Security",
+            "disabled": false,
+            "options": {
+                "rules": [
+                    {
+                        "type": "regex",
+                        "value": "(?i)(war|conflict|military|attack|bomb|strike|sanction|diplomat|nato|nuclear|missile|drone|weapon|treaty|ceasefire|invasion|occupation|blockade|embargo|coup|assassination|terror|cyber|hack|espionage|intelligence|election interference)",
+                        "path": "title"
+                    }
+                ],
+                "must_match": 1
+            },
+            "keep_events_for": 604800,
+            "propagate_immediately": true,
+            "sources": [
+                "RSS - Reuters World", "RSS - AP News", "RSS - Al Jazeera",
+                "RSS - SCMP (Asia)", "RSS - Moscow Times"
+            ]
+        },
+        {
+            "type": "Agents::WebhookAgent",
+            "name": "Push to Elasticsearch",
+            "disabled": false,
+            "options": {
+                "url": "http://elasticsearch:9200/hego-articles-{{ 'now' | date: '%Y.%m' }}/_doc",
+                "method": "post",
+                "content_type": "json",
+                "headers": {
+                    "Authorization": "Basic {{ 'elastic:${ELASTIC_PASSWORD}' | base64 }}"
+                },
+                "payload": {
+                    "title": "{{ title }}",
+                    "url": "{{ url }}",
+                    "source": "{{ agent_name }}",
+                    "published_date": "{{ date_published }}",
+                    "description": "{{ description | strip_html | truncate: 500 }}",
+                    "category": "news_agency",
+                    "ingested_at": "{{ 'now' | date: '%Y-%m-%dT%H:%M:%SZ' }}"
+                }
+            },
+            "keep_events_for": 86400,
+            "propagate_immediately": false,
+            "sources": ["Filter - Geopolitics & Security"]
+        }
+    ],
+    "links": [
+        {"source": 0, "receiver": 5},
+        {"source": 1, "receiver": 5},
+        {"source": 2, "receiver": 5},
+        {"source": 3, "receiver": 5},
+        {"source": 4, "receiver": 5},
+        {"source": 5, "receiver": 6}
+    ]
+}

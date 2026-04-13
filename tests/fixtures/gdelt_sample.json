@@ -1,0 +1,173 @@
+{
+    "articles": [
+        {
+            "url": "https://www.reuters.com/world/europe/russia-ukraine-tensions-2025-06-15/",
+            "url_mobile": "",
+            "title": "Russia deploys additional military forces near Ukrainian border",
+            "seendate": "20250615T120000Z",
+            "socialimage": "",
+            "domain": "reuters.com",
+            "language": "English",
+            "sourcecountry": "United States",
+            "tone": -6.82,
+            "themes": [
+                "MILITARY",
+                "ARMED_CONFLICT",
+                "NATIONAL_SECURITY",
+                "CRISISLEX_T03_DEAD",
+                "TAX_WEAPONS"
+            ],
+            "locations": [
+                {
+                    "geoType": 3,
+                    "geoName": "Moscow, Russia",
+                    "countryCode": "RS",
+                    "adm1Code": "RS48",
+                    "latitude": 55.7558,
+                    "longitude": 37.6173,
+                    "featureId": "524901"
+                },
+                {
+                    "geoType": 3,
+                    "geoName": "Kyiv, Ukraine",
+                    "countryCode": "UP",
+                    "adm1Code": "UP12",
+                    "latitude": 50.4501,
+                    "longitude": 30.5234,
+                    "featureId": "703448"
+                }
+            ],
+            "persons": [
+                "Vladimir Putin",
+                "Volodymyr Zelenskyy"
+            ],
+            "organizations": [
+                "Russian Ministry of Defense",
+                "NATO",
+                "United Nations"
+            ],
+            "cameo": {
+                "eventCode": "190",
+                "eventBaseCode": "19",
+                "eventRootCode": "19",
+                "goldsteinScale": -10.0,
+                "numArticles": 47,
+                "actor1CountryCode": "RUS",
+                "actor2CountryCode": "UKR",
+                "actor1Name": "RUSSIAN MILITARY",
+                "actor2Name": "UKRAINE"
+            }
+        },
+        {
+            "url": "https://www.aljazeera.com/news/2025/06/15/china-taiwan-tensions-rise",
+            "url_mobile": "",
+            "title": "China conducts military exercises near Taiwan amid diplomatic row",
+            "seendate": "20250615T083000Z",
+            "socialimage": "",
+            "domain": "aljazeera.com",
+            "language": "English",
+            "sourcecountry": "Qatar",
+            "tone": -4.21,
+            "themes": [
+                "MILITARY",
+                "DIPLOMATIC_TENSIONS",
+                "MARITIME_SECURITY",
+                "GENERAL_GOVERNMENT"
+            ],
+            "locations": [
+                {
+                    "geoType": 1,
+                    "geoName": "Taiwan",
+                    "countryCode": "TW",
+                    "adm1Code": "",
+                    "latitude": 23.6978,
+                    "longitude": 120.9605,
+                    "featureId": "1668284"
+                },
+                {
+                    "geoType": 1,
+                    "geoName": "China",
+                    "countryCode": "CH",
+                    "adm1Code": "",
+                    "latitude": 35.8617,
+                    "longitude": 104.1954,
+                    "featureId": "1814991"
+                }
+            ],
+            "persons": [
+                "Xi Jinping",
+                "Lai Ching-te"
+            ],
+            "organizations": [
+                "People's Liberation Army",
+                "Taiwan Ministry of National Defense"
+            ],
+            "cameo": {
+                "eventCode": "130",
+                "eventBaseCode": "13",
+                "eventRootCode": "13",
+                "goldsteinScale": -4.4,
+                "numArticles": 23,
+                "actor1CountryCode": "CHN",
+                "actor2CountryCode": "TWN",
+                "actor1Name": "CHINA",
+                "actor2Name": "TAIWAN"
+            }
+        },
+        {
+            "url": "https://www.france24.com/en/africa/20250615-sahel-military-cooperation",
+            "url_mobile": "",
+            "title": "Sahel nations sign new military cooperation agreement",
+            "seendate": "20250615T140000Z",
+            "socialimage": "",
+            "domain": "france24.com",
+            "language": "English",
+            "sourcecountry": "France",
+            "tone": 2.15,
+            "themes": [
+                "MILITARY_COOPERATION",
+                "DIPLOMATIC_AGREEMENT",
+                "AFRICAN_UNION",
+                "SECURITY_COOPERATION"
+            ],
+            "locations": [
+                {
+                    "geoType": 1,
+                    "geoName": "Mali",
+                    "countryCode": "ML",
+                    "adm1Code": "",
+                    "latitude": 17.5707,
+                    "longitude": -3.9962,
+                    "featureId": "2453866"
+                },
+                {
+                    "geoType": 1,
+                    "geoName": "Burkina Faso",
+                    "countryCode": "UV",
+                    "adm1Code": "",
+                    "latitude": 12.2383,
+                    "longitude": -1.5616,
+                    "featureId": "2361809"
+                }
+            ],
+            "persons": [
+                "Assimi Goita"
+            ],
+            "organizations": [
+                "Alliance of Sahel States",
+                "ECOWAS"
+            ],
+            "cameo": {
+                "eventCode": "043",
+                "eventBaseCode": "04",
+                "eventRootCode": "04",
+                "goldsteinScale": 5.2,
+                "numArticles": 12,
+                "actor1CountryCode": "MLI",
+                "actor2CountryCode": "BFA",
+                "actor1Name": "MALI",
+                "actor2Name": "BURKINA FASO"
+            }
+        }
+    ]
+}

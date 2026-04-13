@@ -1,0 +1,37 @@
+{
+  "mappings": {
+    "properties": {
+      "event_id": { "type": "keyword" },
+      "event_date": { "type": "date", "format": "yyyy-MM-dd||epoch_millis" },
+      "event_type": { "type": "keyword" },
+      "sub_event_type": { "type": "keyword" },
+      "actor1": {
+        "type": "text",
+        "fields": { "keyword": { "type": "keyword" } }
+      },
+      "actor2": {
+        "type": "text",
+        "fields": { "keyword": { "type": "keyword" } }
+      },
+      "country": { "type": "keyword" },
+      "admin1": { "type": "keyword" },
+      "location": {
+        "type": "text",
+        "fields": { "keyword": { "type": "keyword" } }
+      },
+      "geo_location": { "type": "geo_point" },
+      "latitude": { "type": "float" },
+      "longitude": { "type": "float" },
+      "fatalities": { "type": "integer" },
+      "notes": { "type": "text" },
+      "source": { "type": "keyword" },
+      "ingested_at": { "type": "date" }
+    }
+  },
+  "settings": {
+    "number_of_shards": 1,
+    "number_of_replicas": 0,
+    "index.lifecycle.name": "hego-ilm-policy",
+    "index.lifecycle.rollover_alias": "hego-acled"
+  }
+}
