@@ -2,13 +2,13 @@
 
 ## Summary
 
-This use case illustrates how NEGO would have detected the correlation between escalating drone warfare in Libya -- involving Turkish and UAE-supplied systems -- and concurrent cyber operations targeting Ukrainian defense and diplomatic networks. The connection runs through shared military-industrial supply chains and competing geopolitical alignments, a pattern invisible to tools that monitor only one domain.
+This use case illustrates how GEON would have detected the correlation between escalating drone warfare in Libya -- involving Turkish and UAE-supplied systems -- and concurrent cyber operations targeting Ukrainian defense and diplomatic networks. The connection runs through shared military-industrial supply chains and competing geopolitical alignments, a pattern invisible to tools that monitor only one domain.
 
 ## Context
 
 Since 2019, the Libyan civil conflict has served as a testing ground for military drone technology. Turkey provided Bayraktar TB2 drones to the Government of National Accord (GNA), while the UAE supplied Wing Loong II systems to the Libyan National Army (LNA) led by Khalifa Haftar. These same drone platforms and the geopolitical alignments they represent extend to the Ukraine theater, where Turkish Bayraktar drones became a prominent element of Ukrainian defense capabilities.
 
-This overlap creates a triangular dynamic: actors with stakes in the Libyan drone conflict also have interests in the Ukraine conflict, and cyber operations become a tool for intelligence gathering on drone capabilities, supply chains, and diplomatic negotiations.
+This overlap creates a triangular dynamic: actors with stakes in the Libyan drone conflict also have interests in the Ukraine conflict, and cyber operations become a tool for intelligence gathering on drone capabilities, supply chains, and diplomatic geontiations.
 
 ## Data Points
 
@@ -39,7 +39,7 @@ This overlap creates a triangular dynamic: actors with stakes in the Libyan dron
 
 ## Correlation Detected
 
-NEGO's correlation engine would have triggered two rules:
+GEON's correlation engine would have triggered two rules:
 
 ### Correlation 1: Diplomatic Escalation + APT Activity (Rule 1)
 
@@ -72,7 +72,7 @@ Nov 16  --  [CTI]   Campaign attributed to APT group (MITRE techniques mapped)
 Nov 18  --  [GDELT] UAE condemns Turkish military buildup (Goldstein -7.4)
 Nov 20  --  [CTI]   C2 infrastructure linked to Middle Eastern APT cluster
 Nov 22  --  [CTI]   Defense sector VPN vulnerability exploited
-         --  [NEGO]  Correlation alerts generated (2x High severity)
+         --  [GEON]  Correlation alerts generated (2x High severity)
 ```
 
 ## Analysis
@@ -87,18 +87,18 @@ The hypothesis: a state or state-aligned actor with interests opposed to Turkey'
 
 **Limitations**: Attribution in the cyber domain is inherently uncertain. The temporal correlation does not prove causation. The APT cluster's geographic hosting is suggestive but not definitive. Further investigation would require deeper technical analysis of the C2 infrastructure and malware samples.
 
-## NEGO Value
+## GEON Value
 
-Without NEGO, an analyst would need to manually:
+Without GEON, an analyst would need to manually:
 
 1. Monitor ACLED for Libyan conflict events
 2. Track GDELT for Turkey-UAE diplomatic tensions
 3. Review OpenCTI for campaigns targeting defense contractors
 4. Notice the temporal and thematic correlation across all three
 
-NEGO automates this cross-domain detection. The correlation engine identified the pattern within hours of the second cyber event appearing in OpenCTI, generating alerts that prompted human analysis of the connection between Libyan drone warfare and defense-sector cyber operations.
+GEON automates this cross-domain detection. The correlation engine identified the pattern within hours of the second cyber event appearing in OpenCTI, generating alerts that prompted human analysis of the connection between Libyan drone warfare and defense-sector cyber operations.
 
-A pure CTI platform would have flagged the phishing campaign but missed the geopolitical context. A pure geopolitical monitor would have tracked the diplomatic tensions but missed the cyber dimension. NEGO bridges both.
+A pure CTI platform would have flagged the phishing campaign but missed the geopolitical context. A pure geopolitical monitor would have tracked the diplomatic tensions but missed the cyber dimension. GEON bridges both.
 
 ## Dashboard Screenshots
 

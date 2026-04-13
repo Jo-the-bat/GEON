@@ -1,4 +1,4 @@
-"""NEGO Elasticsearch client wrapper.
+"""GEON Elasticsearch client wrapper.
 
 Provides helper functions for connecting to Elasticsearch, managing indices,
 bulk-indexing documents, and querying timestamps for incremental ingestion.

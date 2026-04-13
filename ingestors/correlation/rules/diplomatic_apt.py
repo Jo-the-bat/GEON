@@ -59,7 +59,7 @@ class DiplomaticAPTRule:
 
         Returns:
             List of correlation dicts ready for indexing. Each dict follows
-            the ``nego-correlations`` schema.
+            the ``geon-correlations`` schema.
         """
         correlations: list[dict[str, Any]] = []
 
@@ -196,7 +196,7 @@ class DiplomaticAPTRule:
             apt_matches: List of matching APT campaigns/intrusion sets.
 
         Returns:
-            Correlation document dict following the ``nego-correlations``
+            Correlation document dict following the ``geon-correlations``
             schema.
         """
         now = datetime.now(timezone.utc).isoformat()
@@ -208,7 +208,7 @@ class DiplomaticAPTRule:
         # Pick the most relevant APT match for the summary.
         primary_apt = apt_matches[0] if apt_matches else {}
         apt_name = primary_apt.get("name", "Unknown APT")
-        apt_type = primary_apt.get("_nego_type", "campaign")
+        apt_type = primary_apt.get("_geon_type", "campaign")
 
         # Build a timeline of relevant events.
         timeline: list[dict[str, str]] = [

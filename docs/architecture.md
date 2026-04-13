@@ -1,8 +1,8 @@
-# NEGO Architecture
+# GEON Architecture
 
 ## Overview
 
-NEGO is a multi-container Docker application that ingests, indexes, correlates, and visualizes geopolitical events alongside cyber threat intelligence. All services run in rootless Docker behind a single Nginx reverse proxy with TLS termination and Authelia MFA.
+GEON is a multi-container Docker application that ingests, indexes, correlates, and visualizes geopolitical events alongside cyber threat intelligence. All services run in rootless Docker behind a single Nginx reverse proxy with TLS termination and Authelia MFA.
 
 Elasticsearch serves as the shared data layer, accessed by Grafana for dashboards and visualization, by OpenCTI as its STIX2 knowledge graph backend, and by the Python ingestors for writing geopolitical and CTI data. n8n provides workflow automation for RSS ingestion, entity enrichment, and alert delivery.
 
@@ -16,7 +16,7 @@ Internet
 |     Nginx      |  :443 (TLS via Certbot / Let's Encrypt)
 |  reverse proxy |  :80  (redirect to 443)
 +-------+--------+
-        | Docker internal network (nego_net)
+        | Docker internal network (geon_net)
         |
         +---> /                --> Landing page (static files)
         +---> /opencti         --> opencti:8080
@@ -25,7 +25,7 @@ Internet
         +---> /auth            --> authelia:9091
         |
 +-------+--------------------------------------------------+
-|               Docker network: nego_net                    |
+|               Docker network: geon_net                    |
 |                                                           |
 |  +---------------+  +----------------+  +-------------+  |
 |  | Elasticsearch |  |    OpenCTI     |  |     n8n     |  |
@@ -62,22 +62,22 @@ Internet
 - **Image**: `nginx:alpine`
 - **Role**: TLS termination, reverse proxy routing, static file serving
 - **Ports**: 80 (redirect), 443 (HTTPS) -- the only ports exposed to the public
-- **Configuration**: `docker/nginx/conf.d/nego.conf`
+- **Configuration**: `docker/nginx/conf.d/geon.conf`
 - **TLS**: Let's Encrypt certificates managed by a Certbot sidecar container
 
 ### Elasticsearch
 
 - **Image**: `docker.elastic.co/elasticsearch/elasticsearch:8.x`
 - **Role**: Primary data store for all ingested events, articles, and correlations. Shared by Grafana (dashboards), OpenCTI (STIX2 backend), and the Python ingestors (data writers).
-- **Indices**: `nego-gdelt-*`, `nego-acled-*`, `nego-cti-*`, `nego-sanctions`, `nego-articles-*`, `nego-correlations`
+- **Indices**: `geon-gdelt-*`, `geon-acled-*`, `geon-cti-*`, `geon-sanctions`, `geon-articles-*`, `geon-correlations`
 - **Configuration**: Single-node deployment, 1 primary shard, 0 replicas
-- **Persistence**: Named volume `nego_elasticsearch_data`
+- **Persistence**: Named volume `geon_elasticsearch_data`
 - **Requirement**: `vm.max_map_count >= 262144` on the host
 
 ### Grafana
 
 - **Image**: `grafana/grafana`
-- **Role**: Dashboards and visualization for geopolitical events, CTI data, correlations, and platform monitoring. Connects to Elasticsearch as a datasource to query all `nego-*` indices. Also connects to Prometheus for service health monitoring.
+- **Role**: Dashboards and visualization for geopolitical events, CTI data, correlations, and platform monitoring. Connects to Elasticsearch as a datasource to query all `geon-*` indices. Also connects to Prometheus for service health monitoring.
 - **Access**: Via Nginx at `/grafana`, behind Authelia authentication
 - **Dashboards**: Global overview (Geomap), country profiles (template variables), correlations, article feed, monitoring
 - **Provisioning**: Datasources and dashboards provisioned via YAML and JSON files in `docker/grafana/`
@@ -97,7 +97,7 @@ Internet
 - **Workflows**:
   - RSS Feed Trigger nodes fetch articles from think tanks, agencies, and defense publications
   - Function nodes filter articles by keyword relevance and extract entities (countries, organizations, persons)
-  - Elasticsearch nodes write filtered articles to `nego-articles-YYYY.MM`
+  - Elasticsearch nodes write filtered articles to `geon-articles-YYYY.MM`
   - HTTP Request nodes create reports in OpenCTI via GraphQL for CTI-relevant articles
   - Webhook + notification workflows for alert delivery (Discord, email)
 - **Access**: Via Nginx at `/n8n`, behind Authelia authentication
@@ -124,24 +124,24 @@ Internet
 ### Ingestion Pipeline
 
 ```
-GDELT API -----> gdelt/ingestor.py -----> Elasticsearch (nego-gdelt-events-YYYY.MM)
+GDELT API -----> gdelt/ingestor.py -----> Elasticsearch (geon-gdelt-events-YYYY.MM)
                                      +--> OpenCTI (country/org entities)
 
-ACLED API -----> acled/ingestor.py -----> Elasticsearch (nego-acled-events-YYYY.MM)
+ACLED API -----> acled/ingestor.py -----> Elasticsearch (geon-acled-events-YYYY.MM)
 
-OFAC/EU/UN ----> sanctions/ingestor.py -> Elasticsearch (nego-sanctions)
+OFAC/EU/UN ----> sanctions/ingestor.py -> Elasticsearch (geon-sanctions)
                                      +--> OpenCTI (sanctioned entities)
 
-RSS Feeds -----> n8n workflows ---------> Elasticsearch (nego-articles-YYYY.MM)
+RSS Feeds -----> n8n workflows ---------> Elasticsearch (geon-articles-YYYY.MM)
                                      +--> OpenCTI (reports, if CTI-relevant)
 
-OpenCTI -------> opencti_export/exporter.py -> Elasticsearch (nego-cti-*)
+OpenCTI -------> opencti_export/exporter.py -> Elasticsearch (geon-cti-*)
 ```
 
 ### Visualization Layer
 
 ```
-Elasticsearch (nego-*)
+Elasticsearch (geon-*)
         |
         v
   Grafana Dashboards
@@ -155,12 +155,12 @@ Elasticsearch (nego-*)
 ### Correlation Pipeline
 
 ```
-Elasticsearch (nego-gdelt-*, nego-acled-*, nego-cti-*, nego-sanctions)
+Elasticsearch (geon-gdelt-*, geon-acled-*, geon-cti-*, geon-sanctions)
         |
         v
   Correlation Engine (correlation/engine.py)
         |
-        +--> Elasticsearch (nego-correlations)
+        +--> Elasticsearch (geon-correlations)
         +--> n8n webhook (triggers alert workflows)
         +--> Discord webhook (direct alerts)
         +--> Email (alerts)
@@ -182,12 +182,12 @@ All stateful services use named Docker volumes:
 
 | Volume | Service | Content |
 |--------|---------|---------|
-| `nego_elasticsearch_data` | Elasticsearch | Index data |
-| `nego_opencti_data` | OpenCTI | Platform state |
-| `nego_minio_data` | MinIO | Object storage |
-| `nego_rabbitmq_data` | RabbitMQ | Message queues |
-| `nego_redis_data` | Redis | Cache data |
-| `nego_n8n_data` | n8n | Workflow definitions and execution history |
-| `nego_authelia_data` | Authelia | User database |
-| `nego_prometheus_data` | Prometheus | Metrics |
-| `nego_grafana_data` | Grafana | Dashboard config and user preferences |
+| `geon_elasticsearch_data` | Elasticsearch | Index data |
+| `geon_opencti_data` | OpenCTI | Platform state |
+| `geon_minio_data` | MinIO | Object storage |
+| `geon_rabbitmq_data` | RabbitMQ | Message queues |
+| `geon_redis_data` | Redis | Cache data |
+| `geon_n8n_data` | n8n | Workflow definitions and execution history |
+| `geon_authelia_data` | Authelia | User database |
+| `geon_prometheus_data` | Prometheus | Metrics |
+| `geon_grafana_data` | Grafana | Dashboard config and user preferences |

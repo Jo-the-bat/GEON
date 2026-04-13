@@ -1,5 +1,5 @@
 # =============================================================================
-# NEGO — Grafana Provisioning: Datasources
+# GEON — Grafana Provisioning: Datasources
 # Auto-provisioned on first boot
 # =============================================================================
 
@@ -35,7 +35,7 @@ datasources:
     basicAuth: true
     basicAuthUser: elastic
     jsonData:
-      index: 'nego-*'
+      index: 'geon-*'
       timeField: 'date'
       esVersion: '8.17.0'
       maxConcurrentShardRequests: 5

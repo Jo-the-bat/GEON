@@ -1,4 +1,4 @@
-"""NEGO sanctions ingestor.
+"""GEON sanctions ingestor.
 
 Fetches sanctioned entities from the OFAC SDN list (and optionally EU/UN
 lists) and indexes them into Elasticsearch.  Entities are also created or
@@ -212,7 +212,7 @@ class SanctionsIngestor:
 
     @staticmethod
     def _map_sdn_type(raw: str) -> str:
-        """Map OFAC sdnType to NEGO entity_type vocabulary.
+        """Map OFAC sdnType to GEON entity_type vocabulary.
 
         Args:
             raw: Raw value like ``"Individual"``, ``"Entity"``, ``"Vessel"``.
@@ -375,7 +375,7 @@ def main() -> None:
     """CLI entry point for the sanctions ingestor."""
     setup_logging("sanctions.ingestor")
 
-    parser = argparse.ArgumentParser(description="NEGO sanctions ingestor")
+    parser = argparse.ArgumentParser(description="GEON sanctions ingestor")
     parser.parse_args()
 
     try:

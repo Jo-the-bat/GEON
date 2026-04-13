@@ -1,7 +1,7 @@
 {
-  "uid": "nego-global-overview",
-  "title": "NEGO \u2014 Global Overview",
-  "tags": ["nego", "overview"],
+  "uid": "geon-global-overview",
+  "title": "GEON \u2014 Global Overview",
+  "tags": ["geon", "overview"],
   "timezone": "browser",
   "editable": true,
   "fiscalYearStartMonth": 0,
@@ -78,7 +78,7 @@
       "targets": [
         {
           "refId": "A",
-          "query": "_index:nego-gdelt-*",
+          "query": "_index:geon-gdelt-*",
           "alias": "GDELT Events",
           "metrics": [
             { "id": "1", "type": "count" }
@@ -95,7 +95,7 @@
         },
         {
           "refId": "B",
-          "query": "_index:nego-acled-*",
+          "query": "_index:geon-acled-*",
           "alias": "ACLED Events",
           "metrics": [
             { "id": "1", "type": "count" }
@@ -140,7 +140,7 @@
       "targets": [
         {
           "refId": "A",
-          "query": "_index:nego-gdelt-*",
+          "query": "_index:geon-gdelt-*",
           "alias": "",
           "metrics": [
             { "id": "1", "type": "count" }
@@ -191,7 +191,7 @@
       "targets": [
         {
           "refId": "A",
-          "query": "_index:nego-gdelt-*",
+          "query": "_index:geon-gdelt-*",
           "alias": "Avg Goldstein",
           "metrics": [
             { "id": "1", "type": "avg", "field": "goldstein_scale" }
@@ -233,7 +233,7 @@
       "targets": [
         {
           "refId": "A",
-          "query": "_index:nego-correlations",
+          "query": "_index:geon-correlations",
           "alias": "Correlations",
           "metrics": [
             { "id": "1", "type": "count" }
@@ -273,7 +273,7 @@
       "targets": [
         {
           "refId": "A",
-          "query": "_index:nego-correlations",
+          "query": "_index:geon-correlations",
           "alias": "",
           "metrics": [
             {

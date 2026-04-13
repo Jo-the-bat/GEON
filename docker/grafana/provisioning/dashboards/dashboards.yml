@@ -1,12 +1,12 @@
 # =============================================================================
-# NEGO — Grafana Provisioning: Dashboard provider
+# GEON — Grafana Provisioning: Dashboard provider
 # Auto-provisions dashboards from JSON files on first boot
 # =============================================================================
 
 apiVersion: 1
 
 providers:
-  - name: 'NEGO Dashboards'
+  - name: 'GEON Dashboards'
     orgId: 1
     type: file
     disableDeletion: false

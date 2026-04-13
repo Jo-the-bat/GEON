@@ -33,7 +33,7 @@
   "settings": {
     "number_of_shards": 1,
     "number_of_replicas": 0,
-    "index.lifecycle.name": "nego-ilm-policy",
-    "index.lifecycle.rollover_alias": "nego-gdelt"
+    "index.lifecycle.name": "geon-ilm-policy",
+    "index.lifecycle.rollover_alias": "geon-gdelt"
   }
 }

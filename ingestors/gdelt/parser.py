@@ -1,4 +1,4 @@
-"""NEGO GDELT response parser.
+"""GEON GDELT response parser.
 
 Parses raw responses from the GDELT DOC and GEO APIs into structured dicts
 ready for Elasticsearch indexation.
@@ -50,7 +50,7 @@ CAMEO_SUBCODES: dict[str, str] = {
     "043": "Host a visit",
     "044": "Meet at a third location",
     "045": "Mediate",
-    "046": "Engage in negotiation",
+    "046": "Engage in geontiation",
     # Diplomatic cooperation (05x)
     "050": "Engage in diplomatic cooperation, not specified",
     "051": "Praise or endorse",
@@ -82,7 +82,7 @@ CAMEO_SUBCODES: dict[str, str] = {
     "161": "Reduce or break diplomatic relations",
     "162": "Reduce or stop material aid",
     "163": "Impose embargo, boycott, or sanctions",
-    "164": "Halt negotiations",
+    "164": "Halt geontiations",
     "165": "Halt mediation",
     "166": "Expel or withdraw",
     # Fight (19x)
@@ -242,7 +242,7 @@ def _generate_event_id(event: dict[str, Any]) -> str:
 
 
 def normalize_event(raw_event: dict[str, Any]) -> dict[str, Any]:
-    """Normalize a raw GDELT event into the NEGO Elasticsearch document format.
+    """Normalize a raw GDELT event into the GEON Elasticsearch document format.
 
     Handles both DOC API article objects and GEO API event objects with
     graceful fallbacks for missing fields.

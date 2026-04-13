@@ -1,7 +1,7 @@
 {
-  "uid": "nego-correlations",
-  "title": "NEGO \u2014 Cyber/Geopolitical Correlations",
-  "tags": ["nego", "correlations", "cyber", "geopolitical"],
+  "uid": "geon-correlations",
+  "title": "GEON \u2014 Cyber/Geopolitical Correlations",
+  "tags": ["geon", "correlations", "cyber", "geopolitical"],
   "timezone": "browser",
   "editable": true,
   "fiscalYearStartMonth": 0,
@@ -25,7 +25,7 @@
       "targets": [
         {
           "refId": "A",
-          "query": "_index:nego-correlations",
+          "query": "_index:geon-correlations",
           "alias": "",
           "metrics": [
             {
@@ -98,7 +98,7 @@
       "targets": [
         {
           "refId": "A",
-          "query": "_index:nego-correlations",
+          "query": "_index:geon-correlations",
           "alias": "Correlations",
           "metrics": [
             { "id": "1", "type": "count" }
@@ -142,7 +142,7 @@
       "targets": [
         {
           "refId": "A",
-          "query": "_index:nego-correlations AND severity:\"critical\"",
+          "query": "_index:geon-correlations AND severity:\"critical\"",
           "alias": "Critical",
           "metrics": [
             { "id": "1", "type": "count" }
@@ -174,7 +174,7 @@
       "targets": [
         {
           "refId": "A",
-          "query": "_index:nego-correlations AND severity:\"high\"",
+          "query": "_index:geon-correlations AND severity:\"high\"",
           "alias": "High",
           "metrics": [
             { "id": "1", "type": "count" }
@@ -206,7 +206,7 @@
       "targets": [
         {
           "refId": "A",
-          "query": "_index:nego-correlations AND severity:\"medium\"",
+          "query": "_index:geon-correlations AND severity:\"medium\"",
           "alias": "Medium",
           "metrics": [
             { "id": "1", "type": "count" }
@@ -238,7 +238,7 @@
       "targets": [
         {
           "refId": "A",
-          "query": "_index:nego-correlations AND severity:\"low\"",
+          "query": "_index:geon-correlations AND severity:\"low\"",
           "alias": "Low",
           "metrics": [
             { "id": "1", "type": "count" }

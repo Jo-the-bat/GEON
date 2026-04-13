@@ -1,4 +1,4 @@
-"""NEGO correlation rules.
+"""GEON correlation rules.
 
 Each rule class implements a ``run()`` method that queries Elasticsearch and/or
 OpenCTI for matching patterns and returns a list of correlation dicts.

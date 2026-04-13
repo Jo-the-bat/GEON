@@ -1,17 +1,17 @@
 # =============================================================================
-# NEGO — Elasticsearch Configuration
+# GEON — Elasticsearch Configuration
 # Single-node deployment with security enabled
 # =============================================================================
 
 # ---------------------------------------------------------------------------
 # Cluster
 # ---------------------------------------------------------------------------
-cluster.name: ${ELASTIC_CLUSTER_NAME:nego}
+cluster.name: ${ELASTIC_CLUSTER_NAME:geon}
 
 # ---------------------------------------------------------------------------
 # Node
 # ---------------------------------------------------------------------------
-node.name: nego-es-01
+node.name: geon-es-01
 node.roles: [master, data, ingest]
 
 # ---------------------------------------------------------------------------
@@ -54,7 +54,7 @@ xpack.license.self_generated.type: basic
 bootstrap.memory_lock: true
 
 # Index defaults
-action.auto_create_index: "+nego-*,+.kibana*,+.security*,+.apm*,+opencti*,+.internal*,+.transform*,+.async*,+.reporting*"
+action.auto_create_index: "+geon-*,+.kibana*,+.security*,+.apm*,+opencti*,+.internal*,+.transform*,+.async*,+.reporting*"
 
 # ---------------------------------------------------------------------------
 # ILM — Index Lifecycle Management

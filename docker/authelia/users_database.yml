@@ -1,5 +1,5 @@
 # =============================================================================
-# NEGO — Authelia Users Database
+# GEON — Authelia Users Database
 # =============================================================================
 #
 # To generate a password hash, run:
@@ -11,9 +11,9 @@
 users:
   admin:
     disabled: false
-    displayname: 'NEGO Administrator'
+    displayname: 'GEON Administrator'
     password: '$argon2id$v=19$m=65536,t=3,p=4$srxbcobK0G6QEWkWSjrg+w$GOy0VZK7YhoC++He9wSWMWNhXuQrrkqd73IYlQ7XOGg'
-    email: 'admin@nego.local'
+    email: 'admin@geon.local'
     groups:
       - 'admins'
-      - 'nego-users'
+      - 'geon-users'

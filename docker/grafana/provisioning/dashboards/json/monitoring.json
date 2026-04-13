@@ -1,7 +1,7 @@
 {
-  "uid": "nego-monitoring",
-  "title": "NEGO \u2014 Platform Monitoring",
-  "tags": ["nego", "monitoring", "ops"],
+  "uid": "geon-monitoring",
+  "title": "GEON \u2014 Platform Monitoring",
+  "tags": ["geon", "monitoring", "ops"],
   "timezone": "browser",
   "editable": true,
   "fiscalYearStartMonth": 0,
@@ -65,7 +65,7 @@
       "targets": [
         {
           "refId": "A",
-          "query": "_index:nego-gdelt-*",
+          "query": "_index:geon-gdelt-*",
           "alias": "GDELT",
           "metrics": [
             { "id": "1", "type": "max", "field": "date" }
@@ -75,7 +75,7 @@
         },
         {
           "refId": "B",
-          "query": "_index:nego-acled-*",
+          "query": "_index:geon-acled-*",
           "alias": "ACLED",
           "metrics": [
             { "id": "1", "type": "max", "field": "date" }
@@ -85,7 +85,7 @@
         },
         {
           "refId": "C",
-          "query": "_index:nego-articles-*",
+          "query": "_index:geon-articles-*",
           "alias": "Articles (RSS)",
           "metrics": [
             { "id": "1", "type": "max", "field": "date" }
@@ -95,7 +95,7 @@
         },
         {
           "refId": "D",
-          "query": "_index:nego-cti-*",
+          "query": "_index:geon-cti-*",
           "alias": "OpenCTI Export",
           "metrics": [
             { "id": "1", "type": "max", "field": "date" }
@@ -105,7 +105,7 @@
         },
         {
           "refId": "E",
-          "query": "_index:nego-sanctions",
+          "query": "_index:geon-sanctions",
           "alias": "Sanctions",
           "metrics": [
             { "id": "1", "type": "max", "field": "date" }
@@ -115,7 +115,7 @@
         },
         {
           "refId": "F",
-          "query": "_index:nego-correlations",
+          "query": "_index:geon-correlations",
           "alias": "Correlations",
           "metrics": [
             { "id": "1", "type": "max", "field": "timestamp" }
@@ -176,7 +176,7 @@
       "targets": [
         {
           "refId": "A",
-          "query": "_index:nego-gdelt-*",
+          "query": "_index:geon-gdelt-*",
           "alias": "GDELT",
           "metrics": [
             { "id": "1", "type": "count" }
@@ -186,7 +186,7 @@
         },
         {
           "refId": "B",
-          "query": "_index:nego-acled-*",
+          "query": "_index:geon-acled-*",
           "alias": "ACLED",
           "metrics": [
             { "id": "1", "type": "count" }
@@ -196,7 +196,7 @@
         },
         {
           "refId": "C",
-          "query": "_index:nego-articles-*",
+          "query": "_index:geon-articles-*",
           "alias": "Articles",
           "metrics": [
             { "id": "1", "type": "count" }
@@ -206,7 +206,7 @@
         },
         {
           "refId": "D",
-          "query": "_index:nego-cti-*",
+          "query": "_index:geon-cti-*",
           "alias": "CTI",
           "metrics": [
             { "id": "1", "type": "count" }
@@ -216,7 +216,7 @@
         },
         {
           "refId": "E",
-          "query": "_index:nego-sanctions",
+          "query": "_index:geon-sanctions",
           "alias": "Sanctions",
           "metrics": [
             { "id": "1", "type": "count" }
@@ -226,7 +226,7 @@
         },
         {
           "refId": "F",
-          "query": "_index:nego-correlations",
+          "query": "_index:geon-correlations",
           "alias": "Correlations",
           "metrics": [
             { "id": "1", "type": "count" }

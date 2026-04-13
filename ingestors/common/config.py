@@ -1,4 +1,4 @@
-"""NEGO configuration module.
+"""GEON configuration module.
 
 Loads environment variables from the project root .env file and exposes
 them as module-level constants. Provides a logging setup helper.
@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 
 # ---------------------------------------------------------------------------
 # Locate and load the .env file from the project root (two levels up from
-# this file: ingestors/common/config.py -> ingestors/ -> nego/).
+# this file: ingestors/common/config.py -> ingestors/ -> geon/).
 # ---------------------------------------------------------------------------
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 _ENV_PATH = _PROJECT_ROOT / ".env"
@@ -61,7 +61,7 @@ ALERT_EMAIL_PASSWORD: str = os.getenv("ALERT_EMAIL_PASSWORD", "")
 # ---------------------------------------------------------------------------
 # Index naming
 # ---------------------------------------------------------------------------
-INDEX_PREFIX: str = "nego"
+INDEX_PREFIX: str = "geon"
 
 # ---------------------------------------------------------------------------
 # Retry defaults (used by tenacity decorators across the project)

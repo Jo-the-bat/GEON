@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# NEGO — Backup Script
+# GEON — Backup Script
 # Creates Elasticsearch snapshots and exports OpenCTI data.
 # Retains the last 7 daily backups.
 
@@ -25,7 +25,7 @@ RETENTION_DAYS=7
 ES_HOST="${ES_HOST:-http://localhost:9200}"
 ES_USER="${ES_USER:-elastic}"
 ES_PASS="${ELASTIC_PASSWORD:-changeme}"
-SNAPSHOT_REPO="nego_backup"
+SNAPSHOT_REPO="geon_backup"
 
 OPENCTI_URL="${OPENCTI_URL:-http://localhost:8080}"
 OPENCTI_TOKEN="${OPENCTI_ADMIN_TOKEN:-}"
@@ -40,7 +40,7 @@ info() { echo -e "${CYAN}[INFO]${NC}  $(date '+%Y-%m-%d %H:%M:%S') $*"; }
 ok()   { echo -e "${GREEN}[OK]${NC}    $(date '+%Y-%m-%d %H:%M:%S') $*"; }
 fail() { echo -e "${RED}[FAIL]${NC}  $(date '+%Y-%m-%d %H:%M:%S') $*"; }
 
-info "Starting NEGO backup: ${TIMESTAMP}"
+info "Starting GEON backup: ${TIMESTAMP}"
 
 mkdir -p "$BACKUP_PATH"
 
@@ -67,8 +67,8 @@ else
     echo "     Ensure path.repo is set in elasticsearch.yml and the directory exists."
 fi
 
-# Create a snapshot of all nego-* indices
-SNAPSHOT_NAME="nego_${TIMESTAMP}"
+# Create a snapshot of all geon-* indices
+SNAPSHOT_NAME="geon_${TIMESTAMP}"
 info "Creating Elasticsearch snapshot: ${SNAPSHOT_NAME}"
 
 SNAPSHOT_RESULT=$(curl -s -o /dev/null -w "%{http_code}" \
@@ -76,7 +76,7 @@ SNAPSHOT_RESULT=$(curl -s -o /dev/null -w "%{http_code}" \
     -X PUT "${ES_HOST}/_snapshot/${SNAPSHOT_REPO}/${SNAPSHOT_NAME}?wait_for_completion=true" \
     -H "Content-Type: application/json" \
     -d "{
-        \"indices\": \"nego-*\",
+        \"indices\": \"geon-*\",
         \"ignore_unavailable\": true,
         \"include_global_state\": false
     }" 2>/dev/null || echo "000")
@@ -94,7 +94,7 @@ curl -s -u "${ES_USER}:${ES_PASS}" \
 
 # Export index list
 curl -s -u "${ES_USER}:${ES_PASS}" \
-    "${ES_HOST}/_cat/indices/nego-*?v&h=index,docs.count,store.size" \
+    "${ES_HOST}/_cat/indices/geon-*?v&h=index,docs.count,store.size" \
     2>/dev/null > "${BACKUP_PATH}/es_indices.txt" || true
 
 ok "Elasticsearch index metadata saved."
@@ -102,7 +102,7 @@ ok "Elasticsearch index metadata saved."
 # --- 2. n8n Backup (SQLite database) ---
 info "Backing up n8n data..."
 
-N8N_VOLUME="nego_n8n_data"
+N8N_VOLUME="geon_n8n_data"
 N8N_CONTAINER=$(docker ps --filter "name=n8n" --format "{{.Names}}" 2>/dev/null | head -1)
 
 if [ -n "$N8N_CONTAINER" ]; then
@@ -166,7 +166,7 @@ fi
 # --- 4. Compress ---
 info "Compressing backup..."
 
-ARCHIVE="${BACKUP_DIR}/nego_backup_${TIMESTAMP}.tar.gz"
+ARCHIVE="${BACKUP_DIR}/geon_backup_${TIMESTAMP}.tar.gz"
 tar -czf "$ARCHIVE" -C "$BACKUP_DIR" "$TIMESTAMP" 2>/dev/null
 
 # Remove the uncompressed directory
@@ -177,7 +177,7 @@ ok "Backup archived: ${ARCHIVE}"
 info "Cleaning old backups (keeping last ${RETENTION_DAYS} days)..."
 
 DELETED=0
-find "$BACKUP_DIR" -name "nego_backup_*.tar.gz" -type f -mtime "+${RETENTION_DAYS}" -print -delete 2>/dev/null | while read -r OLD; do
+find "$BACKUP_DIR" -name "geon_backup_*.tar.gz" -type f -mtime "+${RETENTION_DAYS}" -print -delete 2>/dev/null | while read -r OLD; do
     info "  Deleted: $(basename "$OLD")"
     DELETED=$((DELETED + 1))
 done
