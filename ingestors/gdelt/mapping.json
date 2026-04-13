@@ -33,7 +33,7 @@
   "settings": {
     "number_of_shards": 1,
     "number_of_replicas": 0,
-    "index.lifecycle.name": "hego-ilm-policy",
-    "index.lifecycle.rollover_alias": "hego-gdelt"
+    "index.lifecycle.name": "nego-ilm-policy",
+    "index.lifecycle.rollover_alias": "nego-gdelt"
   }
 }

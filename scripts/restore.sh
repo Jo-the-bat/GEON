@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# HEGO — Restore Script
+# NEGO — Restore Script
 # Restores an Elasticsearch snapshot and OpenCTI data from a backup archive.
 #
 # Usage: ./scripts/restore.sh <backup_archive.tar.gz>
-# Example: ./scripts/restore.sh backups/hego_backup_20250615_040000.tar.gz
+# Example: ./scripts/restore.sh backups/nego_backup_20250615_040000.tar.gz
 
 set -euo pipefail
 
@@ -22,7 +22,7 @@ fi
 ES_HOST="${ES_HOST:-http://localhost:9200}"
 ES_USER="${ES_USER:-elastic}"
 ES_PASS="${ELASTIC_PASSWORD:-changeme}"
-SNAPSHOT_REPO="hego_backup"
+SNAPSHOT_REPO="nego_backup"
 
 OPENCTI_URL="${OPENCTI_URL:-http://localhost:8080}"
 OPENCTI_TOKEN="${OPENCTI_ADMIN_TOKEN:-}"
@@ -44,7 +44,7 @@ if [ $# -lt 1 ]; then
     echo "Usage: $0 <backup_archive.tar.gz>"
     echo ""
     echo "Available backups:"
-    ls -1t "${PROJECT_DIR}/backups"/hego_backup_*.tar.gz 2>/dev/null || echo "  (none found)"
+    ls -1t "${PROJECT_DIR}/backups"/nego_backup_*.tar.gz 2>/dev/null || echo "  (none found)"
     exit 1
 fi
 
@@ -109,16 +109,16 @@ fi
 info "Snapshot to restore: ${SNAPSHOT_NAME}"
 
 # Close indices that will be restored (to avoid conflicts)
-warn "This will close and overwrite existing hego-* indices."
+warn "This will close and overwrite existing nego-* indices."
 read -rp "Continue? [y/N] " CONFIRM
 if [[ ! "$CONFIRM" =~ ^[Yy]$ ]]; then
     info "Restore cancelled."
     exit 0
 fi
 
-info "Closing existing hego-* indices..."
+info "Closing existing nego-* indices..."
 curl -s -u "${ES_USER}:${ES_PASS}" \
-    -X POST "${ES_HOST}/hego-*/_close?ignore_unavailable=true" 2>/dev/null || true
+    -X POST "${ES_HOST}/nego-*/_close?ignore_unavailable=true" 2>/dev/null || true
 
 # Restore the snapshot
 info "Restoring snapshot ${SNAPSHOT_NAME}..."
@@ -127,7 +127,7 @@ RESTORE_RESULT=$(curl -s -w "\n%{http_code}" \
     -X POST "${ES_HOST}/_snapshot/${SNAPSHOT_REPO}/${SNAPSHOT_NAME}/_restore?wait_for_completion=true" \
     -H "Content-Type: application/json" \
     -d '{
-        "indices": "hego-*",
+        "indices": "nego-*",
         "ignore_unavailable": true,
         "include_global_state": false
     }' 2>/dev/null)
@@ -141,7 +141,44 @@ else
     fail "Elasticsearch restore failed (HTTP ${HTTP_CODE}): ${BODY}"
 fi
 
-# --- 2. Restore OpenCTI Data ---
+# --- 2. Restore n8n Data ---
+info "Checking for n8n database backup..."
+
+if [ -f "${BACKUP_DIR}/n8n_database.sqlite" ]; then
+    N8N_CONTAINER=$(docker ps --filter "name=n8n" --format "{{.Names}}" 2>/dev/null | head -1)
+    if [ -n "$N8N_CONTAINER" ]; then
+        warn "This will overwrite the current n8n database."
+        read -rp "Restore n8n database? [y/N] " N8N_CONFIRM
+        if [[ "$N8N_CONFIRM" =~ ^[Yy]$ ]]; then
+            # Stop n8n before restoring
+            info "Stopping n8n container..."
+            docker stop "$N8N_CONTAINER" 2>/dev/null || true
+
+            docker cp "${BACKUP_DIR}/n8n_database.sqlite" \
+                "${N8N_CONTAINER}:/home/node/.n8n/database.sqlite" 2>/dev/null && \
+                ok "n8n database restored." || \
+                fail "Could not restore n8n database."
+
+            # Restore encryption key if present
+            if [ -f "${BACKUP_DIR}/n8n_encryption_key" ]; then
+                docker cp "${BACKUP_DIR}/n8n_encryption_key" \
+                    "${N8N_CONTAINER}:/home/node/.n8n/.n8n-encryption-key" 2>/dev/null || true
+            fi
+
+            info "Restarting n8n container..."
+            docker start "$N8N_CONTAINER" 2>/dev/null || true
+        else
+            info "Skipping n8n restore."
+        fi
+    else
+        warn "n8n container not running. Copy manually:"
+        echo "      docker cp ${BACKUP_DIR}/n8n_database.sqlite <n8n_container>:/home/node/.n8n/database.sqlite"
+    fi
+else
+    info "No n8n database found in this backup."
+fi
+
+# --- 3. Restore OpenCTI Data ---
 info "Checking for OpenCTI export data..."
 
 if [ -f "${BACKUP_DIR}/opencti_reports.json" ] && [ -n "$OPENCTI_TOKEN" ]; then
@@ -174,5 +211,5 @@ echo ""
 ok "Restore complete."
 echo ""
 info "  Elasticsearch snapshot: ${SNAPSHOT_NAME}"
-info "  Verify indices: curl -s -u ${ES_USER}:*** ${ES_HOST}/_cat/indices/hego-*?v"
+info "  Verify indices: curl -s -u ${ES_USER}:*** ${ES_HOST}/_cat/indices/nego-*?v"
 echo ""

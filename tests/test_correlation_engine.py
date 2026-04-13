@@ -1,4 +1,4 @@
-"""Tests for the HEGO correlation engine."""
+"""Tests for the NEGO correlation engine."""
 
 import json
 from datetime import datetime, timedelta

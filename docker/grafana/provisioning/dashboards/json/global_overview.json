@@ -1,0 +1,321 @@
+{
+  "uid": "nego-global-overview",
+  "title": "NEGO \u2014 Global Overview",
+  "tags": ["nego", "overview"],
+  "timezone": "browser",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "refresh": "5m",
+  "schemaVersion": 39,
+  "time": {
+    "from": "now-30d",
+    "to": "now"
+  },
+  "templating": {
+    "list": []
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "GDELT Events — World Map",
+      "type": "geomap",
+      "gridPos": { "h": 12, "w": 16, "x": 0, "y": 0 },
+      "datasource": { "uid": "elasticsearch" },
+      "targets": [
+        {
+          "refId": "A",
+          "query": "",
+          "alias": "Events",
+          "metrics": [
+            { "id": "1", "type": "count" }
+          ],
+          "bucketAggs": [
+            {
+              "id": "3",
+              "type": "geohash_grid",
+              "field": "geo_location",
+              "settings": { "precision": "3" }
+            }
+          ],
+          "timeField": "date"
+        }
+      ],
+      "options": {
+        "view": {
+          "id": "coords",
+          "lat": 20,
+          "lon": 0,
+          "zoom": 2
+        },
+        "basemap": {
+          "type": "default",
+          "name": "World"
+        },
+        "layers": [
+          {
+            "type": "heatmap",
+            "name": "GDELT Events",
+            "config": {
+              "weight": { "fixed": 1 },
+              "radius": { "fixed": 20 },
+              "blur": { "fixed": 15 }
+            }
+          }
+        ]
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      }
+    },
+    {
+      "id": 2,
+      "title": "Event Count Over Time",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 16, "x": 0, "y": 12 },
+      "datasource": { "uid": "elasticsearch" },
+      "targets": [
+        {
+          "refId": "A",
+          "query": "_index:nego-gdelt-*",
+          "alias": "GDELT Events",
+          "metrics": [
+            { "id": "1", "type": "count" }
+          ],
+          "bucketAggs": [
+            {
+              "id": "2",
+              "type": "date_histogram",
+              "field": "date",
+              "settings": { "interval": "1d", "min_doc_count": "0" }
+            }
+          ],
+          "timeField": "date"
+        },
+        {
+          "refId": "B",
+          "query": "_index:nego-acled-*",
+          "alias": "ACLED Events",
+          "metrics": [
+            { "id": "1", "type": "count" }
+          ],
+          "bucketAggs": [
+            {
+              "id": "2",
+              "type": "date_histogram",
+              "field": "date",
+              "settings": { "interval": "1d", "min_doc_count": "0" }
+            }
+          ],
+          "timeField": "date"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 20,
+            "pointSize": 5,
+            "lineWidth": 2,
+            "showPoints": "auto",
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      }
+    },
+    {
+      "id": 3,
+      "title": "Top 10 Countries by Event Count",
+      "type": "bargauge",
+      "gridPos": { "h": 12, "w": 8, "x": 16, "y": 0 },
+      "datasource": { "uid": "elasticsearch" },
+      "targets": [
+        {
+          "refId": "A",
+          "query": "_index:nego-gdelt-*",
+          "alias": "",
+          "metrics": [
+            { "id": "1", "type": "count" }
+          ],
+          "bucketAggs": [
+            {
+              "id": "2",
+              "type": "terms",
+              "field": "source_country",
+              "settings": {
+                "size": "10",
+                "order": "desc",
+                "orderBy": "_count",
+                "min_doc_count": "1"
+              }
+            }
+          ],
+          "timeField": "date"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 100 },
+              { "color": "red", "value": 500 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "showUnfilled": true
+      }
+    },
+    {
+      "id": 4,
+      "title": "Average Tone (Goldstein Scale)",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 16, "y": 12 },
+      "datasource": { "uid": "elasticsearch" },
+      "targets": [
+        {
+          "refId": "A",
+          "query": "_index:nego-gdelt-*",
+          "alias": "Avg Goldstein",
+          "metrics": [
+            { "id": "1", "type": "avg", "field": "goldstein_scale" }
+          ],
+          "bucketAggs": [],
+          "timeField": "date"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "orange", "value": -5 },
+              { "color": "yellow", "value": -2 },
+              { "color": "green", "value": 0 }
+            ]
+          },
+          "decimals": 2
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "textMode": "auto"
+      }
+    },
+    {
+      "id": 5,
+      "title": "Active Correlations",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 20, "y": 12 },
+      "datasource": { "uid": "elasticsearch" },
+      "targets": [
+        {
+          "refId": "A",
+          "query": "_index:nego-correlations",
+          "alias": "Correlations",
+          "metrics": [
+            { "id": "1", "type": "count" }
+          ],
+          "bucketAggs": [],
+          "timeField": "timestamp"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "blue", "value": null },
+              { "color": "yellow", "value": 10 },
+              { "color": "red", "value": 50 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "auto"
+      }
+    },
+    {
+      "id": 6,
+      "title": "Latest Correlations",
+      "type": "table",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 16 },
+      "datasource": { "uid": "elasticsearch" },
+      "targets": [
+        {
+          "refId": "A",
+          "query": "_index:nego-correlations",
+          "alias": "",
+          "metrics": [
+            {
+              "id": "1",
+              "type": "raw_data",
+              "settings": { "size": "20" }
+            }
+          ],
+          "bucketAggs": [],
+          "timeField": "timestamp"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "sortBy": [{ "displayName": "timestamp", "desc": true }]
+      },
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "includeByName": {
+              "timestamp": true,
+              "rule_name": true,
+              "severity": true,
+              "countries_involved": true,
+              "description": true
+            },
+            "indexByName": {
+              "timestamp": 0,
+              "rule_name": 1,
+              "severity": 2,
+              "countries_involved": 3,
+              "description": 4
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "version": 1
+}

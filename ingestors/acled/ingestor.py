@@ -1,4 +1,4 @@
-"""HEGO ACLED ingestor.
+"""NEGO ACLED ingestor.
 
 Fetches armed-conflict events from the ACLED API and indexes them into
 Elasticsearch for use in correlation analysis and Kibana dashboards.
@@ -192,7 +192,7 @@ class ACLEDIngestor:
             date_str: Date in ``YYYY-MM-DD`` format.
 
         Returns:
-            Index name like ``hego-acled-events-2026.04``.
+            Index name like ``nego-acled-events-2026.04``.
         """
         try:
             dt = datetime.strptime(date_str[:10], "%Y-%m-%d")
@@ -277,7 +277,7 @@ def main() -> None:
     """CLI entry point for the ACLED ingestor."""
     setup_logging("acled.ingestor")
 
-    parser = argparse.ArgumentParser(description="HEGO ACLED event ingestor")
+    parser = argparse.ArgumentParser(description="NEGO ACLED event ingestor")
     parser.add_argument(
         "--days",
         type=int,

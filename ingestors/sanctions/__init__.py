@@ -1,1 +1,1 @@
-"""HEGO sanctions ingestor — fetches and indexes international sanctions lists."""
+"""NEGO sanctions ingestor — fetches and indexes international sanctions lists."""

@@ -1,5 +1,5 @@
 # =============================================================================
-# HEGO — Authelia Users Database
+# NEGO — Authelia Users Database
 # =============================================================================
 #
 # To generate a password hash, run:
@@ -11,9 +11,9 @@
 users:
   admin:
     disabled: false
-    displayname: 'HEGO Administrator'
+    displayname: 'NEGO Administrator'
     password: '$argon2id$v=19$m=65536,t=3,p=4$srxbcobK0G6QEWkWSjrg+w$GOy0VZK7YhoC++He9wSWMWNhXuQrrkqd73IYlQ7XOGg'
-    email: 'admin@hego.local'
+    email: 'admin@nego.local'
     groups:
       - 'admins'
-      - 'hego-users'
+      - 'nego-users'
