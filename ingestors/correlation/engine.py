@@ -1,9 +1,9 @@
-"""HEGO correlation engine.
+"""NEGO correlation engine.
 
 Orchestrates the execution of all correlation rules, indexes the results
 into Elasticsearch, and dispatches alerts for significant findings.
 
-This is the core value engine of the HEGO platform: it detects patterns
+This is the core value engine of the NEGO platform: it detects patterns
 that span geopolitical events (GDELT, ACLED, sanctions) and cyber threat
 intelligence (OpenCTI) to surface actionable intelligence.
 
@@ -87,7 +87,7 @@ CORRELATIONS_MAPPING: dict[str, Any] = {
 }
 
 # Temporary mapping file path (written at runtime).
-_MAPPING_TMP_PATH = Path("/tmp/hego-correlations-mapping.json")
+_MAPPING_TMP_PATH = Path("/tmp/nego-correlations-mapping.json")
 
 # Map rule numbers (for CLI) to rule classes.
 RULE_REGISTRY: dict[int, type] = {
@@ -114,7 +114,7 @@ class CorrelationEngine:
     1. Initialises Elasticsearch and OpenCTI clients.
     2. Loads and runs each correlation rule.
     3. Deduplicates results against previously indexed correlations.
-    4. Indexes new correlations into ``hego-correlations``.
+    4. Indexes new correlations into ``nego-correlations``.
     5. Dispatches alerts for high/critical findings.
 
     Attributes:
@@ -428,7 +428,7 @@ def main() -> None:
     setup_logging("correlation.engine")
 
     parser = argparse.ArgumentParser(
-        description="HEGO correlation engine — detect cross-domain patterns"
+        description="NEGO correlation engine — detect cross-domain patterns"
     )
     parser.add_argument(
         "--rules",

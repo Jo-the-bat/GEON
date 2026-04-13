@@ -1,1 +1,1 @@
-"""HEGO common utilities — shared clients, config, and helpers."""
+"""NEGO common utilities — shared clients, config, and helpers."""

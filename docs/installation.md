@@ -1,4 +1,4 @@
-# HEGO Installation Guide
+# NEGO Installation Guide
 
 ## Prerequisites
 
@@ -74,8 +74,8 @@ docker info 2>/dev/null | grep -i rootless
 ## Step 2: Clone the Repository
 
 ```bash
-git clone https://github.com/Jo-the-bat/HEGO.git
-cd HEGO
+git clone https://github.com/Jo-the-bat/NEGO.git
+cd NEGO
 ```
 
 ---
@@ -89,13 +89,15 @@ nano .env
 
 At minimum, set the following:
 
-1. **HEGO_DOMAIN** -- your domain name (e.g., `hego.joranbatty.fr`)
-2. **HEGO_EMAIL** -- email for Let's Encrypt certificate notifications
+1. **NEGO_DOMAIN** -- your domain name (e.g., `hego.joranbatty.fr`)
+2. **NEGO_EMAIL** -- email for Let's Encrypt certificate notifications
 3. **ELASTIC_PASSWORD** -- a strong password for Elasticsearch
 4. **OPENCTI_ADMIN_PASSWORD** -- a strong password for the OpenCTI admin
 5. **OPENCTI_ADMIN_TOKEN** -- generate a UUID: `python3 -c "import uuid; print(uuid.uuid4())"`
+6. **N8N_ENCRYPTION_KEY** -- generate a 32-character key for n8n workflow encryption
+7. **GF_SECURITY_ADMIN_PASSWORD** -- a strong password for the Grafana admin
 
-Generate strong passwords for the other services (RabbitMQ, MinIO, Huginn, Authelia).
+Generate strong passwords for the other services (RabbitMQ, MinIO, Authelia).
 
 All fields marked `<GENERATE>` need unique random values. All fields marked `<YOUR_*>` need your actual API keys.
 
@@ -137,8 +139,8 @@ Services start in dependency order:
 
 1. Redis, RabbitMQ, MinIO (no dependencies)
 2. Elasticsearch (waits for healthy state)
-3. Kibana, OpenCTI (wait for Elasticsearch)
-4. Huginn (waits for Redis)
+3. Grafana, OpenCTI (wait for Elasticsearch)
+4. n8n (waits for Redis)
 5. Authelia
 6. Nginx (waits for all upstream services)
 
@@ -155,8 +157,8 @@ docker compose -f docker/docker-compose.yml ps
 # Test Elasticsearch
 curl -sk -u elastic:${ELASTIC_PASSWORD} https://localhost:9200/_cluster/health | python3 -m json.tool
 
-# Test Kibana (may take 1-2 minutes after ES is ready)
-curl -sk https://hego.joranbatty.fr/kibana/api/status | python3 -m json.tool
+# Test Grafana
+curl -sk https://hego.joranbatty.fr/grafana/api/health | python3 -m json.tool
 
 # Test OpenCTI
 curl -sk https://hego.joranbatty.fr/opencti/health
@@ -164,14 +166,15 @@ curl -sk https://hego.joranbatty.fr/opencti/health
 
 ---
 
-## Step 7: Set Up Kibana Index Patterns
+## Step 7: Set Up Grafana Datasources
 
-```bash
-chmod +x kibana/index_patterns/setup.sh
-./kibana/index_patterns/setup.sh
-```
+Grafana datasources are provisioned automatically via `docker/grafana/datasources.yml`. If you need to verify or adjust them:
 
-This creates index patterns for all HEGO indices so Kibana can discover and visualize the data.
+1. Open Grafana at `https://hego.joranbatty.fr/grafana`
+2. Navigate to **Configuration > Data sources**
+3. Verify the Elasticsearch datasource points to `http://elasticsearch:9200` and the Prometheus datasource points to `http://prometheus:9090`
+
+The Elasticsearch datasource should be configured with index patterns matching `nego-*` to discover all NEGO indices.
 
 ---
 
@@ -211,12 +214,17 @@ crontab scripts/crontab.example
 
 ---
 
-## Step 9: Import Huginn Scenarios
+## Step 9: Import n8n Workflows
 
-1. Open Huginn at `https://hego.joranbatty.fr/huginn`
-2. Log in with the invitation code set in `.env`
-3. Go to **Scenarios** > **Import**
-4. Import each JSON file from `huginn/scenarios/`
+1. Open n8n at `https://hego.joranbatty.fr/n8n`
+2. Log in with the credentials set in `.env` (`N8N_BASIC_AUTH_USER` / `N8N_BASIC_AUTH_PASSWORD`)
+3. Go to **Workflows > Import from File**
+4. Import each JSON file from `n8n/workflows/`:
+   - `rss_think_tanks.json` -- RSS feeds from research institutes
+   - `rss_agencies.json` -- News agency RSS feeds
+   - `rss_defense.json` -- Defense and cybersecurity RSS feeds
+   - `enrichment_pipeline.json` -- Entity extraction and OpenCTI enrichment
+5. Activate each workflow after verifying its configuration
 
 ---
 
@@ -257,6 +265,18 @@ Certbot auto-renewal is handled by the Certbot sidecar container.
 
 - The upstream service is not yet ready. Wait and retry.
 - Check the specific service logs: `docker compose logs <service>`
+
+### Grafana shows "No data" on dashboards
+
+- Verify the Elasticsearch datasource is configured and reachable
+- Ensure at least one ingestor has run to populate the `nego-*` indices
+- Check that the index pattern in the dashboard panels matches your indices
+
+### n8n workflows fail to execute
+
+- Check n8n logs: `docker compose logs n8n`
+- Verify Elasticsearch and OpenCTI URLs are reachable from within the Docker network (use service names, not localhost)
+- Ensure the `N8N_ENCRYPTION_KEY` has not changed since workflows were created
 
 ### Permission denied errors
 

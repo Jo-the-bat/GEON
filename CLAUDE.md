@@ -1,145 +1,156 @@
-# HEGO — Huginn, Elasticsearch, GDELT, OpenCTI
+# NEGO -- n8n, Elasticsearch, GDELT, OpenCTI
 
-## Identité du projet
+## Identite du projet
 
-HEGO est une plateforme d'intelligence géopolitique et cyber qui corrèle automatiquement les événements diplomatiques/militaires avec l'activité des menaces cyber (APT, campagnes, IoC). Le nom est un acronyme de la stack technique (Huginn, Elasticsearch, GDELT, OpenCTI) et fait écho au grec ἡγεμονία (hégémonie).
+NEGO est une plateforme d'intelligence geopolitique et cyber qui correle automatiquement les evenements diplomatiques/militaires avec l'activite des menaces cyber (APT, campagnes, IoC). Le nom est un acronyme de la stack technique (**n**8n, **E**lasticsearch, **G**DELT, **O**penCTI) et evoque la negociation, concept central des relations internationales.
 
-**Positionnement** : Aucun outil open source existant ne fait la convergence entre CTI structurée (OpenCTI/STIX2) et données géopolitiques (GDELT/ACLED). World Monitor fait du géopolitique sans CTI. Les intégrations OpenCTI/Elastic existantes font de la CTI sans géopolitique. HEGO comble ce gap.
+**Positionnement** : Aucun outil open source existant ne fait la convergence entre CTI structuree (OpenCTI/STIX2) et donnees geopolitiques (GDELT/ACLED). World Monitor fait du geopolitique sans CTI. Les integrations OpenCTI/Elastic existantes font de la CTI sans geopolitique. NEGO comble ce gap.
 
-**Contexte** : Projet personnel de Joran Batty, professionnel en cybersécurité (analyste SOC, administration Linux/Docker), destiné à servir de portfolio pour une candidature en Master Relations Internationales. Le projet doit démontrer la capacité à croiser analyse technique et compréhension géopolitique.
+**Contexte** : Projet personnel de Joran Batty, professionnel en cybersecurite (analyste SOC, administration Linux/Docker), destine a servir de portfolio pour une candidature en Master Relations Internationales. Le projet doit demontrer la capacite a croiser analyse technique et comprehension geopolitique.
 
 ---
 
-## Architecture générale
+## Architecture generale
 
 ```
 Internet
-   │
-   ▼
-┌──────────────┐
-│    Nginx     │ :443 (TLS via Certbot / Let's Encrypt)
-│  reverse     │ :80  (redirect → 443)
-│  proxy       │
-└──────┬───────┘
-       │ réseau Docker interne uniquement
-       ├──→ /                →  Landing page HEGO (statique)
-       ├──→ /opencti         →  opencti:8080
-       ├──→ /kibana          →  kibana:5601
-       ├──→ /huginn          →  huginn:3000
-       └──→ /auth            →  authelia:9091
+   |
+   v
++----------------+
+|     Nginx      | :443 (TLS via Certbot / Let's Encrypt)
+|  reverse proxy | :80  (redirect -> 443)
++-------+--------+
+        | reseau Docker interne uniquement
+        +---> /                -->  Landing page NEGO (statique)
+        +---> /opencti         -->  opencti:8080
+        +---> /grafana         -->  grafana:3000
+        +---> /n8n             -->  n8n:5678
+        +---> /auth            -->  authelia:9091
 
-┌─────────────────────────────────────────────────────┐
-│              Réseau interne Docker                   │
-│                                                      │
-│  ┌─────────────┐  ┌──────────────┐  ┌────────────┐ │
-│  │ Elasticsearch│  │   OpenCTI    │  │   Huginn   │ │
-│  │  + Kibana    │  │  (GraphQL)   │  │  (agents)  │ │
-│  └──────┬──────┘  └──────┬───────┘  └─────┬──────┘ │
-│         │                │                 │         │
-│  ┌──────┴──────┐  ┌──────┴───────┐  ┌─────┴──────┐ │
-│  │   Redis     │  │  RabbitMQ    │  │  MinIO     │ │
-│  └─────────────┘  └──────────────┘  └────────────┘ │
-│                                                      │
-│  ┌─────────────────────────────────────────────────┐ │
-│  │           Scripts d'ingestion Python            │ │
-│  │  • GDELT ingestor (cron)                        │ │
-│  │  • ACLED ingestor (cron)                        │ │
-│  │  • Sanctions ingestor (cron)                    │ │
-│  │  • RSS aggregator → Huginn                      │ │
-│  │  • Corrélation engine (cron)                    │ │
-│  └─────────────────────────────────────────────────┘ │
-│                                                      │
-│  ┌──────────────┐  ┌──────────────┐                 │
-│  │   Authelia   │  │  Prometheus  │                 │
-│  │   (MFA)      │  │  + Grafana   │                 │
-│  └──────────────┘  └──────────────┘                 │
-└─────────────────────────────────────────────────────┘
++-----------------------------------------------------------+
+|               Reseau interne Docker                        |
+|                                                            |
+|  +-----------------+  +-----------------+  +------------+  |
+|  | Elasticsearch   |  |    OpenCTI      |  |    n8n     |  |
+|  | (stockage,      |  |   (GraphQL,     |  | (workflow  |  |
+|  |  indexation)     |  |    STIX2)       |  |  engine)   |  |
+|  +--------+--------+  +--------+--------+  +-----+------+  |
+|           |                    |                  |          |
+|  +--------+--------+  +-------+--------+  +------+------+  |
+|  |    Grafana      |  |   RabbitMQ     |  |    Redis    |  |
+|  | (dashboards,    |  |  (msg broker)  |  |   (cache)   |  |
+|  |  visualisation) |  +----------------+  +-------------+  |
+|  +-----------------+                                        |
+|                        +----------------+                   |
+|                        |     MinIO      |                   |
+|                        | (object store) |                   |
+|                        +----------------+                   |
+|                                                            |
+|  +----------------------------------------------------+   |
+|  |           Scripts d'ingestion Python                |   |
+|  |  - GDELT ingestor (cron)                            |   |
+|  |  - ACLED ingestor (cron)                            |   |
+|  |  - Sanctions ingestor (cron)                        |   |
+|  |  - OpenCTI exporter (cron)                          |   |
+|  |  - Correlation engine (cron)                        |   |
+|  +----------------------------------------------------+   |
+|                                                            |
+|  +-----------------+  +-----------------+                  |
+|  |   Authelia      |  |   Prometheus    |                  |
+|  |   (MFA)         |  |  (monitoring)   |                  |
+|  +-----------------+  +-----------------+                  |
++------------------------------------------------------------+
 ```
+
+**Flux de donnees** : Elasticsearch est le point central partage par trois consommateurs :
+- **Grafana** interroge Elasticsearch pour les dashboards geopolitiques et CTI
+- **OpenCTI** utilise Elasticsearch comme backend de stockage pour le graphe STIX2
+- **Les ingestors Python** ecrivent dans Elasticsearch (index `nego-*`)
+- **n8n** orchestre les workflows d'automatisation (RSS, enrichissement, webhooks)
 
 ---
 
 ## Stack technique
 
-| Composant | Rôle | Image Docker |
+| Composant | Role | Image Docker |
 |-----------|------|--------------|
 | **Nginx** | Reverse proxy, TLS termination, Let's Encrypt | `nginx:alpine` + certbot sidecar |
-| **Elasticsearch** | Stockage, indexation, recherche, agrégations | `docker.elastic.co/elasticsearch/elasticsearch:8.x` |
-| **Kibana** | Dashboards, visualisations, cartes, timelines | `docker.elastic.co/kibana/kibana:8.x` |
+| **Elasticsearch** | Stockage, indexation, recherche, agregations (partage par OpenCTI, Grafana et les ingestors) | `docker.elastic.co/elasticsearch/elasticsearch:8.x` |
+| **Grafana** | Dashboards geopolitiques, visualisations, cartes, timelines, monitoring | `grafana/grafana` |
 | **OpenCTI** | Graphe de connaissances CTI, relations STIX2 | `opencti/platform:latest` |
-| **Huginn** | Agents automatisés : veille RSS, enrichissement, déclencheurs | `ghcr.io/huginn/huginn` |
-| **Redis** | Cache pour OpenCTI et Huginn | `redis:7-alpine` |
+| **n8n** | Automatisation de workflows : veille RSS, enrichissement, declencheurs, webhooks | `docker.n8n.io/n8nio/n8n` |
+| **Redis** | Cache pour OpenCTI | `redis:7-alpine` |
 | **RabbitMQ** | Message broker pour OpenCTI | `rabbitmq:3-management-alpine` |
 | **MinIO** | Stockage objet pour OpenCTI | `minio/minio` |
-| **Authelia** | Authentification centralisée + MFA devant Nginx | `authelia/authelia` |
-| **Prometheus** | Monitoring du stack | `prom/prometheus` |
-| **Grafana** | Dashboards de monitoring | `grafana/grafana` |
+| **Authelia** | Authentification centralisee + MFA devant Nginx | `authelia/authelia` |
+| **Prometheus** | Collecte de metriques pour le monitoring | `prom/prometheus` |
 | **Certbot** | Renouvellement automatique Let's Encrypt | `certbot/certbot` |
 
 ---
 
-## Contraintes techniques impératives
+## Contraintes techniques imperatives
 
 ### Rootless Docker
 
-L'ensemble du stack DOIT tourner en Docker rootless. Raisons : sécurité (surface d'attaque réduite), cohérence avec le positionnement sécu du projet.
+L'ensemble du stack DOIT tourner en Docker rootless. Raisons : securite (surface d'attaque reduite), coherence avec le positionnement secu du projet.
 
-**Configuration requise sur le host (seules commandes root nécessaires) :**
+**Configuration requise sur le host (seules commandes root necessaires) :**
 ```bash
 # Pour Elasticsearch
 sudo sysctl -w vm.max_map_count=262144
 echo "vm.max_map_count=262144" | sudo tee -a /etc/sysctl.d/99-elasticsearch.conf
 
-# Pour les ports privilégiés (80/443)
+# Pour les ports privilegies (80/443)
 sudo sysctl -w net.ipv4.ip_unprivileged_port_start=80
 echo "net.ipv4.ip_unprivileged_port_start=80" | sudo tee -a /etc/sysctl.d/99-unprivileged-ports.conf
 ```
 
-**Toute la suite (docker compose, builds, etc.) s'exécute en tant qu'utilisateur non-root.**
+**Toute la suite (docker compose, builds, etc.) s'execute en tant qu'utilisateur non-root.**
 
-### Réseau
+### Reseau
 
 - AUCUN service interne ne doit exposer de port sur l'interface publique, sauf Nginx (80/443)
-- Toute communication inter-services passe par le réseau Docker interne
+- Toute communication inter-services passe par le reseau Docker interne
 - Les services internes communiquent par leurs noms de service Docker (DNS interne)
 - Le domaine cible est `hego.joranbatty.fr` avec un certificat Let's Encrypt
 
-### Sécurité
+### Securite
 
-- Authelia devant tous les services web (Kibana, OpenCTI, Huginn, Grafana)
-- MFA activé (TOTP)
+- Authelia devant tous les services web (Grafana, OpenCTI, n8n)
+- MFA active (TOTP)
 - Toutes les credentials dans un fichier `.env` hors du repo (gitignore)
 - Aucun mot de passe en dur dans le docker-compose ou les scripts
 - Healthchecks Docker sur tous les services critiques
 
 ### Volumes et persistance
 
-- Tous les services avec état doivent avoir des volumes nommés Docker
-- Convention de nommage : `hego_<service>_data` (ex: `hego_elasticsearch_data`)
+- Tous les services avec etat doivent avoir des volumes nommes Docker
+- Convention de nommage : `nego_<service>_data` (ex: `nego_elasticsearch_data`)
 - Un script de backup qui snapshot les index Elasticsearch et exporte la base OpenCTI
 
 ---
 
-## Sources de données
+## Sources de donnees
 
 ### 1. GDELT (Global Database of Events, Language, and Tone)
 
-**Rôle** : Source principale d'événements géopolitiques mondiaux.
+**Role** : Source principale d'evenements geopolitiques mondiaux.
 
 **API** : `https://api.gdeltproject.org/api/v2/`
-- GDELT DOC API : articles, tonalité, thèmes, géolocalisation
-- GDELT GEO API : événements géolocalisés
-- GDELT TV API : monitoring médias TV (optionnel)
+- GDELT DOC API : articles, tonalite, themes, geolocalisation
+- GDELT GEO API : evenements geolocalises
+- GDELT TV API : monitoring medias TV (optionnel)
 
-**Filtres à appliquer** :
-- Catégories CAMEO pertinentes : conflits armés (19x), menaces (13x), sanctions (16x), coopération militaire (04x), diplomatie (05x, 06x)
-- Filtrage géographique par pays/régions d'intérêt
-- Score de tonalité (Goldstein scale) pour détecter les pics négatifs
+**Filtres a appliquer** :
+- Categories CAMEO pertinentes : conflits armes (19x), menaces (13x), sanctions (16x), cooperation militaire (04x), diplomatie (05x, 06x)
+- Filtrage geographique par pays/regions d'interet
+- Score de tonalite (Goldstein scale) pour detecter les pics negatifs
 
 **Ingestion** : Script Python avec cron toutes les 15 minutes.
-- Requête l'API GDELT
-- Parse et structure les événements
-- Indexe dans Elasticsearch (index `hego-gdelt-events-YYYY.MM`)
-- Crée des entités dans OpenCTI si pertinent (pays, organisations)
+- Requete l'API GDELT
+- Parse et structure les evenements
+- Indexe dans Elasticsearch (index `nego-gdelt-events-YYYY.MM`)
+- Cree des entites dans OpenCTI si pertinent (pays, organisations)
 
 **Index Elasticsearch** :
 ```json
@@ -164,14 +175,14 @@ echo "net.ipv4.ip_unprivileged_port_start=80" | sudo tee -a /etc/sysctl.d/99-unp
 
 ### 2. ACLED (Armed Conflict Location & Event Data)
 
-**Rôle** : Données de terrain sur les conflits armés, violences politiques, manifestations.
+**Role** : Donnees de terrain sur les conflits armes, violences politiques, manifestations.
 
 **API** : `https://api.acleddata.com/acled/read/`
-- Nécessite une clé API (gratuite pour usage non-commercial)
-- Événements géolocalisés avec types (batailles, violences contre civils, émeutes, etc.)
+- Necessite une cle API (gratuite pour usage non-commercial)
+- Evenements geolocalises avec types (batailles, violences contre civils, emeutes, etc.)
 
 **Ingestion** : Script Python avec cron quotidien.
-- Index : `hego-acled-events-YYYY.MM`
+- Index : `nego-acled-events-YYYY.MM`
 
 **Mapping** :
 ```json
@@ -197,70 +208,70 @@ echo "net.ipv4.ip_unprivileged_port_start=80" | sudo tee -a /etc/sysctl.d/99-unp
 
 **Sources** :
 - OFAC (US Treasury) : `https://sanctionslistservice.ofac.treas.gov/api/`
-- EU Consolidated Sanctions : via le site du Conseil européen
+- EU Consolidated Sanctions : via le site du Conseil europeen
 - UN Security Council Sanctions : via l'API UN
 
 **Ingestion** : Script Python avec cron hebdomadaire.
-- Index : `hego-sanctions`
-- Enrichit les entités dans OpenCTI (personnes, organisations, pays sanctionnés)
+- Index : `nego-sanctions`
+- Enrichit les entites dans OpenCTI (personnes, organisations, pays sanctionnes)
 
-### 4. Flux RSS via Huginn
+### 4. Flux RSS via n8n
 
-**Sources à agréger** (non exhaustif) :
+**Sources a agreger** (non exhaustif) :
 - **Think tanks** : IRSEM, IFRI, CSIS, Brookings, Chatham House, War on the Rocks, Lawfare, The Diplomat, Carnegie Endowment, RAND
 - **Agences** : Reuters, AFP, AP
 - **Institutionnel** : ANSSI (alertes), CERT-FR, CISA, ENISA
-- **Défense** : Revue Défense Nationale, Jane's (si accessible), Defense One
-- **Régional** : Al Jazeera, SCMP, Moscow Times
+- **Defense** : Revue Defense Nationale, Jane's (si accessible), Defense One
+- **Regional** : Al Jazeera, SCMP, Moscow Times
 
-**Pipeline Huginn** :
-1. Agent RSS → récupère les articles
-2. Agent de filtrage → garde uniquement les articles pertinents (mots-clés géopolitique/cyber/défense)
-3. Agent d'extraction → extrait entités (pays, organisations, personnes) via regex/NLP basique
-4. Agent webhook → pousse dans Elasticsearch (index `hego-articles-YYYY.MM`)
-5. Agent webhook → crée des entités/rapports dans OpenCTI si c'est du CTI
+**Pipeline n8n** :
+1. Noeud RSS Feed Trigger -> recupere les articles a intervalles reguliers
+2. Noeud Function (filtrage) -> garde uniquement les articles pertinents (mots-cles geopolitique/cyber/defense)
+3. Noeud Function (extraction) -> extrait entites (pays, organisations, personnes) via regex/NLP basique
+4. Noeud Elasticsearch -> pousse dans Elasticsearch (index `nego-articles-YYYY.MM`)
+5. Noeud HTTP Request -> cree des entites/rapports dans OpenCTI via l'API GraphQL si c'est du CTI
 
 ### 5. OpenCTI Feeds (CTI technique)
 
-**Connecteurs OpenCTI à activer** :
+**Connecteurs OpenCTI a activer** :
 - MITRE ATT&CK
 - AlienVault OTX
 - Abuse IPDB
-- OpenCTI Datasets (secteurs, géographie)
+- OpenCTI Datasets (secteurs, geographie)
 - CISA Known Exploited Vulnerabilities
 - CVE (NVD)
-- Red Flag Domains (optionnel, déjà configuré sur le serveur SOC)
+- Red Flag Domains (optionnel, deja configure sur le serveur SOC)
 
-**Export vers Elasticsearch** : Utiliser le connecteur Elastic officiel ou un script custom qui interroge l'API GraphQL d'OpenCTI et indexe dans `hego-cti-*`.
+**Export vers Elasticsearch** : Utiliser le connecteur Elastic officiel ou un script custom qui interroge l'API GraphQL d'OpenCTI et indexe dans `nego-cti-*`.
 
 ---
 
-## Moteur de corrélation
+## Moteur de correlation
 
-C'est le cœur de la valeur ajoutée de HEGO. Un script Python (ou ensemble de scripts) qui tourne en cron et cherche des patterns inter-sources.
+C'est le coeur de la valeur ajoutee de NEGO. Un script Python (ou ensemble de scripts) qui tourne en cron et cherche des patterns inter-sources.
 
-### Règles de corrélation
+### Regles de correlation
 
-**Règle 1 : Escalade diplomatique + activité APT**
-- Déclencheur : score Goldstein < -5 (tension forte) sur une paire de pays dans GDELT
-- ET : campagne APT attribuée à l'un des deux pays dans OpenCTI dans une fenêtre de ±30 jours
-- Action : créer une alerte dans `hego-correlations`, enrichir le rapport OpenCTI
+**Regle 1 : Escalade diplomatique + activite APT**
+- Declencheur : score Goldstein < -5 (tension forte) sur une paire de pays dans GDELT
+- ET : campagne APT attribuee a l'un des deux pays dans OpenCTI dans une fenetre de +/-30 jours
+- Action : creer une alerte dans `nego-correlations`, enrichir le rapport OpenCTI
 
-**Règle 2 : Sanction + pic cyber**
-- Déclencheur : nouvelle sanction contre un pays/entité
-- ET : augmentation > 200% des IoC liés à ce pays dans les 60 jours suivants
+**Regle 2 : Sanction + pic cyber**
+- Declencheur : nouvelle sanction contre un pays/entite
+- ET : augmentation > 200% des IoC lies a ce pays dans les 60 jours suivants
 - Action : alerte + timeline automatique
 
-**Règle 3 : Conflit armé + infrastructure cyber**
-- Déclencheur : événement ACLED de type "bataille" ou "violence contre civils"
-- ET : activité cyber attribuée à un acteur de la même zone dans OpenCTI
-- Action : alerte + corrélation géographique
+**Regle 3 : Conflit arme + infrastructure cyber**
+- Declencheur : evenement ACLED de type "bataille" ou "violence contre civils"
+- ET : activite cyber attribuee a un acteur de la meme zone dans OpenCTI
+- Action : alerte + correlation geographique
 
-**Règle 4 : Changement de rhétorique**
-- Déclencheur : variation de tonalité GDELT > 2 écarts-types sur 7 jours pour une paire de pays
-- Action : alerte "signal faible" dans `hego-correlations`
+**Regle 4 : Changement de rhetorique**
+- Declencheur : variation de tonalite GDELT > 2 ecarts-types sur 7 jours pour une paire de pays
+- Action : alerte "signal faible" dans `nego-correlations`
 
-### Index de corrélation
+### Index de correlation
 
 ```json
 {
@@ -280,64 +291,75 @@ C'est le cœur de la valeur ajoutée de HEGO. Un script Python (ou ensemble de s
 
 ## Alerting
 
-### Elasticsearch Watcher / Rules
+### Grafana Alerting
 
-Configurer des alertes Kibana qui se déclenchent sur :
-- Nouvelle entrée dans `hego-correlations` avec severity >= high
-- Plus de N articles négatifs (tone < -5) sur un pays en 24h
-- Nouveau groupe APT détecté dans OpenCTI lié à un pays en conflit actif dans ACLED
-- Nouvelle sanction ingérée
+Configurer des regles d'alerte Grafana qui se declenchent sur :
+- Nouvelle entree dans `nego-correlations` avec severity >= high
+- Plus de N articles negatifs (tone < -5) sur un pays en 24h
+- Nouveau groupe APT detecte dans OpenCTI lie a un pays en conflit actif dans ACLED
+- Nouvelle sanction ingeree
+
+Les alertes Grafana interrogent directement Elasticsearch via la datasource configuree.
+
+### n8n Alerting Workflows
+
+n8n peut egalement declencher des alertes via des workflows dedies :
+- Webhook entrant depuis le moteur de correlation Python
+- Noeud de decision sur la severite
+- Envoi vers Discord ou email selon le niveau
 
 ### Notifications
 
-Les alertes sont envoyées via :
-- **Discord webhook** (canal dédié HEGO)
-- **Email** (via Huginn ou Elasticsearch Watcher)
+Les alertes sont envoyees via :
+- **Discord webhook** (canal dedie NEGO)
+- **Email** (via n8n workflows ou Grafana contact points)
 
 Format de notification :
 ```
-🔴 [HEGO ALERT] Corrélation détectée
-Règle: Escalade diplomatique + activité APT
-Pays: Russie ↔ Ukraine
-Événement diplo: Goldstein -8.3 — "Military force deployment"
-Événement cyber: APT28 — Campagne phishing ciblant infrastructure énergétique
-Fenêtre: 12 jours
-Dashboard: https://hego.joranbatty.fr/kibana/app/dashboards#/view/correlations
+[NEGO ALERT] Correlation detectee
+Regle: Escalade diplomatique + activite APT
+Pays: Russie <-> Ukraine
+Evenement diplo: Goldstein -8.3 -- "Military force deployment"
+Evenement cyber: APT28 -- Campagne phishing ciblant infrastructure energetique
+Fenetre: 12 jours
+Dashboard: https://hego.joranbatty.fr/grafana/d/correlations
 ```
 
 ---
 
-## Dashboards Kibana
+## Dashboards Grafana
+
+Grafana se connecte a Elasticsearch en tant que datasource pour visualiser toutes les donnees indexees. Il remplace Kibana dans cette architecture, offrant un point unique pour les dashboards geopolitiques, CTI et monitoring.
 
 ### Dashboard 1 : Vue globale (landing)
-- Carte mondiale avec les événements GDELT (points) + conflits ACLED (zones) + campagnes APT (vecteurs)
+- Carte mondiale avec les evenements GDELT (points) + conflits ACLED (zones) + campagnes APT (vecteurs) via le panel Geomap
 - Timeline des 30 derniers jours
-- Top 10 pays par nombre d'événements
-- Score de tonalité moyen par région
-- Dernières corrélations détectées
+- Top 10 pays par nombre d'evenements
+- Score de tonalite moyen par region
+- Dernieres correlations detectees
 
 ### Dashboard 2 : Fiche pays
-- Sélecteur de pays
-- Timeline des événements (GDELT + ACLED + CTI) pour ce pays
-- Groupes APT attribués (via OpenCTI)
+- Variable template pour selectionner un pays
+- Timeline des evenements (GDELT + ACLED + CTI) pour ce pays
+- Groupes APT attribues (via OpenCTI)
 - Sanctions actives
 - Score de risque composite
-- Articles récents (RSS)
+- Articles recents (RSS)
 
-### Dashboard 3 : Corrélations cyber/géopolitique
-- Liste des corrélations détectées par le moteur
-- Filtres par sévérité, pays, type de règle
-- Vue détaillée avec timeline croisée (événement diplo + événement cyber sur le même axe)
+### Dashboard 3 : Correlations cyber/geopolitique
+- Liste des correlations detectees par le moteur
+- Filtres par severite, pays, type de regle via variables
+- Vue detaillee avec timeline croisee (evenement diplo + evenement cyber sur le meme axe)
 
 ### Dashboard 4 : Veille articles
-- Flux des articles ingérés via Huginn
-- Filtres par source, pays, thème
-- Nuage de mots-clés
+- Flux des articles ingeres via n8n
+- Filtres par source, pays, theme
+- Nuage de mots-cles (via panel Word cloud)
 - Tendances sur 7/30 jours
 
-### Dashboard 5 : Monitoring HEGO
-- Santé des services (via Prometheus)
-- Dernière ingestion par source (GDELT, ACLED, RSS, OpenCTI)
+### Dashboard 5 : Monitoring NEGO
+- Sante des services (via Prometheus datasource)
+- Derniere ingestion par source (GDELT, ACLED, RSS, OpenCTI)
 - Volume d'index Elasticsearch
 - Alertes de monitoring
 
@@ -346,118 +368,118 @@ Dashboard: https://hego.joranbatty.fr/kibana/app/dashboards#/view/correlations
 ## Structure du repository
 
 ```
-hego/
-├── CLAUDE.md                          # Ce fichier
-├── README.md                          # Documentation publique
-├── LICENSE                            # MIT ou Apache 2.0
-├── .env.example                       # Template des variables d'environnement
-├── .gitignore
-│
-├── docker/
-│   ├── docker-compose.yml             # Compose principal
-│   ├── docker-compose.override.yml    # Overrides dev local (optionnel)
-│   ├── nginx/
-│   │   ├── nginx.conf                 # Config principale Nginx
-│   │   ├── conf.d/
-│   │   │   └── hego.conf              # Vhost HEGO avec reverse proxy
-│   │   └── ssl/                       # Certificats (gitignore, généré par certbot)
-│   ├── authelia/
-│   │   ├── configuration.yml
-│   │   └── users_database.yml
-│   ├── elasticsearch/
-│   │   └── elasticsearch.yml
-│   ├── kibana/
-│   │   └── kibana.yml
-│   ├── opencti/
-│   │   └── opencti.env
-│   ├── huginn/
-│   │   └── .env
-│   ├── prometheus/
-│   │   └── prometheus.yml
-│   └── grafana/
-│       └── datasources.yml
-│
-├── ingestors/
-│   ├── requirements.txt               # Dépendances Python communes
-│   ├── common/
-│   │   ├── __init__.py
-│   │   ├── es_client.py               # Client Elasticsearch partagé
-│   │   ├── opencti_client.py           # Client OpenCTI GraphQL partagé
-│   │   └── config.py                   # Chargement .env, constantes
-│   ├── gdelt/
-│   │   ├── __init__.py
-│   │   ├── ingestor.py                 # Script principal d'ingestion GDELT
-│   │   ├── parser.py                   # Parsing des réponses GDELT
-│   │   └── mapping.json                # Mapping Elasticsearch pour l'index GDELT
-│   ├── acled/
-│   │   ├── __init__.py
-│   │   ├── ingestor.py
-│   │   └── mapping.json
-│   ├── sanctions/
-│   │   ├── __init__.py
-│   │   ├── ingestor.py
-│   │   └── mapping.json
-│   ├── opencti_export/
-│   │   ├── __init__.py
-│   │   ├── exporter.py                 # Export OpenCTI → Elasticsearch
-│   │   └── mapping.json
-│   └── correlation/
-│       ├── __init__.py
-│       ├── engine.py                   # Moteur de corrélation principal
-│       ├── rules/
-│       │   ├── __init__.py
-│       │   ├── diplomatic_apt.py       # Règle 1
-│       │   ├── sanction_cyber.py       # Règle 2
-│       │   ├── conflict_cyber.py       # Règle 3
-│       │   └── rhetoric_shift.py       # Règle 4
-│       └── alerting.py                 # Envoi des alertes (Discord, email)
-│
-├── kibana/
-│   ├── dashboards/                     # Exports JSON des dashboards Kibana
-│   │   ├── global_overview.ndjson
-│   │   ├── country_profile.ndjson
-│   │   ├── correlations.ndjson
-│   │   ├── articles.ndjson
-│   │   └── monitoring.ndjson
-│   └── index_patterns/                 # Index patterns pré-configurés
-│       └── setup.sh
-│
-├── huginn/
-│   └── scenarios/                      # Exports JSON des scénarios Huginn
-│       ├── rss_think_tanks.json
-│       ├── rss_agencies.json
-│       ├── rss_defense.json
-│       └── enrichment_pipeline.json
-│
-├── scripts/
-│   ├── setup.sh                        # Script d'installation initial
-│   ├── backup.sh                       # Backup Elasticsearch + OpenCTI
-│   ├── restore.sh                      # Restauration
-│   └── crontab.example                 # Exemple de crontab pour les ingestors
-│
-├── landing/                            # Page d'accueil statique HEGO
-│   ├── index.html
-│   ├── style.css
-│   └── assets/
-│       └── logo.svg
-│
-├── docs/
-│   ├── architecture.md                 # Documentation architecture détaillée
-│   ├── installation.md                 # Guide d'installation pas à pas
-│   ├── data_sources.md                 # Documentation des sources de données
-│   ├── correlation_rules.md            # Documentation des règles de corrélation
-│   └── use_cases/
-│       ├── libya_ukraine_drones.md     # Cas d'usage : affaire Libye/Ukraine
-│       └── template.md                 # Template pour nouveaux cas d'usage
-│
-└── tests/
-    ├── test_gdelt_parser.py
-    ├── test_acled_ingestor.py
-    ├── test_correlation_engine.py
-    └── fixtures/
-        ├── gdelt_sample.json
-        ├── acled_sample.json
-        └── opencti_sample.json
+nego/
++-- CLAUDE.md                          # Ce fichier
++-- README.md                          # Documentation publique
++-- LICENSE                            # MIT ou Apache 2.0
++-- .env.example                       # Template des variables d'environnement
++-- .gitignore
+|
++-- docker/
+|   +-- docker-compose.yml             # Compose principal
+|   +-- docker-compose.override.yml    # Overrides dev local (optionnel)
+|   +-- nginx/
+|   |   +-- nginx.conf                 # Config principale Nginx
+|   |   +-- conf.d/
+|   |   |   +-- nego.conf              # Vhost NEGO avec reverse proxy
+|   |   +-- ssl/                       # Certificats (gitignore, genere par certbot)
+|   +-- authelia/
+|   |   +-- configuration.yml
+|   |   +-- users_database.yml
+|   +-- elasticsearch/
+|   |   +-- elasticsearch.yml
+|   +-- opencti/
+|   |   +-- opencti.env
+|   +-- n8n/
+|   |   +-- n8n.env                    # Variables d'environnement n8n
+|   +-- prometheus/
+|   |   +-- prometheus.yml
+|   +-- grafana/
+|       +-- datasources.yml            # Elasticsearch + Prometheus datasources
+|       +-- dashboards.yml             # Dashboard provisioning config
+|       +-- dashboards/                # Fichiers JSON de dashboards provisionnes
+|
++-- ingestors/
+|   +-- requirements.txt               # Dependances Python communes
+|   +-- common/
+|   |   +-- __init__.py
+|   |   +-- es_client.py               # Client Elasticsearch partage
+|   |   +-- opencti_client.py           # Client OpenCTI GraphQL partage
+|   |   +-- config.py                   # Chargement .env, constantes
+|   +-- gdelt/
+|   |   +-- __init__.py
+|   |   +-- ingestor.py                 # Script principal d'ingestion GDELT
+|   |   +-- parser.py                   # Parsing des reponses GDELT
+|   |   +-- mapping.json                # Mapping Elasticsearch pour l'index GDELT
+|   +-- acled/
+|   |   +-- __init__.py
+|   |   +-- ingestor.py
+|   |   +-- mapping.json
+|   +-- sanctions/
+|   |   +-- __init__.py
+|   |   +-- ingestor.py
+|   |   +-- mapping.json
+|   +-- opencti_export/
+|   |   +-- __init__.py
+|   |   +-- exporter.py                 # Export OpenCTI -> Elasticsearch
+|   |   +-- mapping.json
+|   +-- correlation/
+|       +-- __init__.py
+|       +-- engine.py                   # Moteur de correlation principal
+|       +-- rules/
+|       |   +-- __init__.py
+|       |   +-- diplomatic_apt.py       # Regle 1
+|       |   +-- sanction_cyber.py       # Regle 2
+|       |   +-- conflict_cyber.py       # Regle 3
+|       |   +-- rhetoric_shift.py       # Regle 4
+|       +-- alerting.py                 # Envoi des alertes (Discord, email)
+|
++-- n8n/
+|   +-- workflows/                      # Exports JSON des workflows n8n
+|       +-- rss_think_tanks.json
+|       +-- rss_agencies.json
+|       +-- rss_defense.json
+|       +-- enrichment_pipeline.json
+|
++-- grafana/
+|   +-- dashboards/                     # Exports JSON des dashboards Grafana
+|   |   +-- global_overview.json
+|   |   +-- country_profile.json
+|   |   +-- correlations.json
+|   |   +-- articles.json
+|   |   +-- monitoring.json
+|   +-- datasources/                    # Datasource provisioning
+|       +-- setup.sh
+|
++-- scripts/
+|   +-- setup.sh                        # Script d'installation initial
+|   +-- backup.sh                       # Backup Elasticsearch + OpenCTI
+|   +-- restore.sh                      # Restauration
+|   +-- crontab.example                 # Exemple de crontab pour les ingestors
+|
++-- landing/                            # Page d'accueil statique NEGO
+|   +-- index.html
+|   +-- style.css
+|   +-- assets/
+|       +-- logo.svg
+|
++-- docs/
+|   +-- architecture.md                 # Documentation architecture detaillee
+|   +-- installation.md                 # Guide d'installation pas a pas
+|   +-- data_sources.md                 # Documentation des sources de donnees
+|   +-- correlation_rules.md            # Documentation des regles de correlation
+|   +-- use_cases/
+|       +-- libya_ukraine_drones.md     # Cas d'usage : affaire Libye/Ukraine
+|       +-- template.md                 # Template pour nouveaux cas d'usage
+|
++-- tests/
+    +-- test_gdelt_parser.py
+    +-- test_acled_ingestor.py
+    +-- test_correlation_engine.py
+    +-- fixtures/
+        +-- gdelt_sample.json
+        +-- acled_sample.json
+        +-- opencti_sample.json
 ```
 
 ---
@@ -466,19 +488,18 @@ hego/
 
 ```bash
 # === DOMAINE ===
-HEGO_DOMAIN=hego.joranbatty.fr
-HEGO_EMAIL=contact@joranbatty.fr
+NEGO_DOMAIN=hego.joranbatty.fr
+NEGO_EMAIL=contact@joranbatty.fr
 
 # === ELASTICSEARCH ===
 ELASTIC_VERSION=8.17.0
 ELASTIC_PASSWORD=<GENERATE>
-ELASTIC_CLUSTER_NAME=hego
+ELASTIC_CLUSTER_NAME=nego
 ELASTIC_HEAP_SIZE=2g
-KIBANA_ENCRYPTION_KEY=<GENERATE_32_CHARS>
 
 # === OPENCTI ===
 OPENCTI_VERSION=latest
-OPENCTI_ADMIN_EMAIL=admin@hego.local
+OPENCTI_ADMIN_EMAIL=admin@nego.local
 OPENCTI_ADMIN_PASSWORD=<GENERATE>
 OPENCTI_ADMIN_TOKEN=<GENERATE_UUID>
 OPENCTI_HEALTHCHECK_KEY=<GENERATE_UUID>
@@ -491,9 +512,16 @@ RABBITMQ_DEFAULT_PASS=<GENERATE>
 MINIO_ROOT_USER=opencti
 MINIO_ROOT_PASSWORD=<GENERATE>
 
-# === HUGINN ===
-HUGINN_DATABASE_PASSWORD=<GENERATE>
-HUGINN_INVITATION_CODE=<GENERATE>
+# === N8N ===
+N8N_ENCRYPTION_KEY=<GENERATE_32_CHARS>
+N8N_BASIC_AUTH_USER=admin
+N8N_BASIC_AUTH_PASSWORD=<GENERATE>
+
+# === GRAFANA ===
+GF_SECURITY_ADMIN_USER=admin
+GF_SECURITY_ADMIN_PASSWORD=<GENERATE>
+GF_SERVER_ROOT_URL=https://hego.joranbatty.fr/grafana
+GF_SERVER_SERVE_FROM_SUB_PATH=true
 
 # === AUTHELIA ===
 AUTHELIA_JWT_SECRET=<GENERATE>
@@ -508,7 +536,7 @@ ACLED_EMAIL=<YOUR_ACLED_EMAIL>
 DISCORD_WEBHOOK_URL=<YOUR_DISCORD_WEBHOOK>
 ALERT_EMAIL_SMTP_HOST=<SMTP_HOST>
 ALERT_EMAIL_SMTP_PORT=587
-ALERT_EMAIL_FROM=hego@joranbatty.fr
+ALERT_EMAIL_FROM=nego@joranbatty.fr
 ALERT_EMAIL_TO=joran@joranbatty.fr
 ALERT_EMAIL_PASSWORD=<SMTP_PASSWORD>
 
@@ -525,55 +553,55 @@ OPENCTI_DATASETS_CONNECTOR_ID=<GENERATE_UUID>
 
 ---
 
-## Phases de développement
+## Phases de developpement
 
-### Phase 1 — Socle infrastructure
-1. Docker Compose avec Nginx + Elasticsearch + Kibana + Authelia
+### Phase 1 -- Socle infrastructure
+1. Docker Compose avec Nginx + Elasticsearch + Grafana + Authelia
 2. Configuration rootless Docker
 3. TLS via Certbot pour hego.joranbatty.fr
-4. Vérifier que tout boot proprement et que Kibana est accessible derrière Authelia
-5. Landing page HEGO
+4. Verifier que tout boot proprement et que Grafana est accessible derriere Authelia
+5. Landing page NEGO
 
-### Phase 2 — OpenCTI
+### Phase 2 -- OpenCTI
 1. Ajouter OpenCTI + Redis + RabbitMQ + MinIO au compose
 2. Configurer les connecteurs de base (MITRE ATT&CK, AlienVault, CISA KEV, OpenCTI Datasets)
-3. Vérifier que les données CTI remontent dans OpenCTI
-4. Mettre en place l'export OpenCTI → Elasticsearch
+3. Verifier que les donnees CTI remontent dans OpenCTI
+4. Mettre en place l'export OpenCTI -> Elasticsearch
 
-### Phase 3 — Ingestion GDELT
+### Phase 3 -- Ingestion GDELT
 1. Script Python d'ingestion GDELT
 2. Mapping Elasticsearch
 3. Cron toutes les 15 minutes
-4. Premier dashboard Kibana (carte + timeline)
+4. Premier dashboard Grafana (carte + timeline)
 
-### Phase 4 — Ingestion ACLED + Sanctions
+### Phase 4 -- Ingestion ACLED + Sanctions
 1. Script Python ACLED
 2. Script Python sanctions (OFAC, EU, UN)
-3. Enrichissement croisé avec OpenCTI (entités pays, organisations)
+3. Enrichissement croise avec OpenCTI (entites pays, organisations)
 
-### Phase 5 — Huginn + RSS
-1. Déployer Huginn
-2. Configurer les agents RSS pour les think tanks et agences
-3. Pipeline de filtrage et d'extraction d'entités
+### Phase 5 -- n8n + RSS
+1. Deployer n8n
+2. Configurer les workflows RSS pour les think tanks et agences
+3. Pipeline de filtrage et d'extraction d'entites via noeuds Function
 4. Indexation dans Elasticsearch
 
-### Phase 6 — Moteur de corrélation
-1. Implémenter les 4 règles de corrélation
-2. Index `hego-correlations`
-3. Alerting Discord + email
-4. Dashboard corrélations dans Kibana
+### Phase 6 -- Moteur de correlation
+1. Implementer les 4 regles de correlation
+2. Index `nego-correlations`
+3. Alerting Discord + email (via n8n workflows et Grafana alerting)
+4. Dashboard correlations dans Grafana
 
-### Phase 7 — Monitoring + backup
-1. Prometheus + Grafana
-2. Dashboard monitoring HEGO
-3. Script de backup automatisé
-4. Crontab complète
+### Phase 7 -- Monitoring + backup
+1. Prometheus + Grafana (monitoring unifie avec les dashboards geopolitiques)
+2. Dashboard monitoring NEGO
+3. Script de backup automatise
+4. Crontab complete
 
-### Phase 8 — Documentation + cas d'usage
+### Phase 8 -- Documentation + cas d'usage
 1. README.md complet
 2. Documentation d'installation
-3. Cas d'usage documenté : affaire Libye/Ukraine/drones
-4. Captures d'écran des dashboards
+3. Cas d'usage documente : affaire Libye/Ukraine/drones
+4. Captures d'ecran des dashboards
 
 ---
 
@@ -581,12 +609,12 @@ OPENCTI_DATASETS_CONNECTOR_ID=<GENERATE_UUID>
 
 ### Python (ingestors)
 - Python 3.11+
-- Type hints systématiques
+- Type hints systematiques
 - Docstrings Google style
 - Logging via le module `logging` (pas de print)
 - Configuration via variables d'environnement (python-dotenv)
 - Gestion d'erreurs robuste : retry avec backoff exponentiel pour les appels API
-- Bibliothèques : `elasticsearch[async]`, `requests`, `pycti` (client OpenCTI), `python-dotenv`
+- Bibliotheques : `elasticsearch[async]`, `requests`, `pycti` (client OpenCTI), `python-dotenv`
 
 ### Docker
 - Images Alpine quand disponibles
@@ -594,32 +622,32 @@ OPENCTI_DATASETS_CONNECTOR_ID=<GENERATE_UUID>
 - Healthchecks sur tous les services
 - Labels clairs sur chaque service
 - Pas de `privileged: true` ni de `network_mode: host`
-- Tous les services sur un réseau bridge custom (`hego_net`)
+- Tous les services sur un reseau bridge custom (`nego_net`)
 
 ### Elasticsearch
 - Index Lifecycle Management (ILM) pour la rotation des index
-- Convention de nommage : `hego-<source>-<type>-YYYY.MM`
-- Alias pour les requêtes : `hego-gdelt` → pointe vers tous les `hego-gdelt-events-*`
+- Convention de nommage : `nego-<source>-<type>-YYYY.MM`
+- Alias pour les requetes : `nego-gdelt` -> pointe vers tous les `nego-gdelt-events-*`
 - Mapping explicite (pas de dynamic mapping en production)
 - Shards : 1 primary, 0 replica (single node)
 
 ### Git
 - Commits conventionnels : `feat:`, `fix:`, `docs:`, `infra:`, `ingest:`, `corr:`
-- Branches : `main` (stable), `dev` (développement), `feature/<nom>`
+- Branches : `main` (stable), `dev` (developpement), `feature/<nom>`
 - `.env` et tous les secrets dans `.gitignore`
-- GitHub repo : sous le compte `Jo-the-bat`
+- GitHub repo : `Jo-the-bat/NEGO`
 
 ---
 
 ## Commandes utiles
 
 ```bash
-# Démarrer le stack complet
+# Demarrer le stack complet
 docker compose -f docker/docker-compose.yml up -d
 
-# Vérifier la santé
+# Verifier la sante
 docker compose -f docker/docker-compose.yml ps
-curl -sk https://hego.joranbatty.fr/kibana/api/status | jq .status
+curl -sk https://hego.joranbatty.fr/grafana/api/health | jq .
 
 # Lancer une ingestion manuellement
 cd ingestors && python -m gdelt.ingestor
@@ -629,26 +657,28 @@ cd ingestors && python -m correlation.engine
 # Voir les logs
 docker compose -f docker/docker-compose.yml logs -f --tail=100 opencti
 docker compose -f docker/docker-compose.yml logs -f --tail=100 elasticsearch
+docker compose -f docker/docker-compose.yml logs -f --tail=100 n8n
 
 # Backup
 ./scripts/backup.sh
 
 # Consulter les index
-curl -s localhost:9200/_cat/indices?v | grep hego
+curl -s localhost:9200/_cat/indices?v | grep nego
 ```
 
 ---
 
-## Ressources et références
+## Ressources et references
 
 - **GDELT** : https://www.gdeltproject.org/ | API Doc : https://blog.gdeltproject.org/gdelt-doc-2-0-api-debuts/
 - **ACLED** : https://acleddata.com/ | API Doc : https://apidocs.acleddata.com/
 - **OpenCTI** : https://docs.opencti.io/ | GitHub : https://github.com/OpenCTI-Platform/opencti
-- **Elastic/Kibana** : https://www.elastic.co/guide/
-- **Huginn** : https://github.com/huginn/huginn
+- **Elasticsearch** : https://www.elastic.co/guide/
+- **Grafana** : https://grafana.com/docs/ | Elasticsearch datasource : https://grafana.com/docs/grafana/latest/datasources/elasticsearch/
+- **n8n** : https://docs.n8n.io/ | GitHub : https://github.com/n8n-io/n8n
 - **Authelia** : https://www.authelia.com/configuration/
 - **Docker rootless** : https://docs.docker.com/engine/security/rootless/
-- **World Monitor** (état de l'art, concurrent) : https://worldmonitor.app | https://github.com/koala73/worldmonitor
-- **PizzINT GDELT Dashboard** (état de l'art) : https://www.pizzint.watch/gdelt
+- **World Monitor** (etat de l'art, concurrent) : https://worldmonitor.app | https://github.com/koala73/worldmonitor
+- **PizzINT GDELT Dashboard** (etat de l'art) : https://www.pizzint.watch/gdelt
 - **Elastic OpenCTI connector** : https://www.elastic.co/guide/en/integrations/current/ti_opencti.html
 - **CAMEO Codes** (classification GDELT) : https://www.gdeltproject.org/data/lookups/CAMEO.eventcodes.txt

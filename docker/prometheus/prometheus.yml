@@ -1,5 +1,5 @@
 # =============================================================================
-# HEGO — Prometheus Configuration
+# NEGO — Prometheus Configuration
 # Metrics collection for platform monitoring
 # =============================================================================
 
@@ -9,7 +9,7 @@ global:
   scrape_timeout: 10s
 
   external_labels:
-    cluster: 'hego'
+    cluster: 'nego'
     environment: 'production'
 
 # ---------------------------------------------------------------------------

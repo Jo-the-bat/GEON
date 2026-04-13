@@ -1,21 +1,17 @@
-# HEGO
+# NEGO
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Docker](https://img.shields.io/badge/Docker-rootless-2496ED?logo=docker&logoColor=white)](https://docs.docker.com/engine/security/rootless/)
 
 **Geopolitical & Cyber Threat Intelligence Platform**
 
-HEGO automatically correlates diplomatic events, armed conflicts, and sanctions with cyber threat activity from APT groups and malware campaigns. It bridges the gap between structured CTI (OpenCTI/STIX2) and geopolitical event data (GDELT/ACLED) that no existing open-source tool connects.
+NEGO automatically correlates diplomatic events, armed conflicts, and sanctions with cyber threat activity from APT groups and malware campaigns. It bridges the gap between structured CTI (OpenCTI/STIX2) and geopolitical event data (GDELT/ACLED) that no existing open-source tool connects.
 
-The name is an acronym of the core stack -- **H**uginn, **E**lasticsearch, **G**DELT, **O**penCTI -- and echoes the Greek word for hegemony.
-
----
-
-![HEGO Dashboard](docs/screenshots/dashboard.png)
+The name is an acronym of the core stack -- **n**8n, **E**lasticsearch, **G**DELT, **O**penCTI -- and evokes *negotiation*, a central concept in international relations.
 
 ---
 
-## Why HEGO?
+## Why NEGO?
 
 Existing tools address one side of the picture but never both:
 
@@ -24,23 +20,29 @@ Existing tools address one side of the picture but never both:
 | [World Monitor](https://worldmonitor.app) | Yes | No | No |
 | [PizzINT GDELT](https://www.pizzint.watch/gdelt) | Yes | No | No |
 | OpenCTI + Elastic connector | No | Yes | No |
-| **HEGO** | **Yes** | **Yes** | **Yes** |
+| **NEGO** | **Yes** | **Yes** | **Yes** |
 
-HEGO is the first platform that detects patterns like "diplomatic escalation between two countries followed by an APT campaign attributed to one of them" -- automatically.
+NEGO is the first platform that detects patterns like "diplomatic escalation between two countries followed by an APT campaign attributed to one of them" -- automatically.
 
 ---
 
 ## Architecture
 
 ```
-Internet --> Nginx (TLS) --> Kibana / OpenCTI / Huginn
+Internet --> Nginx (TLS) --> Grafana / OpenCTI / n8n
                   |
       Elasticsearch  <--  Ingestors (GDELT, ACLED, Sanctions)
-                  |
-           OpenCTI (STIX2)  <--  Connectors (MITRE, AlienVault, CISA)
-                  |
-          Correlation Engine  -->  Alerts (Discord, Email)
+           |
+      Grafana (dashboards)  <--  Elasticsearch datasource
+           |
+      OpenCTI (STIX2)  <--  Connectors (MITRE, AlienVault, CISA)
+           |
+      n8n (workflows)  -->  RSS ingestion, enrichment, alerting
+           |
+      Correlation Engine  -->  Alerts (Discord, Email)
 ```
+
+Elasticsearch is the shared data layer accessed by three consumers: Grafana for dashboards and visualizations, OpenCTI for its STIX2 knowledge graph backend, and the Python ingestors for writing geopolitical and CTI data. n8n handles workflow automation -- RSS feed aggregation, entity enrichment, and alert delivery.
 
 All services run behind Nginx with TLS termination and Authelia MFA. No internal port is exposed to the public interface. See [docs/architecture.md](docs/architecture.md) for the full diagram and component descriptions.
 
@@ -59,8 +61,8 @@ All services run behind Nginx with TLS termination and Authelia MFA. No internal
 
 ```bash
 # Clone the repository
-git clone https://github.com/Jo-the-bat/HEGO.git
-cd HEGO
+git clone https://github.com/Jo-the-bat/NEGO.git
+cd NEGO
 
 # Copy the environment template and fill in your secrets
 cp .env.example .env
@@ -88,7 +90,7 @@ See [docs/installation.md](docs/installation.md) for the complete step-by-step g
 | **GDELT** | Geopolitical events | Every 15 min | Global diplomatic/military events, CAMEO-coded and geolocated |
 | **ACLED** | Armed conflicts | Daily | Battles, protests, violence against civilians |
 | **OFAC / EU / UN** | Sanctions | Weekly | Sanctioned persons, organizations, countries |
-| **RSS via Huginn** | Articles | Continuous | Think tanks, agencies, defense publications |
+| **RSS via n8n** | Articles | Continuous | Think tanks, agencies, defense publications |
 | **OpenCTI Connectors** | Cyber threats | Continuous | MITRE ATT&CK, AlienVault OTX, CISA KEV, CVE |
 
 See [docs/data_sources.md](docs/data_sources.md) for API details and configuration.
@@ -110,23 +112,25 @@ See [docs/correlation_rules.md](docs/correlation_rules.md) for trigger condition
 
 ## Dashboards
 
+All dashboards are built in Grafana using Elasticsearch as the datasource:
+
 | Dashboard | Description |
 |-----------|-------------|
-| **Global Overview** | World map with GDELT events, ACLED conflicts, and APT campaigns. 30-day timeline. |
-| **Country Profile** | Per-country timeline, attributed APT groups, active sanctions, risk score. |
+| **Global Overview** | World map (Geomap panel) with GDELT events, ACLED conflicts, and APT campaigns. 30-day timeline. |
+| **Country Profile** | Per-country timeline, attributed APT groups, active sanctions, risk score. Uses template variables for country selection. |
 | **Correlations** | Detected cross-domain patterns with severity filters and dual timelines. |
-| **Article Feed** | Ingested articles from RSS sources with keyword trends. |
-| **Monitoring** | Service health, ingestion timestamps, index volumes. |
+| **Article Feed** | Ingested articles from RSS sources (via n8n) with keyword trends. |
+| **Monitoring** | Service health (Prometheus datasource), ingestion timestamps, index volumes. |
 
 ---
 
 ## Roadmap
 
-- [x] Phase 1 -- Infrastructure: Nginx, Elasticsearch, Kibana, Authelia, TLS
+- [x] Phase 1 -- Infrastructure: Nginx, Elasticsearch, Grafana, Authelia, TLS
 - [x] Phase 2 -- OpenCTI: platform, connectors, STIX2 graph
-- [ ] Phase 3 -- GDELT ingestion and first dashboards
+- [ ] Phase 3 -- GDELT ingestion and first Grafana dashboards
 - [ ] Phase 4 -- ACLED and sanctions ingestion
-- [ ] Phase 5 -- Huginn RSS pipeline
+- [ ] Phase 5 -- n8n RSS workflows
 - [ ] Phase 6 -- Correlation engine and alerting
 - [ ] Phase 7 -- Monitoring, backups, crontab
 - [ ] Phase 8 -- Documentation and use cases
@@ -167,11 +171,12 @@ Built by [Joran Batty](https://github.com/Jo-the-bat) as a portfolio project for
 
 ### Upstream Projects
 
-- [Elasticsearch & Kibana](https://www.elastic.co/) -- Search and visualization
+- [Elasticsearch](https://www.elastic.co/) -- Search and indexation
+- [Grafana](https://grafana.com/) -- Dashboards and visualization
 - [OpenCTI](https://github.com/OpenCTI-Platform/opencti) -- Cyber threat intelligence platform
+- [n8n](https://n8n.io/) -- Workflow automation
 - [GDELT Project](https://www.gdeltproject.org/) -- Global event database
 - [ACLED](https://acleddata.com/) -- Armed conflict data
-- [Huginn](https://github.com/huginn/huginn) -- Agent automation
 - [Authelia](https://www.authelia.com/) -- Authentication and MFA
 - [Nginx](https://nginx.org/) -- Reverse proxy
-- [Prometheus](https://prometheus.io/) & [Grafana](https://grafana.com/) -- Monitoring
+- [Prometheus](https://prometheus.io/) -- Monitoring

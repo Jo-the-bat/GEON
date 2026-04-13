@@ -1,5 +1,5 @@
 # =============================================================================
-# HEGO — Authelia Configuration
+# NEGO — Authelia Configuration
 # Centralized authentication with MFA (TOTP)
 # =============================================================================
 
@@ -37,7 +37,7 @@ theme: 'dark'
 # ---------------------------------------------------------------------------
 totp:
   disable: false
-  issuer: 'HEGO'
+  issuer: 'NEGO'
   algorithm: 'sha1'
   digits: 6
   period: 30
@@ -93,23 +93,17 @@ access_control:
       resources:
         - '^/\.well-known(/.*)?$'
 
-    # Kibana — requires two-factor authentication
-    - domain: 'hego.joranbatty.fr'
-      policy: 'two_factor'
-      resources:
-        - '^/kibana([/?].*)?$'
-
     # OpenCTI — requires two-factor authentication
     - domain: 'hego.joranbatty.fr'
       policy: 'two_factor'
       resources:
         - '^/opencti([/?].*)?$'
 
-    # Huginn — requires two-factor authentication
+    # n8n — requires two-factor authentication
     - domain: 'hego.joranbatty.fr'
       policy: 'two_factor'
       resources:
-        - '^/huginn([/?].*)?$'
+        - '^/n8n([/?].*)?$'
 
     # Grafana — requires two-factor authentication
     - domain: 'hego.joranbatty.fr'
@@ -121,7 +115,7 @@ access_control:
 # Session
 # ---------------------------------------------------------------------------
 session:
-  name: 'hego_session'
+  name: 'nego_session'
   same_site: 'lax'
   expiration: '1h'
   inactivity: '5m'
@@ -154,8 +148,8 @@ storage:
 #       address: 'smtp://smtp.example.com:587'
 #       username: 'hego@joranbatty.fr'
 #       password: 'smtp_password'
-#       sender: 'HEGO Auth <hego@joranbatty.fr>'
-#       subject: '[HEGO] {title}'
+#       sender: 'NEGO Auth <hego@joranbatty.fr>'
+#       subject: '[NEGO] {title}'
 # ---------------------------------------------------------------------------
 notifier:
   filesystem:

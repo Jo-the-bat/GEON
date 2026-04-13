@@ -1,10 +1,10 @@
-# HEGO Data Sources
+# NEGO Data Sources
 
 ## 1. GDELT (Global Database of Events, Language, and Tone)
 
 ### Overview
 
-GDELT monitors news media worldwide and extracts structured event data, including actors, actions, locations, and sentiment. HEGO uses it as the primary source for diplomatic and military events.
+GDELT monitors news media worldwide and extracts structured event data, including actors, actions, locations, and sentiment. NEGO uses it as the primary source for diplomatic and military events.
 
 - **Website**: [gdeltproject.org](https://www.gdeltproject.org/)
 - **API**: `https://api.gdeltproject.org/api/v2/`
@@ -21,7 +21,7 @@ GDELT monitors news media worldwide and extracts structured event data, includin
 
 ### CAMEO Event Codes
 
-HEGO filters on the following CAMEO code families:
+NEGO filters on the following CAMEO code families:
 
 | Code Range | Category | Description |
 |------------|----------|-------------|
@@ -37,7 +37,7 @@ HEGO filters on the following CAMEO code families:
 
 ### Goldstein Scale
 
-Events are scored on the Goldstein scale from -10 (maximum conflict) to +10 (maximum cooperation). HEGO uses this to detect tension spikes:
+Events are scored on the Goldstein scale from -10 (maximum conflict) to +10 (maximum cooperation). NEGO uses this to detect tension spikes:
 
 - **> +5**: Strong cooperation signal
 - **-3 to +3**: Neutral range
@@ -46,8 +46,8 @@ Events are scored on the Goldstein scale from -10 (maximum conflict) to +10 (max
 
 ### Elasticsearch Index
 
-- **Pattern**: `hego-gdelt-events-YYYY.MM`
-- **Alias**: `hego-gdelt`
+- **Pattern**: `nego-gdelt-events-YYYY.MM`
+- **Alias**: `nego-gdelt`
 
 ### Key Fields
 
@@ -105,8 +105,8 @@ ACLED provides detailed, disaggregated data on political violence and protests w
 
 ### Elasticsearch Index
 
-- **Pattern**: `hego-acled-events-YYYY.MM`
-- **Alias**: `hego-acled`
+- **Pattern**: `nego-acled-events-YYYY.MM`
+- **Alias**: `nego-acled`
 
 ### Key Fields
 
@@ -130,7 +130,7 @@ ACLED provides detailed, disaggregated data on political violence and protests w
 
 ### Overview
 
-HEGO ingests sanctions data from three major regulatory bodies to track sanctioned entities and detect correlations with cyber activity.
+NEGO ingests sanctions data from three major regulatory bodies to track sanctioned entities and detect correlations with cyber activity.
 
 ### Sources
 
@@ -139,7 +139,7 @@ HEGO ingests sanctions data from three major regulatory bodies to track sanction
 - **API**: `https://sanctionslistservice.ofac.treas.gov/api/`
 - **Lists**: SDN (Specially Designated Nationals), Consolidated Sanctions
 - **Format**: JSON/XML
-- **Update frequency**: Near-daily (HEGO checks weekly)
+- **Update frequency**: Near-daily (NEGO checks weekly)
 
 #### EU Consolidated Sanctions
 
@@ -157,8 +157,8 @@ HEGO ingests sanctions data from three major regulatory bodies to track sanction
 
 ### Elasticsearch Index
 
-- **Index**: `hego-sanctions` (single index, no time rotation)
-- **Alias**: `hego-sanctions`
+- **Index**: `nego-sanctions` (single index, no time rotation)
+- **Alias**: `nego-sanctions`
 
 ### Key Fields
 
@@ -176,11 +176,11 @@ HEGO ingests sanctions data from three major regulatory bodies to track sanction
 
 ---
 
-## 4. RSS Feeds via Huginn
+## 4. RSS Feeds via n8n
 
 ### Overview
 
-Huginn agents aggregate, filter, and extract entities from RSS feeds published by think tanks, news agencies, defense publications, and cybersecurity organizations.
+n8n workflows aggregate, filter, and extract entities from RSS feeds published by think tanks, news agencies, defense publications, and cybersecurity organizations. Unlike traditional agent-based systems, n8n uses a visual workflow builder with nodes for each processing step.
 
 ### Feed Categories
 
@@ -204,7 +204,7 @@ Huginn agents aggregate, filter, and extract entities from RSS feeds published b
 | Source | RSS URL | Focus |
 |--------|---------|-------|
 | Reuters World | `https://feeds.reuters.com/reuters/worldNews` | Global news |
-| AFP | Via Huginn scraping | French/global news |
+| AFP | Via n8n HTTP Request node | French/global news |
 | AP News | `https://apnews.com/rss` | US/global news |
 
 #### Cybersecurity & Defense
@@ -225,18 +225,18 @@ Huginn agents aggregate, filter, and extract entities from RSS feeds published b
 | SCMP | `https://www.scmp.com/rss/91/feed` | Asia / China |
 | Moscow Times | `https://www.themoscowtimes.com/rss/news` | Russia |
 
-### Huginn Pipeline
+### n8n Workflow Pipeline
 
-1. **RSS Agent**: Fetches articles from each feed
-2. **Filter Agent**: Keeps articles matching keywords (geopolitics, cyber, defense, sanctions, conflict, etc.)
-3. **Extraction Agent**: Identifies country names, organization names, and person names via pattern matching
-4. **Elasticsearch Agent**: Indexes filtered articles into `hego-articles-YYYY.MM`
-5. **OpenCTI Agent**: Creates reports in OpenCTI for articles with CTI relevance
+1. **RSS Feed Trigger node**: Polls each feed at configured intervals (typically every 30 minutes)
+2. **Function node (filtering)**: Evaluates articles against keyword lists (geopolitics, cyber, defense, sanctions, conflict) and discards irrelevant items
+3. **Function node (extraction)**: Identifies country names, organization names, and person names via pattern matching and lookups
+4. **Elasticsearch node**: Indexes filtered and enriched articles into `nego-articles-YYYY.MM`
+5. **IF node + HTTP Request node**: For articles with CTI relevance, creates reports in OpenCTI via the GraphQL API
 
 ### Elasticsearch Index
 
-- **Pattern**: `hego-articles-YYYY.MM`
-- **Alias**: `hego-articles`
+- **Pattern**: `nego-articles-YYYY.MM`
+- **Alias**: `nego-articles`
 
 ---
 
@@ -244,7 +244,7 @@ Huginn agents aggregate, filter, and extract entities from RSS feeds published b
 
 ### Overview
 
-OpenCTI aggregates structured CTI from multiple sources into a STIX2 knowledge graph. HEGO exports relevant data to Elasticsearch for cross-correlation with geopolitical events.
+OpenCTI aggregates structured CTI from multiple sources into a STIX2 knowledge graph. NEGO exports relevant data to Elasticsearch for cross-correlation with geopolitical events.
 
 ### Active Connectors
 
@@ -261,7 +261,7 @@ OpenCTI aggregates structured CTI from multiple sources into a STIX2 knowledge g
 
 The `opencti_export/exporter.py` script queries the OpenCTI GraphQL API and indexes relevant objects into Elasticsearch:
 
-- **Index**: `hego-cti-*`
+- **Index**: `nego-cti-*`
 - **Objects exported**: Intrusion sets (APT groups), campaigns, indicators, malware, attack patterns
 - **Frequency**: Every 6 hours
 

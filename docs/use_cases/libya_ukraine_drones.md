@@ -2,7 +2,7 @@
 
 ## Summary
 
-This use case illustrates how HEGO would have detected the correlation between escalating drone warfare in Libya -- involving Turkish and UAE-supplied systems -- and concurrent cyber operations targeting Ukrainian defense and diplomatic networks. The connection runs through shared military-industrial supply chains and competing geopolitical alignments, a pattern invisible to tools that monitor only one domain.
+This use case illustrates how NEGO would have detected the correlation between escalating drone warfare in Libya -- involving Turkish and UAE-supplied systems -- and concurrent cyber operations targeting Ukrainian defense and diplomatic networks. The connection runs through shared military-industrial supply chains and competing geopolitical alignments, a pattern invisible to tools that monitor only one domain.
 
 ## Context
 
@@ -39,7 +39,7 @@ This overlap creates a triangular dynamic: actors with stakes in the Libyan dron
 
 ## Correlation Detected
 
-HEGO's correlation engine would have triggered two rules:
+NEGO's correlation engine would have triggered two rules:
 
 ### Correlation 1: Diplomatic Escalation + APT Activity (Rule 1)
 
@@ -72,7 +72,7 @@ Nov 16  --  [CTI]   Campaign attributed to APT group (MITRE techniques mapped)
 Nov 18  --  [GDELT] UAE condemns Turkish military buildup (Goldstein -7.4)
 Nov 20  --  [CTI]   C2 infrastructure linked to Middle Eastern APT cluster
 Nov 22  --  [CTI]   Defense sector VPN vulnerability exploited
-         --  [HEGO]  Correlation alerts generated (2x High severity)
+         --  [NEGO]  Correlation alerts generated (2x High severity)
 ```
 
 ## Analysis
@@ -87,23 +87,23 @@ The hypothesis: a state or state-aligned actor with interests opposed to Turkey'
 
 **Limitations**: Attribution in the cyber domain is inherently uncertain. The temporal correlation does not prove causation. The APT cluster's geographic hosting is suggestive but not definitive. Further investigation would require deeper technical analysis of the C2 infrastructure and malware samples.
 
-## HEGO Value
+## NEGO Value
 
-Without HEGO, an analyst would need to manually:
+Without NEGO, an analyst would need to manually:
 
 1. Monitor ACLED for Libyan conflict events
 2. Track GDELT for Turkey-UAE diplomatic tensions
 3. Review OpenCTI for campaigns targeting defense contractors
 4. Notice the temporal and thematic correlation across all three
 
-HEGO automates this cross-domain detection. The correlation engine identified the pattern within hours of the second cyber event appearing in OpenCTI, generating alerts that prompted human analysis of the connection between Libyan drone warfare and defense-sector cyber operations.
+NEGO automates this cross-domain detection. The correlation engine identified the pattern within hours of the second cyber event appearing in OpenCTI, generating alerts that prompted human analysis of the connection between Libyan drone warfare and defense-sector cyber operations.
 
-A pure CTI platform would have flagged the phishing campaign but missed the geopolitical context. A pure geopolitical monitor would have tracked the diplomatic tensions but missed the cyber dimension. HEGO bridges both.
+A pure CTI platform would have flagged the phishing campaign but missed the geopolitical context. A pure geopolitical monitor would have tracked the diplomatic tensions but missed the cyber dimension. NEGO bridges both.
 
 ## Dashboard Screenshots
 
 *Screenshots would be inserted here showing:*
-- The global overview map with Libya events and APT campaign vectors
-- The country profile for Turkey showing the timeline overlay
-- The correlations dashboard with the two detected patterns
-- The article feed with related think tank analysis from IRSEM and CSIS
+- The Grafana global overview Geomap panel with Libya events and APT campaign vectors
+- The Grafana country profile for Turkey showing the timeline overlay
+- The Grafana correlations dashboard with the two detected patterns
+- The article feed dashboard with related think tank analysis from IRSEM and CSIS

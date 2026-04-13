@@ -1,4 +1,4 @@
-"""HEGO GDELT response parser.
+"""NEGO GDELT response parser.
 
 Parses raw responses from the GDELT DOC and GEO APIs into structured dicts
 ready for Elasticsearch indexation.
@@ -242,7 +242,7 @@ def _generate_event_id(event: dict[str, Any]) -> str:
 
 
 def normalize_event(raw_event: dict[str, Any]) -> dict[str, Any]:
-    """Normalize a raw GDELT event into the HEGO Elasticsearch document format.
+    """Normalize a raw GDELT event into the NEGO Elasticsearch document format.
 
     Handles both DOC API article objects and GEO API event objects with
     graceful fallbacks for missing fields.

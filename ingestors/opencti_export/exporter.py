@@ -1,4 +1,4 @@
-"""HEGO OpenCTI exporter.
+"""NEGO OpenCTI exporter.
 
 Exports CTI data (threat actors, campaigns, indicators, malware,
 vulnerabilities) from OpenCTI into Elasticsearch indices so they can be
@@ -357,7 +357,7 @@ def main() -> None:
     """CLI entry point for the OpenCTI exporter."""
     setup_logging("opencti_export.exporter")
 
-    parser = argparse.ArgumentParser(description="HEGO OpenCTI → Elasticsearch exporter")
+    parser = argparse.ArgumentParser(description="NEGO OpenCTI → Elasticsearch exporter")
     parser.add_argument(
         "--full",
         action="store_true",

@@ -1,0 +1,255 @@
+{
+  "uid": "nego-monitoring",
+  "title": "NEGO \u2014 Platform Monitoring",
+  "tags": ["nego", "monitoring", "ops"],
+  "timezone": "browser",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "templating": {
+    "list": []
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Service Health",
+      "type": "stat",
+      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 0 },
+      "datasource": { "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "up",
+          "legendFormat": "{{job}}",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "green", "value": 1 }
+            ]
+          },
+          "mappings": [
+            { "type": "value", "options": { "0": { "text": "DOWN", "color": "red" } } },
+            { "type": "value", "options": { "1": { "text": "UP", "color": "green" } } }
+          ]
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "auto",
+        "orientation": "horizontal"
+      }
+    },
+    {
+      "id": 2,
+      "title": "Last Ingestion Timestamps",
+      "type": "table",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
+      "datasource": { "uid": "elasticsearch" },
+      "targets": [
+        {
+          "refId": "A",
+          "query": "_index:nego-gdelt-*",
+          "alias": "GDELT",
+          "metrics": [
+            { "id": "1", "type": "max", "field": "date" }
+          ],
+          "bucketAggs": [],
+          "timeField": "date"
+        },
+        {
+          "refId": "B",
+          "query": "_index:nego-acled-*",
+          "alias": "ACLED",
+          "metrics": [
+            { "id": "1", "type": "max", "field": "date" }
+          ],
+          "bucketAggs": [],
+          "timeField": "date"
+        },
+        {
+          "refId": "C",
+          "query": "_index:nego-articles-*",
+          "alias": "Articles (RSS)",
+          "metrics": [
+            { "id": "1", "type": "max", "field": "date" }
+          ],
+          "bucketAggs": [],
+          "timeField": "date"
+        },
+        {
+          "refId": "D",
+          "query": "_index:nego-cti-*",
+          "alias": "OpenCTI Export",
+          "metrics": [
+            { "id": "1", "type": "max", "field": "date" }
+          ],
+          "bucketAggs": [],
+          "timeField": "date"
+        },
+        {
+          "refId": "E",
+          "query": "_index:nego-sanctions",
+          "alias": "Sanctions",
+          "metrics": [
+            { "id": "1", "type": "max", "field": "date" }
+          ],
+          "bucketAggs": [],
+          "timeField": "date"
+        },
+        {
+          "refId": "F",
+          "query": "_index:nego-correlations",
+          "alias": "Correlations",
+          "metrics": [
+            { "id": "1", "type": "max", "field": "timestamp" }
+          ],
+          "bucketAggs": [],
+          "timeField": "timestamp"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true
+      }
+    },
+    {
+      "id": 3,
+      "title": "Index Sizes Over Time",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
+      "datasource": { "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "elasticsearch_indices_store_size_bytes_total",
+          "legendFormat": "Total Store Size",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "unit": "decbytes",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 20,
+            "pointSize": 5,
+            "lineWidth": 2,
+            "showPoints": "auto",
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "single" }
+      }
+    },
+    {
+      "id": 4,
+      "title": "Total Documents Across All Indices",
+      "type": "stat",
+      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 14 },
+      "datasource": { "uid": "elasticsearch" },
+      "targets": [
+        {
+          "refId": "A",
+          "query": "_index:nego-gdelt-*",
+          "alias": "GDELT",
+          "metrics": [
+            { "id": "1", "type": "count" }
+          ],
+          "bucketAggs": [],
+          "timeField": "date"
+        },
+        {
+          "refId": "B",
+          "query": "_index:nego-acled-*",
+          "alias": "ACLED",
+          "metrics": [
+            { "id": "1", "type": "count" }
+          ],
+          "bucketAggs": [],
+          "timeField": "date"
+        },
+        {
+          "refId": "C",
+          "query": "_index:nego-articles-*",
+          "alias": "Articles",
+          "metrics": [
+            { "id": "1", "type": "count" }
+          ],
+          "bucketAggs": [],
+          "timeField": "date"
+        },
+        {
+          "refId": "D",
+          "query": "_index:nego-cti-*",
+          "alias": "CTI",
+          "metrics": [
+            { "id": "1", "type": "count" }
+          ],
+          "bucketAggs": [],
+          "timeField": "date"
+        },
+        {
+          "refId": "E",
+          "query": "_index:nego-sanctions",
+          "alias": "Sanctions",
+          "metrics": [
+            { "id": "1", "type": "count" }
+          ],
+          "bucketAggs": [],
+          "timeField": "date"
+        },
+        {
+          "refId": "F",
+          "query": "_index:nego-correlations",
+          "alias": "Correlations",
+          "metrics": [
+            { "id": "1", "type": "count" }
+          ],
+          "bucketAggs": [],
+          "timeField": "timestamp"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "textMode": "auto",
+        "orientation": "horizontal"
+      }
+    }
+  ],
+  "version": 1
+}

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# HEGO — Backup Script
+# NEGO — Backup Script
 # Creates Elasticsearch snapshots and exports OpenCTI data.
 # Retains the last 7 daily backups.
 
@@ -25,7 +25,7 @@ RETENTION_DAYS=7
 ES_HOST="${ES_HOST:-http://localhost:9200}"
 ES_USER="${ES_USER:-elastic}"
 ES_PASS="${ELASTIC_PASSWORD:-changeme}"
-SNAPSHOT_REPO="hego_backup"
+SNAPSHOT_REPO="nego_backup"
 
 OPENCTI_URL="${OPENCTI_URL:-http://localhost:8080}"
 OPENCTI_TOKEN="${OPENCTI_ADMIN_TOKEN:-}"
@@ -40,7 +40,7 @@ info() { echo -e "${CYAN}[INFO]${NC}  $(date '+%Y-%m-%d %H:%M:%S') $*"; }
 ok()   { echo -e "${GREEN}[OK]${NC}    $(date '+%Y-%m-%d %H:%M:%S') $*"; }
 fail() { echo -e "${RED}[FAIL]${NC}  $(date '+%Y-%m-%d %H:%M:%S') $*"; }
 
-info "Starting HEGO backup: ${TIMESTAMP}"
+info "Starting NEGO backup: ${TIMESTAMP}"
 
 mkdir -p "$BACKUP_PATH"
 
@@ -67,8 +67,8 @@ else
     echo "     Ensure path.repo is set in elasticsearch.yml and the directory exists."
 fi
 
-# Create a snapshot of all hego-* indices
-SNAPSHOT_NAME="hego_${TIMESTAMP}"
+# Create a snapshot of all nego-* indices
+SNAPSHOT_NAME="nego_${TIMESTAMP}"
 info "Creating Elasticsearch snapshot: ${SNAPSHOT_NAME}"
 
 SNAPSHOT_RESULT=$(curl -s -o /dev/null -w "%{http_code}" \
@@ -76,7 +76,7 @@ SNAPSHOT_RESULT=$(curl -s -o /dev/null -w "%{http_code}" \
     -X PUT "${ES_HOST}/_snapshot/${SNAPSHOT_REPO}/${SNAPSHOT_NAME}?wait_for_completion=true" \
     -H "Content-Type: application/json" \
     -d "{
-        \"indices\": \"hego-*\",
+        \"indices\": \"nego-*\",
         \"ignore_unavailable\": true,
         \"include_global_state\": false
     }" 2>/dev/null || echo "000")
@@ -94,12 +94,40 @@ curl -s -u "${ES_USER}:${ES_PASS}" \
 
 # Export index list
 curl -s -u "${ES_USER}:${ES_PASS}" \
-    "${ES_HOST}/_cat/indices/hego-*?v&h=index,docs.count,store.size" \
+    "${ES_HOST}/_cat/indices/nego-*?v&h=index,docs.count,store.size" \
     2>/dev/null > "${BACKUP_PATH}/es_indices.txt" || true
 
 ok "Elasticsearch index metadata saved."
 
-# --- 2. OpenCTI Export ---
+# --- 2. n8n Backup (SQLite database) ---
+info "Backing up n8n data..."
+
+N8N_VOLUME="nego_n8n_data"
+N8N_CONTAINER=$(docker ps --filter "name=n8n" --format "{{.Names}}" 2>/dev/null | head -1)
+
+if [ -n "$N8N_CONTAINER" ]; then
+    # Copy the SQLite database from the n8n container/volume
+    docker cp "${N8N_CONTAINER}:/home/node/.n8n/database.sqlite" \
+        "${BACKUP_PATH}/n8n_database.sqlite" 2>/dev/null && \
+        ok "n8n database backed up." || \
+        warn "Could not copy n8n database from container."
+
+    # Also back up n8n credentials encryption key if accessible
+    docker cp "${N8N_CONTAINER}:/home/node/.n8n/.n8n-encryption-key" \
+        "${BACKUP_PATH}/n8n_encryption_key" 2>/dev/null || true
+else
+    # Try via volume mount directly
+    N8N_DATA_PATH=$(docker volume inspect "$N8N_VOLUME" --format '{{.Mountpoint}}' 2>/dev/null || echo "")
+    if [ -n "$N8N_DATA_PATH" ] && [ -f "${N8N_DATA_PATH}/database.sqlite" ]; then
+        cp "${N8N_DATA_PATH}/database.sqlite" "${BACKUP_PATH}/n8n_database.sqlite" 2>/dev/null && \
+            ok "n8n database backed up from volume." || \
+            warn "Could not copy n8n database from volume."
+    else
+        warn "n8n container not running and volume not accessible. Skipping n8n backup."
+    fi
+fi
+
+# --- 3. OpenCTI Export ---
 info "Exporting OpenCTI data..."
 
 if [ -n "$OPENCTI_TOKEN" ]; then
@@ -135,21 +163,21 @@ else
     echo "     Set the token in .env to enable automatic OpenCTI backups."
 fi
 
-# --- 3. Compress ---
+# --- 4. Compress ---
 info "Compressing backup..."
 
-ARCHIVE="${BACKUP_DIR}/hego_backup_${TIMESTAMP}.tar.gz"
+ARCHIVE="${BACKUP_DIR}/nego_backup_${TIMESTAMP}.tar.gz"
 tar -czf "$ARCHIVE" -C "$BACKUP_DIR" "$TIMESTAMP" 2>/dev/null
 
 # Remove the uncompressed directory
 rm -rf "$BACKUP_PATH"
 ok "Backup archived: ${ARCHIVE}"
 
-# --- 4. Retention ---
+# --- 5. Retention ---
 info "Cleaning old backups (keeping last ${RETENTION_DAYS} days)..."
 
 DELETED=0
-find "$BACKUP_DIR" -name "hego_backup_*.tar.gz" -type f -mtime "+${RETENTION_DAYS}" -print -delete 2>/dev/null | while read -r OLD; do
+find "$BACKUP_DIR" -name "nego_backup_*.tar.gz" -type f -mtime "+${RETENTION_DAYS}" -print -delete 2>/dev/null | while read -r OLD; do
     info "  Deleted: $(basename "$OLD")"
     DELETED=$((DELETED + 1))
 done

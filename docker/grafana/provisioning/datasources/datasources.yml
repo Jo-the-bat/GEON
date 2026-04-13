@@ -1,5 +1,5 @@
 # =============================================================================
-# HEGO — Grafana Provisioning: Datasources
+# NEGO — Grafana Provisioning: Datasources
 # Auto-provisioned on first boot
 # =============================================================================
 
@@ -7,9 +7,10 @@ apiVersion: 1
 
 datasources:
   # ---------------------------------------------------------------------------
-  # Prometheus — Primary metrics source
+  # Prometheus — Primary metrics source (default)
   # ---------------------------------------------------------------------------
   - name: Prometheus
+    uid: prometheus
     type: prometheus
     access: proxy
     url: http://prometheus:9090
@@ -22,23 +23,24 @@ datasources:
     version: 1
 
   # ---------------------------------------------------------------------------
-  # Elasticsearch — Log and event data
+  # Elasticsearch — Event and intelligence data
   # ---------------------------------------------------------------------------
   - name: Elasticsearch
+    uid: elasticsearch
     type: elasticsearch
     access: proxy
     url: http://elasticsearch:9200
-    editable: false
     isDefault: false
+    editable: false
+    basicAuth: true
+    basicAuthUser: elastic
     jsonData:
-      index: 'hego-*'
+      index: 'nego-*'
       timeField: 'date'
-      esVersion: '8.0.0'
+      esVersion: '8.17.0'
       maxConcurrentShardRequests: 5
       logMessageField: 'description'
       logLevelField: 'severity'
     secureJsonData:
-      basicAuthPassword: '${ELASTIC_PASSWORD}'
-    basicAuth: true
-    basicAuthUser: 'elastic'
+      basicAuthPassword: $ELASTIC_PASSWORD
     version: 1

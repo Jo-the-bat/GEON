@@ -1,1 +1,1 @@
-"""HEGO OpenCTI exporter — syncs CTI data from OpenCTI into Elasticsearch."""
+"""NEGO OpenCTI exporter — syncs CTI data from OpenCTI into Elasticsearch."""

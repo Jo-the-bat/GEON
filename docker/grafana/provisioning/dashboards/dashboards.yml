@@ -1,0 +1,17 @@
+# =============================================================================
+# NEGO — Grafana Provisioning: Dashboard provider
+# Auto-provisions dashboards from JSON files on first boot
+# =============================================================================
+
+apiVersion: 1
+
+providers:
+  - name: 'NEGO Dashboards'
+    orgId: 1
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards/json/
+      foldersFromFilesStructure: false

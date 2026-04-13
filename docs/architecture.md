@@ -1,8 +1,10 @@
-# HEGO Architecture
+# NEGO Architecture
 
 ## Overview
 
-HEGO is a multi-container Docker application that ingests, indexes, correlates, and visualizes geopolitical events alongside cyber threat intelligence. All services run in rootless Docker behind a single Nginx reverse proxy with TLS termination and Authelia MFA.
+NEGO is a multi-container Docker application that ingests, indexes, correlates, and visualizes geopolitical events alongside cyber threat intelligence. All services run in rootless Docker behind a single Nginx reverse proxy with TLS termination and Authelia MFA.
+
+Elasticsearch serves as the shared data layer, accessed by Grafana for dashboards and visualization, by OpenCTI as its STIX2 knowledge graph backend, and by the Python ingestors for writing geopolitical and CTI data. n8n provides workflow automation for RSS ingestion, entity enrichment, and alert delivery.
 
 ## Network Topology
 
@@ -14,25 +16,25 @@ Internet
 |     Nginx      |  :443 (TLS via Certbot / Let's Encrypt)
 |  reverse proxy |  :80  (redirect to 443)
 +-------+--------+
-        | Docker internal network (hego_net)
+        | Docker internal network (nego_net)
         |
         +---> /                --> Landing page (static files)
         +---> /opencti         --> opencti:8080
-        +---> /kibana          --> kibana:5601
-        +---> /huginn          --> huginn:3000
+        +---> /grafana         --> grafana:3000
+        +---> /n8n             --> n8n:5678
         +---> /auth            --> authelia:9091
         |
 +-------+--------------------------------------------------+
-|               Docker network: hego_net                    |
+|               Docker network: nego_net                    |
 |                                                           |
 |  +---------------+  +----------------+  +-------------+  |
-|  | Elasticsearch |  |    OpenCTI     |  |   Huginn    |  |
-|  |   (port 9200) |  |   (port 8080) |  |  (port 3000)|  |
+|  | Elasticsearch |  |    OpenCTI     |  |     n8n     |  |
+|  |   (port 9200) |  |   (port 8080) |  | (port 5678) |  |
 |  +-------+-------+  +-------+--------+  +------+------+  |
 |          |                   |                  |         |
 |  +-------+-------+  +-------+--------+  +------+------+  |
-|  |    Kibana     |  |   RabbitMQ    |  |    Redis    |  |
-|  |   (port 5601) |  |  (port 5672)  |  | (port 6379) |  |
+|  |    Grafana    |  |   RabbitMQ    |  |    Redis    |  |
+|  |   (port 3000) |  |  (port 5672)  |  | (port 6379) |  |
 |  +---------------+  +----------------+  +-------------+  |
 |                                                           |
 |  +---------------+  +----------------+                    |
@@ -46,10 +48,10 @@ Internet
 |  |  Correlation Engine                                |   |
 |  +---------------------------------------------------+   |
 |                                                           |
-|  +---------------+  +----------------+                    |
-|  |  Prometheus   |  |    Grafana    |                    |
-|  |  (port 9090)  |  |  (port 3001)  |                    |
-|  +---------------+  +----------------+                    |
+|  +---------------+                                        |
+|  |  Prometheus   |                                        |
+|  |  (port 9090)  |                                        |
+|  +---------------+                                        |
 +-----------------------------------------------------------+
 ```
 
@@ -60,56 +62,61 @@ Internet
 - **Image**: `nginx:alpine`
 - **Role**: TLS termination, reverse proxy routing, static file serving
 - **Ports**: 80 (redirect), 443 (HTTPS) -- the only ports exposed to the public
-- **Configuration**: `docker/nginx/conf.d/hego.conf`
+- **Configuration**: `docker/nginx/conf.d/nego.conf`
 - **TLS**: Let's Encrypt certificates managed by a Certbot sidecar container
 
 ### Elasticsearch
 
 - **Image**: `docker.elastic.co/elasticsearch/elasticsearch:8.x`
-- **Role**: Primary data store for all ingested events, articles, and correlations
-- **Indices**: `hego-gdelt-*`, `hego-acled-*`, `hego-cti-*`, `hego-sanctions`, `hego-articles-*`, `hego-correlations`
+- **Role**: Primary data store for all ingested events, articles, and correlations. Shared by Grafana (dashboards), OpenCTI (STIX2 backend), and the Python ingestors (data writers).
+- **Indices**: `nego-gdelt-*`, `nego-acled-*`, `nego-cti-*`, `nego-sanctions`, `nego-articles-*`, `nego-correlations`
 - **Configuration**: Single-node deployment, 1 primary shard, 0 replicas
-- **Persistence**: Named volume `hego_elasticsearch_data`
+- **Persistence**: Named volume `nego_elasticsearch_data`
 - **Requirement**: `vm.max_map_count >= 262144` on the host
 
-### Kibana
+### Grafana
 
-- **Image**: `docker.elastic.co/kibana/kibana:8.x`
-- **Role**: Visualization dashboards -- maps, timelines, data tables, charts
-- **Access**: Via Nginx at `/kibana`, behind Authelia authentication
-- **Dashboards**: Global overview, country profiles, correlations, article feed, monitoring
+- **Image**: `grafana/grafana`
+- **Role**: Dashboards and visualization for geopolitical events, CTI data, correlations, and platform monitoring. Connects to Elasticsearch as a datasource to query all `nego-*` indices. Also connects to Prometheus for service health monitoring.
+- **Access**: Via Nginx at `/grafana`, behind Authelia authentication
+- **Dashboards**: Global overview (Geomap), country profiles (template variables), correlations, article feed, monitoring
+- **Provisioning**: Datasources and dashboards provisioned via YAML and JSON files in `docker/grafana/`
 
 ### OpenCTI
 
 - **Image**: `opencti/platform:latest`
 - **Role**: STIX2 knowledge graph for structured cyber threat intelligence
-- **Dependencies**: Redis (cache), RabbitMQ (message broker), MinIO (object storage)
+- **Dependencies**: Redis (cache), RabbitMQ (message broker), MinIO (object storage), Elasticsearch (backend storage)
 - **Connectors**: MITRE ATT&CK, AlienVault OTX, CISA KEV, CVE/NVD, OpenCTI Datasets
 - **Access**: Via Nginx at `/opencti`, behind Authelia authentication
 
-### Huginn
+### n8n
 
-- **Image**: `ghcr.io/huginn/huginn`
-- **Role**: Automated agents for RSS feed aggregation, filtering, entity extraction, and webhook delivery
-- **Pipeline**: RSS fetch -> keyword filter -> entity extraction -> Elasticsearch indexing + OpenCTI report creation
-- **Access**: Via Nginx at `/huginn`, behind Authelia authentication
+- **Image**: `docker.n8n.io/n8nio/n8n`
+- **Role**: Workflow automation engine for RSS feed aggregation, article filtering, entity extraction, Elasticsearch indexing, and OpenCTI report creation. Also handles alert delivery workflows triggered by the correlation engine.
+- **Workflows**:
+  - RSS Feed Trigger nodes fetch articles from think tanks, agencies, and defense publications
+  - Function nodes filter articles by keyword relevance and extract entities (countries, organizations, persons)
+  - Elasticsearch nodes write filtered articles to `nego-articles-YYYY.MM`
+  - HTTP Request nodes create reports in OpenCTI via GraphQL for CTI-relevant articles
+  - Webhook + notification workflows for alert delivery (Discord, email)
+- **Access**: Via Nginx at `/n8n`, behind Authelia authentication
 
 ### Authelia
 
 - **Image**: `authelia/authelia`
 - **Role**: Centralized authentication with TOTP-based multi-factor authentication
-- **Protection**: All web-facing services (Kibana, OpenCTI, Huginn, Grafana)
+- **Protection**: All web-facing services (Grafana, OpenCTI, n8n)
 - **Storage**: SQLite or file-based user database
 
 ### Supporting Services
 
 | Service | Image | Role |
 |---------|-------|------|
-| Redis | `redis:7-alpine` | Cache for OpenCTI and Huginn |
+| Redis | `redis:7-alpine` | Cache for OpenCTI |
 | RabbitMQ | `rabbitmq:3-management-alpine` | Message broker for OpenCTI connectors |
 | MinIO | `minio/minio` | S3-compatible object storage for OpenCTI |
-| Prometheus | `prom/prometheus` | Metrics collection and alerting |
-| Grafana | `grafana/grafana` | Monitoring dashboards |
+| Prometheus | `prom/prometheus` | Metrics collection; Grafana queries it for monitoring dashboards |
 | Certbot | `certbot/certbot` | Automatic Let's Encrypt certificate renewal |
 
 ## Data Flow
@@ -117,30 +124,45 @@ Internet
 ### Ingestion Pipeline
 
 ```
-GDELT API -----> gdelt/ingestor.py -----> Elasticsearch (hego-gdelt-events-YYYY.MM)
+GDELT API -----> gdelt/ingestor.py -----> Elasticsearch (nego-gdelt-events-YYYY.MM)
                                      +--> OpenCTI (country/org entities)
 
-ACLED API -----> acled/ingestor.py -----> Elasticsearch (hego-acled-events-YYYY.MM)
+ACLED API -----> acled/ingestor.py -----> Elasticsearch (nego-acled-events-YYYY.MM)
 
-OFAC/EU/UN ----> sanctions/ingestor.py -> Elasticsearch (hego-sanctions)
+OFAC/EU/UN ----> sanctions/ingestor.py -> Elasticsearch (nego-sanctions)
                                      +--> OpenCTI (sanctioned entities)
 
-RSS Feeds -----> Huginn agents ---------> Elasticsearch (hego-articles-YYYY.MM)
+RSS Feeds -----> n8n workflows ---------> Elasticsearch (nego-articles-YYYY.MM)
                                      +--> OpenCTI (reports, if CTI-relevant)
 
-OpenCTI -------> opencti_export/exporter.py -> Elasticsearch (hego-cti-*)
+OpenCTI -------> opencti_export/exporter.py -> Elasticsearch (nego-cti-*)
+```
+
+### Visualization Layer
+
+```
+Elasticsearch (nego-*)
+        |
+        v
+  Grafana Dashboards
+  - Geomap panels for global event maps
+  - Time series for trends and timelines
+  - Table panels for correlation listings
+  - Stat panels for KPIs and risk scores
+  - Template variables for country/source filtering
 ```
 
 ### Correlation Pipeline
 
 ```
-Elasticsearch (hego-gdelt-*, hego-acled-*, hego-cti-*, hego-sanctions)
+Elasticsearch (nego-gdelt-*, nego-acled-*, nego-cti-*, nego-sanctions)
         |
         v
   Correlation Engine (correlation/engine.py)
         |
-        +--> Elasticsearch (hego-correlations)
-        +--> Discord webhook (alerts)
+        +--> Elasticsearch (nego-correlations)
+        +--> n8n webhook (triggers alert workflows)
+        +--> Discord webhook (direct alerts)
         +--> Email (alerts)
         +--> OpenCTI (enriched reports)
 ```
@@ -160,12 +182,12 @@ All stateful services use named Docker volumes:
 
 | Volume | Service | Content |
 |--------|---------|---------|
-| `hego_elasticsearch_data` | Elasticsearch | Index data |
-| `hego_opencti_data` | OpenCTI | Platform state |
-| `hego_minio_data` | MinIO | Object storage |
-| `hego_rabbitmq_data` | RabbitMQ | Message queues |
-| `hego_redis_data` | Redis | Cache data |
-| `hego_huginn_data` | Huginn | Agent state |
-| `hego_authelia_data` | Authelia | User database |
-| `hego_prometheus_data` | Prometheus | Metrics |
-| `hego_grafana_data` | Grafana | Dashboard config |
+| `nego_elasticsearch_data` | Elasticsearch | Index data |
+| `nego_opencti_data` | OpenCTI | Platform state |
+| `nego_minio_data` | MinIO | Object storage |
+| `nego_rabbitmq_data` | RabbitMQ | Message queues |
+| `nego_redis_data` | Redis | Cache data |
+| `nego_n8n_data` | n8n | Workflow definitions and execution history |
+| `nego_authelia_data` | Authelia | User database |
+| `nego_prometheus_data` | Prometheus | Metrics |
+| `nego_grafana_data` | Grafana | Dashboard config and user preferences |

@@ -1,0 +1,266 @@
+{
+  "uid": "nego-correlations",
+  "title": "NEGO \u2014 Cyber/Geopolitical Correlations",
+  "tags": ["nego", "correlations", "cyber", "geopolitical"],
+  "timezone": "browser",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "refresh": "5m",
+  "schemaVersion": 39,
+  "time": {
+    "from": "now-30d",
+    "to": "now"
+  },
+  "templating": {
+    "list": []
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "All Correlations",
+      "type": "table",
+      "gridPos": { "h": 14, "w": 24, "x": 0, "y": 0 },
+      "datasource": { "uid": "elasticsearch" },
+      "targets": [
+        {
+          "refId": "A",
+          "query": "_index:nego-correlations",
+          "alias": "",
+          "metrics": [
+            {
+              "id": "1",
+              "type": "raw_data",
+              "settings": { "size": "100" }
+            }
+          ],
+          "bucketAggs": [],
+          "timeField": "timestamp"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "severity" },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": { "type": "color-text" }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  { "type": "value", "options": { "critical": { "color": "red", "text": "CRITICAL" } } },
+                  { "type": "value", "options": { "high": { "color": "orange", "text": "HIGH" } } },
+                  { "type": "value", "options": { "medium": { "color": "yellow", "text": "MEDIUM" } } },
+                  { "type": "value", "options": { "low": { "color": "green", "text": "LOW" } } }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "sortBy": [{ "displayName": "timestamp", "desc": true }]
+      },
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "includeByName": {
+              "timestamp": true,
+              "rule_name": true,
+              "severity": true,
+              "countries_involved": true,
+              "description": true,
+              "correlation_id": true
+            },
+            "indexByName": {
+              "timestamp": 0,
+              "correlation_id": 1,
+              "rule_name": 2,
+              "severity": 3,
+              "countries_involved": 4,
+              "description": 5
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Correlation Timeline",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 14 },
+      "datasource": { "uid": "elasticsearch" },
+      "targets": [
+        {
+          "refId": "A",
+          "query": "_index:nego-correlations",
+          "alias": "Correlations",
+          "metrics": [
+            { "id": "1", "type": "count" }
+          ],
+          "bucketAggs": [
+            {
+              "id": "2",
+              "type": "date_histogram",
+              "field": "timestamp",
+              "settings": { "interval": "1d", "min_doc_count": "0" }
+            }
+          ],
+          "timeField": "timestamp"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "fixed", "fixedColor": "semi-dark-red" },
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 60,
+            "pointSize": 5,
+            "lineWidth": 1,
+            "showPoints": "never",
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "single" }
+      }
+    },
+    {
+      "id": 3,
+      "title": "Critical Severity",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 22 },
+      "datasource": { "uid": "elasticsearch" },
+      "targets": [
+        {
+          "refId": "A",
+          "query": "_index:nego-correlations AND severity:\"critical\"",
+          "alias": "Critical",
+          "metrics": [
+            { "id": "1", "type": "count" }
+          ],
+          "bucketAggs": [],
+          "timeField": "timestamp"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "fixed", "fixedColor": "dark-red" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "auto"
+      }
+    },
+    {
+      "id": 4,
+      "title": "High Severity",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 22 },
+      "datasource": { "uid": "elasticsearch" },
+      "targets": [
+        {
+          "refId": "A",
+          "query": "_index:nego-correlations AND severity:\"high\"",
+          "alias": "High",
+          "metrics": [
+            { "id": "1", "type": "count" }
+          ],
+          "bucketAggs": [],
+          "timeField": "timestamp"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "fixed", "fixedColor": "orange" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "auto"
+      }
+    },
+    {
+      "id": 5,
+      "title": "Medium Severity",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 22 },
+      "datasource": { "uid": "elasticsearch" },
+      "targets": [
+        {
+          "refId": "A",
+          "query": "_index:nego-correlations AND severity:\"medium\"",
+          "alias": "Medium",
+          "metrics": [
+            { "id": "1", "type": "count" }
+          ],
+          "bucketAggs": [],
+          "timeField": "timestamp"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "fixed", "fixedColor": "yellow" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "auto"
+      }
+    },
+    {
+      "id": 6,
+      "title": "Low Severity",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 22 },
+      "datasource": { "uid": "elasticsearch" },
+      "targets": [
+        {
+          "refId": "A",
+          "query": "_index:nego-correlations AND severity:\"low\"",
+          "alias": "Low",
+          "metrics": [
+            { "id": "1", "type": "count" }
+          ],
+          "bucketAggs": [],
+          "timeField": "timestamp"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "fixed", "fixedColor": "green" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "auto"
+      }
+    }
+  ],
+  "version": 1
+}
