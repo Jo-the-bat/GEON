@@ -17,28 +17,28 @@ networks:
 volumes:
   # Map to existing Docker volumes to preserve data across rename
   geon_elasticsearch_data:
-    name: docker_hego_elasticsearch_data
+    name: docker_geon_elasticsearch_data
     external: true
   geon_redis_data:
-    name: docker_hego_redis_data
+    name: docker_geon_redis_data
     external: true
   geon_rabbitmq_data:
-    name: docker_hego_rabbitmq_data
+    name: docker_geon_rabbitmq_data
     external: true
   geon_minio_data:
-    name: docker_hego_minio_data
+    name: docker_geon_minio_data
     external: true
   geon_prometheus_data:
-    name: docker_hego_prometheus_data
+    name: docker_geon_prometheus_data
     external: true
   geon_grafana_data:
-    name: docker_hego_grafana_data
+    name: docker_geon_grafana_data
     external: true
   geon_authelia_data:
-    name: docker_hego_authelia_data
+    name: docker_geon_authelia_data
     external: true
   geon_n8n_data:
-    name: docker_nego_n8n_data
+    name: docker_geon_n8n_data
     external: true
 
 services:
