@@ -210,7 +210,14 @@
           "metrics": [
             { "id": "1", "type": "count" }
           ],
-          "bucketAggs": [],
+          "bucketAggs": [
+            {
+              "id": "2",
+              "type": "date_histogram",
+              "field": "date",
+              "settings": { "interval": "1d", "min_doc_count": "0" }
+            }
+          ],
           "timeField": "date"
         },
         {
@@ -220,7 +227,14 @@
           "metrics": [
             { "id": "1", "type": "count" }
           ],
-          "bucketAggs": [],
+          "bucketAggs": [
+            {
+              "id": "2",
+              "type": "date_histogram",
+              "field": "timestamp",
+              "settings": { "interval": "1d", "min_doc_count": "0" }
+            }
+          ],
           "timeField": "timestamp"
         }
       ],
@@ -300,5 +314,5 @@
       ]
     }
   ],
-  "version": 1
+  "version": 2
 }
