@@ -595,3 +595,37 @@ services:
     labels:
       - "geon.service=grafana"
       - "geon.role=dashboards"
+
+  # ===========================================================================
+  # INGESTOR — GDELT / ACLED / Sanctions / Correlation cron
+  # ===========================================================================
+  ingestor:
+    image: geon-ingestor
+    build:
+      context: ../ingestors
+      dockerfile: Dockerfile
+    container_name: geon-ingestor
+    restart: unless-stopped
+    environment:
+      - ES_HOST=elasticsearch
+      - ES_SCHEME=http
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
+      - OPENCTI_URL=http://opencti:8080/opencti
+      - OPENCTI_ADMIN_TOKEN=${OPENCTI_ADMIN_TOKEN}
+      - ACLED_API_KEY=${ACLED_API_KEY}
+      - ACLED_EMAIL=${ACLED_EMAIL}
+      - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL}
+    networks:
+      - geon_net
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f scheduler || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    labels:
+      - "geon.service=ingestor"
+      - "geon.role=data-ingestion"

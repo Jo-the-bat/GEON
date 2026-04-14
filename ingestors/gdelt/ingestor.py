@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import logging
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -122,9 +122,9 @@ class GDELTIngestor:
     # ------------------------------------------------------------------
 
     @retry(
-        retry=retry_if_exception_type((requests.ConnectionError, requests.Timeout)),
+        retry=retry_if_exception_type((requests.ConnectionError, requests.Timeout, requests.HTTPError)),
         stop=stop_after_attempt(RETRY_MAX_ATTEMPTS),
-        wait=wait_exponential(min=RETRY_WAIT_MIN, max=RETRY_WAIT_MAX),
+        wait=wait_exponential(min=5, max=60),
         reraise=True,
     )
     def fetch_events(
@@ -132,6 +132,8 @@ class GDELTIngestor:
         query: str,
         timespan: str = "15min",
         max_records: int = 250,
+        start_datetime: str | None = None,
+        end_datetime: str | None = None,
     ) -> dict[str, Any]:
         """Call the GDELT DOC API v2 and return the JSON response.
 
@@ -150,11 +152,15 @@ class GDELTIngestor:
         params: dict[str, str | int] = {
             "query": query,
             "mode": "ArtList",
-            "timespan": timespan,
             "maxrecords": max_records,
             "format": "json",
             "sort": "DateDesc",
         }
+        if start_datetime and end_datetime:
+            params["startdatetime"] = start_datetime
+            params["enddatetime"] = end_datetime
+        else:
+            params["timespan"] = timespan
 
         self.logger.info(
             "Fetching GDELT DOC API — timespan=%s, maxrecords=%d",
@@ -183,9 +189,9 @@ class GDELTIngestor:
             return {}
 
     @retry(
-        retry=retry_if_exception_type((requests.ConnectionError, requests.Timeout)),
+        retry=retry_if_exception_type((requests.ConnectionError, requests.Timeout, requests.HTTPError)),
         stop=stop_after_attempt(RETRY_MAX_ATTEMPTS),
-        wait=wait_exponential(min=RETRY_WAIT_MIN, max=RETRY_WAIT_MAX),
+        wait=wait_exponential(min=5, max=60),
         reraise=True,
     )
     def fetch_geo_events(
@@ -250,19 +256,18 @@ class GDELTIngestor:
     # Main ingestion pipeline
     # ------------------------------------------------------------------
 
-    def ingest(self, timespan: str = "15min") -> int:
+    def ingest(
+        self,
+        timespan: str = "15min",
+        start_offset_days: int = 0,
+    ) -> int:
         """Run the full ingestion pipeline.
 
-        1. Ensure the target index exists.
-        2. Fetch events from the GDELT DOC API.
-        3. Optionally fetch events from the GEO API.
-        4. Normalize all events.
-        5. Filter by relevant CAMEO codes.
-        6. Bulk-index into Elasticsearch.
-
         Args:
-            timespan: GDELT look-back window.  Defaults to ``"15min"``
-                (matching a 15-minute cron schedule).
+            timespan: GDELT look-back window.  Defaults to ``"15min"``.
+            start_offset_days: Shift the query window back by N days
+                (for historical seeding).  When > 0, *timespan* is used
+                as the window width and the window ends N days ago.
 
         Returns:
             Number of documents successfully indexed.
@@ -271,25 +276,30 @@ class GDELTIngestor:
 
         query = self.build_query()
 
+        # Build absolute datetime window when seeding historical data.
+        start_dt = end_dt = None
+        if start_offset_days > 0:
+            end = datetime.now(tz=timezone.utc) - timedelta(days=start_offset_days)
+            start = end - timedelta(days=1)
+            start_dt = start.strftime("%Y%m%d%H%M%S")
+            end_dt = end.strftime("%Y%m%d%H%M%S")
+            self.logger.info("Historical window: %s → %s", start_dt, end_dt)
+
         # --- DOC API ---
         all_events: list[dict[str, Any]] = []
         try:
-            doc_response = self.fetch_events(query, timespan=timespan)
+            doc_response = self.fetch_events(
+                query, timespan=timespan,
+                start_datetime=start_dt, end_datetime=end_dt,
+            )
             doc_articles = parse_doc_api_response(doc_response)
             all_events.extend(doc_articles)
         except Exception:
             self.logger.exception("Failed to fetch/parse GDELT DOC API.")
 
-        # --- GEO API (best-effort) ---
-        try:
-            geo_response = self.fetch_geo_events(query, timespan=timespan)
-            geo_events = parse_geo_api_response(geo_response)
-            all_events.extend(geo_events)
-        except Exception:
-            self.logger.warning(
-                "Failed to fetch/parse GDELT GEO API — continuing with DOC data only.",
-                exc_info=True,
-            )
+        # GEO API v2 is currently returning 404 — disabled to avoid
+        # wasting rate-limit budget on retries.  Re-enable when the
+        # endpoint comes back online.
 
         if not all_events:
             self.logger.info("No events returned from GDELT APIs for timespan=%s.", timespan)
