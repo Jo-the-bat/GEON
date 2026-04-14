@@ -102,33 +102,19 @@ class GDELTIngestor:
             Query string suitable for the GDELT DOC API ``query`` param.
         """
         # GDELT DOC API supports thematic filters via the "theme:" prefix.
-        # We combine multiple conflict/diplomacy themes with OR.
+        # Keep the list short — GDELT rejects queries that are too long.
         themes: list[str] = [
             "MILITARY",
             "ARMED_CONFLICT",
             "SANCTIONS",
             "DIPLOMACY",
-            "THREAT",
-            "PROTEST",
-            "COERCE",
             "CYBER_ATTACK",
             "TERROR",
-            "BLOCKADE",
-            "CEASEFIRE",
-            "PEACE",
-            "TAX_WEAPONS",
+            "PROTEST",
             "WMD",
-            "DRONE",
-            "INTELLIGENCE",
-            "EPU_POLICY_MILITARY",
-            "CRISISLEX_CRISISLEXREC",
         ]
-        # Build OR-joined theme query.
-        theme_query = " OR ".join(f'theme:{t}' for t in themes)
-
-        # Wrap in parentheses for safety and add a source-language filter
-        # to keep article volume manageable (English + French).
-        query = f"({theme_query}) sourcelang:eng OR sourcelang:fra"
+        theme_query = " OR ".join(f"theme:{t}" for t in themes)
+        query = f"({theme_query}) (sourcelang:eng OR sourcelang:fra)"
         return query
 
     # ------------------------------------------------------------------
@@ -184,12 +170,17 @@ class GDELTIngestor:
         )
         response.raise_for_status()
 
-        # GDELT sometimes returns empty body instead of empty JSON.
-        if not response.text.strip():
+        # GDELT returns plain text errors or empty body on bad queries.
+        body = response.text.strip()
+        if not body:
             self.logger.warning("GDELT DOC API returned an empty body.")
             return {}
 
-        return response.json()
+        try:
+            return response.json()
+        except Exception:
+            self.logger.warning("GDELT DOC API returned non-JSON: %s", body[:200])
+            return {}
 
     @retry(
         retry=retry_if_exception_type((requests.ConnectionError, requests.Timeout)),
@@ -232,11 +223,16 @@ class GDELTIngestor:
         )
         response.raise_for_status()
 
-        if not response.text.strip():
+        body = response.text.strip()
+        if not body:
             self.logger.warning("GDELT GEO API returned an empty body.")
             return {}
 
-        return response.json()
+        try:
+            return response.json()
+        except Exception:
+            self.logger.warning("GDELT GEO API returned non-JSON: %s", body[:200])
+            return {}
 
     # ------------------------------------------------------------------
     # CAMEO filtering
@@ -362,8 +358,9 @@ class GDELTIngestor:
 def main() -> None:
     """Create a :class:`GDELTIngestor` and run it."""
     setup_logging(level="INFO")
+    timespan = sys.argv[1] if len(sys.argv) > 1 else "15min"
     ingestor = GDELTIngestor()
-    ingestor.run()
+    ingestor.ingest(timespan=timespan)
 
 
 if __name__ == "__main__":

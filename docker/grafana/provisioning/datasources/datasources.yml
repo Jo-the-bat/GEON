@@ -43,4 +43,4 @@ datasources:
       logLevelField: 'severity'
     secureJsonData:
       basicAuthPassword: $ELASTIC_PASSWORD
-    version: 1
+    version: 2
