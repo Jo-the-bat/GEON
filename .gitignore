@@ -46,6 +46,10 @@ yarn-error.log*
 docker/nginx/ssl/
 docker/authelia/db.sqlite3
 docker/authelia/notification.txt
+docker/authelia/users_database.yml
+docker/authelia/configuration.yml
+docker/elasticsearch/elasticsearch.yml
+docker/prometheus/prometheus.yml
 
 # === IDE ===
 .vscode/

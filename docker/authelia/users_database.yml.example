@@ -12,7 +12,7 @@ users:
   admin:
     disabled: false
     displayname: 'GEON Administrator'
-    password: '$argon2id$v=19$m=65536,t=3,p=4$rcDjWzVlOKTWu8DhbNSnrQ$xm5x40OpYEnGHw9xMs285Ri/o4EXiPw4OZOVDv6Cz+A'
+    password: '<GENERATE: docker run --rm authelia/authelia authelia crypto hash generate argon2 --password YOUR_PASSWORD>'
     email: 'admin@geon.local'
     groups:
       - 'admins'
