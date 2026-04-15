@@ -1,0 +1,51 @@
+# =============================================================================
+# GEON — Prometheus Configuration
+# Metrics collection for platform monitoring
+# =============================================================================
+# Only targets that expose a real /metrics endpoint are listed here.
+# Services without native metrics (Nginx, Redis, MinIO, Authelia,
+# Elasticsearch) are monitored via Docker healthchecks instead.
+# =============================================================================
+
+global:
+  scrape_interval: 30s
+  evaluation_interval: 30s
+  scrape_timeout: 10s
+
+  external_labels:
+    cluster: 'geon'
+    environment: 'production'
+
+# ---------------------------------------------------------------------------
+# Scrape Configurations
+# ---------------------------------------------------------------------------
+scrape_configs:
+
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['localhost:9090']
+        labels:
+          service: 'prometheus'
+
+  # Grafana — built-in metrics (served under subpath)
+  - job_name: 'grafana'
+    metrics_path: '/grafana/metrics'
+    static_configs:
+      - targets: ['grafana:3000']
+        labels:
+          service: 'grafana'
+
+  # RabbitMQ — Prometheus plugin (port 15692)
+  - job_name: 'rabbitmq'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['rabbitmq:15692']
+        labels:
+          service: 'rabbitmq'
+
+  # Note: OpenCTI (/opencti/metrics) and n8n (/n8n/metrics) return HTML
+  # instead of Prometheus exposition format. They would need dedicated
+  # exporters or config changes to expose real metrics. Removed to avoid
+  # false DOWN status in the dashboard.
