@@ -304,30 +304,156 @@ class SanctionsIngestor:
     # ------------------------------------------------------------------
 
     def _fetch_eu_sanctions(self) -> list[dict[str, Any]]:
-        """Fetch the EU Consolidated Sanctions list.
+        """Fetch and parse the EU Consolidated Sanctions list."""
+        url = (
+            "https://webgate.ec.europa.eu/fsd/fsf/public/files/"
+            "xmlFullSanctionsList_1_1/content?token=dG9rZW4tMjAxNw"
+        )
+        try:
+            logger.info("Downloading EU sanctions from %s", url.split("?")[0])
+            resp = requests.get(url, timeout=120)
+            resp.raise_for_status()
+        except Exception:
+            logger.warning("Failed to download EU sanctions, skipping.", exc_info=True)
+            return []
 
-        Returns:
-            List of normalised sanctions entity dicts.
-        """
-        # TODO: Implement EU sanctions ingestion.
-        # The EU publishes a consolidated XML at:
-        #   https://webgate.ec.europa.eu/fsd/fsf/public/files/xmlFullSanctionsList_1_1/content
-        # XML schema differs significantly from OFAC — needs dedicated parser.
-        logger.info("EU sanctions ingestion not yet implemented.")
-        return []
+        root = ET.fromstring(resp.content)
+        # EU XML uses default namespace
+        ns_match = root.tag.split("}")[0] + "}" if "}" in root.tag else ""
+
+        documents: list[dict[str, Any]] = []
+        for entity in root.iter(f"{ns_match}sanctionEntity"):
+            name_el = entity.find(f".//{ns_match}wholeName")
+            if name_el is None or not name_el.text:
+                name_el = entity.find(f".//{ns_match}lastName")
+            name = name_el.text.strip() if name_el is not None and name_el.text else ""
+            if not name:
+                continue
+
+            subject_type = entity.find(f".//{ns_match}subjectType")
+            etype = "person" if subject_type is not None and "person" in (subject_type.text or "").lower() else "organization"
+
+            # Country from citizenship or address
+            country = ""
+            for cit in entity.iter(f"{ns_match}countryDescription"):
+                if cit.text:
+                    country = cit.text.strip()
+                    break
+
+            # Programmes
+            programs: list[str] = []
+            for prog in entity.iter(f"{ns_match}programme"):
+                if prog.text:
+                    programs.append(prog.text.strip())
+
+            uid = entity.get("euReferenceNumber") or entity.get("logicalId") or name
+            entity_id = hashlib.sha256(f"EU-{uid}".encode()).hexdigest()[:24]
+
+            now = datetime.now(tz=timezone.utc).isoformat()
+            documents.append({
+                "entity_id": entity_id,
+                "entity_type": etype,
+                "name": name,
+                "aliases": [],
+                "country": country,
+                "programs": programs,
+                "sanctions_source": "EU",
+                "listed_date": None,
+                "notes": "",
+                "ingested_at": now,
+                "date": now,
+            })
+
+        logger.info("Parsed %d EU sanctions entities.", len(documents))
+        return documents
 
     def _fetch_un_sanctions(self) -> list[dict[str, Any]]:
-        """Fetch the UN Security Council Consolidated Sanctions list.
+        """Fetch and parse the UN Security Council Consolidated Sanctions list."""
+        url = "https://scsanctions.un.org/resources/xml/en/consolidated.xml"
+        try:
+            logger.info("Downloading UN sanctions from %s", url)
+            resp = requests.get(url, timeout=120)
+            resp.raise_for_status()
+        except Exception:
+            logger.warning("Failed to download UN sanctions, skipping.", exc_info=True)
+            return []
 
-        Returns:
-            List of normalised sanctions entity dicts.
-        """
-        # TODO: Implement UN sanctions ingestion.
-        # The UN publishes XML at:
-        #   https://scsanctions.un.org/resources/xml/en/consolidated.xml
-        # Uses its own XML schema — needs dedicated parser.
-        logger.info("UN sanctions ingestion not yet implemented.")
-        return []
+        root = ET.fromstring(resp.content)
+
+        documents: list[dict[str, Any]] = []
+        for individual in root.iter("INDIVIDUAL"):
+            first = ""
+            for fn in individual.iter("FIRST_NAME"):
+                if fn.text:
+                    first = fn.text.strip()
+                    break
+            last = ""
+            for ln in individual.iter("SECOND_NAME"):
+                if ln.text:
+                    last = ln.text.strip()
+                    break
+            name = f"{first} {last}".strip()
+            if not name:
+                continue
+            ref = ""
+            for r in individual.iter("DATAID"):
+                if r.text:
+                    ref = r.text.strip()
+                    break
+            nationality = ""
+            for nat in individual.iter("NATIONALITY"):
+                val = nat.find("VALUE")
+                if val is not None and val.text:
+                    nationality = val.text.strip()
+                    break
+            entity_id = hashlib.sha256(f"UN-{ref or name}".encode()).hexdigest()[:24]
+            now = datetime.now(tz=timezone.utc).isoformat()
+            documents.append({
+                "entity_id": entity_id,
+                "entity_type": "person",
+                "name": name,
+                "aliases": [],
+                "country": nationality,
+                "programs": ["UNSC"],
+                "sanctions_source": "UN",
+                "listed_date": None,
+                "notes": "",
+                "ingested_at": now,
+                "date": now,
+            })
+
+        for entity in root.iter("ENTITY"):
+            first = ""
+            for fn in entity.iter("FIRST_NAME"):
+                if fn.text:
+                    first = fn.text.strip()
+                    break
+            name = first
+            if not name:
+                continue
+            ref = ""
+            for r in entity.iter("DATAID"):
+                if r.text:
+                    ref = r.text.strip()
+                    break
+            entity_id = hashlib.sha256(f"UN-{ref or name}".encode()).hexdigest()[:24]
+            now = datetime.now(tz=timezone.utc).isoformat()
+            documents.append({
+                "entity_id": entity_id,
+                "entity_type": "organization",
+                "name": name,
+                "aliases": [],
+                "country": "",
+                "programs": ["UNSC"],
+                "sanctions_source": "UN",
+                "listed_date": None,
+                "notes": "",
+                "ingested_at": now,
+                "date": now,
+            })
+
+        logger.info("Parsed %d UN sanctions entities.", len(documents))
+        return documents
 
     # ------------------------------------------------------------------
     # Main ingestion flow
