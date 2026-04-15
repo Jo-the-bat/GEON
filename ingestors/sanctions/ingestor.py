@@ -323,10 +323,13 @@ class SanctionsIngestor:
 
         documents: list[dict[str, Any]] = []
         for entity in root.iter(f"{ns_match}sanctionEntity"):
-            name_el = entity.find(f".//{ns_match}wholeName")
-            if name_el is None or not name_el.text:
-                name_el = entity.find(f".//{ns_match}lastName")
-            name = name_el.text.strip() if name_el is not None and name_el.text else ""
+            # wholeName is an attribute on nameAlias, not a child element
+            name = ""
+            first_alias = entity.find(f".//{ns_match}nameAlias")
+            if first_alias is not None:
+                name = first_alias.get("wholeName", "").strip()
+                if not name:
+                    name = first_alias.get("lastName", "").strip()
             if not name:
                 continue
 
