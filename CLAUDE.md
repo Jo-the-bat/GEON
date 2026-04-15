@@ -283,14 +283,54 @@ echo "net.ipv4.ip_unprivileged_port_start=80" | sudo tee -a /etc/sysctl.d/99-unp
 
 **Module** : `risk_score/calculator.py`
 
-Score 0-100 par pays, agregant 5 facteurs ponderes :
-- Evenements GDELT negatifs (Goldstein < 0, 30j) — 30%
-- Conflits ACLED (si disponible) — 20%
-- Sanctions actives — 15%
+Score 0-100 par pays, agregant 7 facteurs ponderes :
+- Evenements GDELT negatifs (Goldstein < 0, 30j) — 25%
+- Conflits ACLED (si disponible) — 15%
+- Sanctions actives — 10%
 - Groupes APT attribues (via `country_apt_mapping.json`) — 15%
 - Correlations detectees — 20%
+- Hausse depenses militaires (YoY) — 10%
+- Importations d'armes recentes (TIV) — 5%
 
 Index : `geon-risk-scores` (1 doc/pays, mis a jour quotidiennement a 05:00)
+
+### 8. Cloudflare Radar (Coupures internet)
+
+**Role** : Detection des coupures internet par pays — indicateur de censure, conflit, ou instabilite.
+
+**API** : `https://api.cloudflare.com/client/v4/radar/annotations/outages`
+- Necessite un token API Cloudflare (gratuit, permissions Radar:Read)
+- `CLOUDFLARE_RADAR_TOKEN` dans `.env`
+
+**Ingestion** : Cron toutes les 30 minutes.
+- Index : `geon-outages`
+
+**Champs** : outage_id, date, country, country_code, asn, asn_name, type (country-level|asn-level|region), scope (national|regional|local), duration_hours, severity (partial|major|total), status (ongoing|resolved), start_time, end_time
+
+### 9. Metaculus + Manifold Markets (Consensus predictif)
+
+**Role** : Croisement de plateformes de prediction pour detecter les divergences de consensus.
+
+**APIs** :
+- Manifold Markets (public) : `https://api.manifold.markets/v0/search-markets`
+- Metaculus (token requis) : `https://www.metaculus.com/api/questions/`
+- `METACULUS_API_TOKEN` dans `.env`
+
+**Ingestion** : Cron toutes les 2 heures.
+- Index marches externes : `geon-predictions`
+- Enrichissement des cases Polymarket existantes avec objet `consensus` (polymarket_yes, metaculus_median, manifold_yes, consensus_score, divergence, platforms_count)
+- Alerte de type `prediction_divergence` dans `geon-correlations` si divergence > 0.15
+
+### 10. SIPRI (Transferts d'armes et depenses militaires)
+
+**Role** : Donnees strategiques sur les flux d'armement et l'evolution des budgets de defense.
+
+**Donnees** : Pas d'API publique. Donnees embarquees (seed) + mise a jour via CSV optionnels dans `ingestors/sipri/data/`.
+- Sources : SIPRI Arms Transfers Database, SIPRI Military Expenditure Database
+
+**Ingestion** : Cron mensuel (lundi a 02:00).
+- Index transferts : `geon-arms-transfers` (supplier_country, recipient_country, weapon_type, tiv_value, etc.)
+- Index depenses : `geon-military-spending` (country, spending_usd_millions, spending_pct_gdp, spending_change_yoy_pct)
 
 ---
 
@@ -318,6 +358,18 @@ C'est le coeur de la valeur ajoutee de GEON. Un script Python (ou ensemble de sc
 **Regle 4 : Changement de rhetorique**
 - Declencheur : variation de tonalite GDELT > 2 ecarts-types sur 7 jours pour une paire de pays
 - Action : alerte "signal faible" dans `geon-correlations`
+
+**Regle 5 : Coupure internet + escalade diplomatique/militaire**
+- Declencheur : coupure internet nationale ou majeure dans `geon-outages`
+- ET : evenements GDELT avec Goldstein < -5 ou conflits ACLED dans le meme pays dans ±48h
+- Action : correlation `internet_outage_escalation` dans `geon-correlations`
+- Severite : critical si coupure totale + conflit, high si partielle + tension
+
+**Regle 6 : Hausse depenses militaires + activite APT**
+- Declencheur : pays avec spending_change_yoy_pct > 10% dans `geon-military-spending`
+- ET : groupe APT attribue a ce pays actif dans OpenCTI
+- Action : correlation `military_buildup_cyber` dans `geon-correlations`
+- Correlation lente (donnees annuelles) mais strategiquement pertinente
 
 ### Index de correlation
 
@@ -488,6 +540,23 @@ geon/
 |   |   +-- ingestor.py                 # Polymarket geopolitical markets
 |   |   +-- parser.py                   # Market filtering and normalization
 |   |   +-- mapping.json
+|   +-- cloudflare_radar/
+|   |   +-- __init__.py
+|   |   +-- ingestor.py
+|   |   +-- parser.py
+|   |   +-- mapping.json
+|   +-- prediction_consensus/
+|   |   +-- __init__.py
+|   |   +-- ingestor.py
+|   |   +-- parser.py
+|   |   +-- matcher.py
+|   |   +-- mapping.json
+|   +-- sipri/
+|   |   +-- __init__.py
+|   |   +-- ingestor.py
+|   |   +-- parser.py
+|   |   +-- mapping.json
+|   |   +-- mapping_spending.json
 |   +-- risk_score/
 |   |   +-- __init__.py
 |   |   +-- calculator.py               # Composite risk score per country
@@ -501,6 +570,8 @@ geon/
 |       |   +-- sanction_cyber.py       # Regle 2
 |       |   +-- conflict_cyber.py       # Regle 3
 |       |   +-- rhetoric_shift.py       # Regle 4
+|       |   +-- internet_outage.py      # Regle 5
+|       |   +-- military_buildup.py     # Regle 6
 |       +-- alerting.py                 # Envoi des alertes (Discord, email)
 |
 +-- n8n/
