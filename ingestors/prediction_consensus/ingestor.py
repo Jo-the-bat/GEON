@@ -160,7 +160,12 @@ class PredictionConsensusIngestor:
                 query={"term": {"status": "active"}},
                 size=500,
             )
-            return [h["_source"] for h in resp["hits"]["hits"]]
+            results = []
+            for h in resp["hits"]["hits"]:
+                doc = h["_source"]
+                doc["_es_id"] = h["_id"]  # preserve ES _id for updates
+                results.append(doc)
+            return results
         except Exception:
             logger.warning("Could not load Polymarket cases.")
             return []
@@ -220,7 +225,8 @@ class PredictionConsensusIngestor:
         divergence_alerts: list[dict[str, Any]] = []
 
         for pm_case in pm_cases:
-            pm_id = pm_case.get("market_id", "")
+            # Polymarket uses case_id as the document _id
+            pm_id = pm_case.get("case_id", pm_case.get("_es_id", ""))
             matched = matches.get(pm_id, [])
             if not matched:
                 continue

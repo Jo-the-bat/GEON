@@ -57,13 +57,13 @@ def find_matches(
         threshold: Minimum similarity score for a match.
 
     Returns:
-        Dict mapping Polymarket case market_id to list of matched externals.
+        Dict mapping Polymarket case_id to list of matched externals.
     """
     matches: dict[str, list[dict[str, Any]]] = {}
 
     for pm_case in polymarket_cases:
         pm_q = pm_case.get("question", "")
-        pm_id = pm_case.get("market_id", "")
+        pm_id = pm_case.get("case_id", pm_case.get("_es_id", ""))
         pm_countries = set(pm_case.get("countries_involved", []))
 
         best_matches: list[tuple[float, dict[str, Any]]] = []
