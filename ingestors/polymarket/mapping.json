@@ -1,0 +1,33 @@
+{
+  "mappings": {
+    "properties": {
+      "case_id": { "type": "keyword" },
+      "question": { "type": "text", "fields": { "keyword": { "type": "keyword", "ignore_above": 512 } } },
+      "status": { "type": "keyword" },
+      "created_at": { "type": "date" },
+      "end_date": { "type": "date" },
+      "date": { "type": "date" },
+      "outcome_yes_price": { "type": "float" },
+      "outcome_no_price": { "type": "float" },
+      "volume": { "type": "float" },
+      "liquidity": { "type": "float" },
+      "price_history": { "type": "object", "enabled": false },
+      "countries_involved": { "type": "keyword" },
+      "keywords": { "type": "keyword" },
+      "related_gdelt_events": { "type": "integer" },
+      "related_correlations": { "type": "integer" },
+      "related_apt_groups": { "type": "keyword" },
+      "related_sanctions": { "type": "integer" },
+      "trend": { "type": "keyword" },
+      "price_change_24h": { "type": "float" },
+      "price_change_7d": { "type": "float" },
+      "category": { "type": "keyword" },
+      "source_url": { "type": "keyword" },
+      "ingested_at": { "type": "date" }
+    }
+  },
+  "settings": {
+    "number_of_shards": 1,
+    "number_of_replicas": 0
+  }
+}
