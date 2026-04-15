@@ -1,0 +1,22 @@
+{
+  "mappings": {
+    "properties": {
+      "title": {
+        "type": "text",
+        "fields": { "keyword": { "type": "keyword" } }
+      },
+      "source": { "type": "keyword" },
+      "source_category": { "type": "keyword" },
+      "url": { "type": "keyword" },
+      "published_date": { "type": "date", "format": "strict_date_optional_time||epoch_millis||EEE, dd MMM yyyy HH:mm:ss z||EEE, dd MMM yyyy HH:mm:ss Z" },
+      "date": { "type": "date", "format": "strict_date_optional_time||epoch_millis||EEE, dd MMM yyyy HH:mm:ss z||EEE, dd MMM yyyy HH:mm:ss Z" },
+      "summary": { "type": "text" },
+      "keywords_matched": { "type": "keyword" },
+      "ingested_at": { "type": "date" }
+    }
+  },
+  "settings": {
+    "number_of_shards": 1,
+    "number_of_replicas": 0
+  }
+}

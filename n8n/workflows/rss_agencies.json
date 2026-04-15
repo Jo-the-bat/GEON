@@ -1,0 +1,360 @@
+{
+  "name": "GEON \u2014 News Agencies RSS \u2192 Elasticsearch",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "bf5e7a27-d88a-48a8-92ac-1d664650124c",
+      "name": "Every 1 hour",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://news.google.com/rss/search?q=site:reuters.com+world&hl=en-US&gl=US&ceid=US:en"
+      },
+      "id": "6ff3c17a-c0e3-47e8-8900-7b6e03391ec7",
+      "name": "RSS Reuters",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [
+        250,
+        -360
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1b17381f-7c02-411a-b18c-7662d4b06ee6",
+              "name": "source",
+              "value": "Reuters",
+              "type": "string"
+            },
+            {
+              "id": "63750b33-c3e4-4e82-ab96-02ee0449120e",
+              "name": "source_category",
+              "value": "agency",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "d4cfbe21-b2fe-4ab1-a66e-70ff427c44d7",
+      "name": "Tag Reuters",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        500,
+        -360
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://www.france24.com/en/rss"
+      },
+      "id": "312868c0-2dea-4554-a4e3-5a2aaff4bac2",
+      "name": "RSS France 24",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [
+        250,
+        -120
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c327e7cb-d246-46af-9cdb-70d7b9771b7d",
+              "name": "source",
+              "value": "France 24",
+              "type": "string"
+            },
+            {
+              "id": "4a4660c7-6330-4258-9fee-e93b9f320c3c",
+              "name": "source_category",
+              "value": "agency",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "7315ba41-a01a-45fc-861a-996c47660f62",
+      "name": "Tag France 24",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        500,
+        -120
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://feedx.net/rss/ap.xml"
+      },
+      "id": "74c4446d-ca3c-4cb9-a32f-662dfd2e1943",
+      "name": "RSS AP News",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [
+        250,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "15b8e6d5-7949-45af-be54-296cc955ed0d",
+              "name": "source",
+              "value": "AP News",
+              "type": "string"
+            },
+            {
+              "id": "71a7ddfd-0b89-43bd-8595-94f950d79f4f",
+              "name": "source_category",
+              "value": "agency",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a1e01a27-883f-4bf3-af7a-968a01f76af0",
+      "name": "Tag AP News",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        500,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://feeds.bbci.co.uk/news/world/rss.xml"
+      },
+      "id": "aa38165c-6b8e-4a14-b2f4-b77f6bd06c01",
+      "name": "RSS BBC World",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [
+        250,
+        360
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "3a78f54f-8e69-42dc-8a55-1198d2c2dbeb",
+              "name": "source",
+              "value": "BBC World",
+              "type": "string"
+            },
+            {
+              "id": "0926753f-5e80-49eb-a712-307ba4b077de",
+              "name": "source_category",
+              "value": "agency",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c94d5071-c05c-428d-b595-626a241bb7bd",
+      "name": "Tag BBC World",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        500,
+        360
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const keywords = [\n  'war', 'conflict', 'sanctions', 'military', 'nato', 'ceasefire',\n  'invasion', 'nuclear', 'treaty', 'diplomacy', 'geopolitical',\n  'cyber attack', 'apt', 'espionage', 'intelligence', 'defense',\n  'missile', 'drone', 'territorial', 'sovereignty', 'alliance',\n  'embargo', 'coup', 'insurgency', 'peacekeeping', 'un security council',\n  'arms deal'\n];\n\nconst filtered = [];\nfor (const item of $input.all()) {\n  const text = `${item.json.title || ''} ${item.json.contentSnippet || item.json.content || ''}`.toLowerCase();\n  const matched = keywords.filter(k => text.includes(k));\n  if (matched.length > 0) {\n    filtered.push({\n      json: {\n        title: item.json.title || '',\n        source: item.json.source || 'Unknown',\n        source_category: item.json.source_category || 'unknown',\n        url: item.json.link || item.json.url || '',\n        published_date: new Date(item.json.isoDate || item.json.pubDate || Date.now()).toISOString(),\n        date: new Date(item.json.isoDate || item.json.pubDate || Date.now()).toISOString(),\n        summary: (item.json.contentSnippet || item.json.content || '').substring(0, 500),\n        keywords_matched: matched,\n        ingested_at: new Date().toISOString()\n      }\n    });\n  }\n}\nreturn filtered;"
+      },
+      "id": "33766a53-8fe6-42bb-a3e6-b7a3df15ffa9",
+      "name": "Filter Geopolitical",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        750,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://elastic:{{ $env.ELASTIC_PASSWORD }}@elasticsearch:9200/geon-articles-{{ $now.format('yyyy.MM') }}/_doc",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "cceae5d9-c5e3-42d7-bf59-084036de075c",
+      "name": "Index to ES",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1000,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Every 1 hour": {
+      "main": [
+        [
+          {
+            "node": "RSS Reuters",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "RSS France 24",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "RSS AP News",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "RSS BBC World",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RSS Reuters": {
+      "main": [
+        [
+          {
+            "node": "Tag Reuters",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RSS France 24": {
+      "main": [
+        [
+          {
+            "node": "Tag France 24",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RSS AP News": {
+      "main": [
+        [
+          {
+            "node": "Tag AP News",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RSS BBC World": {
+      "main": [
+        [
+          {
+            "node": "Tag BBC World",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tag Reuters": {
+      "main": [
+        [
+          {
+            "node": "Filter Geopolitical",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tag France 24": {
+      "main": [
+        [
+          {
+            "node": "Filter Geopolitical",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tag AP News": {
+      "main": [
+        [
+          {
+            "node": "Filter Geopolitical",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tag BBC World": {
+      "main": [
+        [
+          {
+            "node": "Filter Geopolitical",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Geopolitical": {
+      "main": [
+        [
+          {
+            "node": "Index to ES",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "geon"
+    }
+  ]
+}

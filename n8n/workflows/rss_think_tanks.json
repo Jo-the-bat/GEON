@@ -1,0 +1,567 @@
+{
+  "name": "GEON \u2014 Think Tanks RSS \u2192 Elasticsearch",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "9d7c8c74-c47d-4b9d-84d2-2cdc83ba68cf",
+      "name": "Every 1 hour",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://news.google.com/rss/search?q=site:irsem.fr&hl=fr&gl=FR&ceid=FR:fr"
+      },
+      "id": "2b3487ce-b9be-45dc-b69e-f16e02344629",
+      "name": "RSS IRSEM",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [
+        250,
+        -720
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "588c45c0-fc6d-4e3c-8388-72e372cb3ac5",
+              "name": "source",
+              "value": "IRSEM",
+              "type": "string"
+            },
+            {
+              "id": "8f6bb11d-177b-4892-a93e-dbef5dcf343f",
+              "name": "source_category",
+              "value": "think_tank",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "17ca34f6-b5e9-480a-9ab1-2c246b05667e",
+      "name": "Tag IRSEM",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        500,
+        -720
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://www.ifri.org/en/rss.xml"
+      },
+      "id": "9219bdaa-2c3d-4071-9519-0c7a644de77a",
+      "name": "RSS IFRI",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [
+        250,
+        -480
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a6292b38-7104-4103-903c-ddced68e5a47",
+              "name": "source",
+              "value": "IFRI",
+              "type": "string"
+            },
+            {
+              "id": "fc2b243b-eee9-49db-ba3d-edce955da3e0",
+              "name": "source_category",
+              "value": "think_tank",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "30ea08a6-23e5-41f1-8d7f-5e776a43200c",
+      "name": "Tag IFRI",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        500,
+        -480
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://www.csis.org/rss.xml"
+      },
+      "id": "2614221d-b5f8-4a13-9952-ba0dda150d8e",
+      "name": "RSS CSIS",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [
+        250,
+        -240
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "432b4ddb-5016-45d4-85fe-2464d857cf68",
+              "name": "source",
+              "value": "CSIS",
+              "type": "string"
+            },
+            {
+              "id": "c54e8352-204d-4c0a-a022-176dbcc8b708",
+              "name": "source_category",
+              "value": "think_tank",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "79d44e9b-d618-4561-bfdf-ca580a61710f",
+      "name": "Tag CSIS",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        500,
+        -240
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://news.google.com/rss/search?q=site:brookings.edu&hl=en-US&gl=US&ceid=US:en"
+      },
+      "id": "60a43228-662b-47dc-82d8-4c0b7fe11198",
+      "name": "RSS Brookings",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [
+        250,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ae769e6a-23ba-42e6-a465-ca35d28ff170",
+              "name": "source",
+              "value": "Brookings",
+              "type": "string"
+            },
+            {
+              "id": "63a0c2fc-f198-406c-819f-29f10fe2bfe2",
+              "name": "source_category",
+              "value": "think_tank",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "bdb1059d-945e-4a59-8594-152cbfe5c8fe",
+      "name": "Tag Brookings",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        500,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://news.google.com/rss/search?q=site:chathamhouse.org&hl=en-US&gl=US&ceid=US:en"
+      },
+      "id": "31ca9f89-12e0-4c38-b1e4-511fe164e01c",
+      "name": "RSS Chatham House",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [
+        250,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "90255f34-b00a-498a-a654-56da0818e59d",
+              "name": "source",
+              "value": "Chatham House",
+              "type": "string"
+            },
+            {
+              "id": "9954c0d3-f617-48d7-9c55-8d3b4bd01866",
+              "name": "source_category",
+              "value": "think_tank",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "accdeba0-5d69-4866-a0a9-56870424cd70",
+      "name": "Tag Chatham House",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        500,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://news.google.com/rss/search?q=site:carnegieendowment.org&hl=en-US&gl=US&ceid=US:en"
+      },
+      "id": "108124bb-c700-4862-b06d-1bc9d0600a44",
+      "name": "RSS Carnegie",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [
+        250,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c90acb46-21b9-4816-a178-2f9c0033f39e",
+              "name": "source",
+              "value": "Carnegie",
+              "type": "string"
+            },
+            {
+              "id": "0d6ae007-3439-43dd-a5d8-5303a90a5219",
+              "name": "source_category",
+              "value": "think_tank",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "46357f86-0759-4494-bef3-8bde8867102e",
+      "name": "Tag Carnegie",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        500,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://www.rand.org/pubs/commentary.xml"
+      },
+      "id": "2b5222b8-d039-4438-a9d7-9253a4fe3d21",
+      "name": "RSS RAND",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [
+        250,
+        720
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "aa96f6c8-fbaa-4f37-80f1-2e7ba28d6caa",
+              "name": "source",
+              "value": "RAND",
+              "type": "string"
+            },
+            {
+              "id": "3923ed7c-02d1-4cca-be30-a98a062083fe",
+              "name": "source_category",
+              "value": "think_tank",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "684e031c-8660-4a91-a129-21ed194d8fb7",
+      "name": "Tag RAND",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        500,
+        720
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const keywords = [\n  'war', 'conflict', 'sanctions', 'military', 'nato', 'ceasefire',\n  'invasion', 'nuclear', 'treaty', 'diplomacy', 'geopolitical',\n  'cyber attack', 'apt', 'espionage', 'intelligence', 'defense',\n  'missile', 'drone', 'territorial', 'sovereignty', 'alliance',\n  'embargo', 'coup', 'insurgency', 'peacekeeping', 'un security council',\n  'arms deal'\n];\n\nconst filtered = [];\nfor (const item of $input.all()) {\n  const text = `${item.json.title || ''} ${item.json.contentSnippet || item.json.content || ''}`.toLowerCase();\n  const matched = keywords.filter(k => text.includes(k));\n  if (matched.length > 0) {\n    filtered.push({\n      json: {\n        title: item.json.title || '',\n        source: item.json.source || 'Unknown',\n        source_category: item.json.source_category || 'unknown',\n        url: item.json.link || item.json.url || '',\n        published_date: new Date(item.json.isoDate || item.json.pubDate || Date.now()).toISOString(),\n        date: new Date(item.json.isoDate || item.json.pubDate || Date.now()).toISOString(),\n        summary: (item.json.contentSnippet || item.json.content || '').substring(0, 500),\n        keywords_matched: matched,\n        ingested_at: new Date().toISOString()\n      }\n    });\n  }\n}\nreturn filtered;"
+      },
+      "id": "41c3e76d-3f5d-4988-ab4c-0c1da9c11a15",
+      "name": "Filter Geopolitical",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        750,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://elastic:{{ $env.ELASTIC_PASSWORD }}@elasticsearch:9200/geon-articles-{{ $now.format('yyyy.MM') }}/_doc",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "b57fb584-83e5-44e7-b7bd-b4b971e918f8",
+      "name": "Index to ES",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1000,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Every 1 hour": {
+      "main": [
+        [
+          {
+            "node": "RSS IRSEM",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "RSS IFRI",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "RSS CSIS",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "RSS Brookings",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "RSS Chatham House",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "RSS Carnegie",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "RSS RAND",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RSS IRSEM": {
+      "main": [
+        [
+          {
+            "node": "Tag IRSEM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RSS IFRI": {
+      "main": [
+        [
+          {
+            "node": "Tag IFRI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RSS CSIS": {
+      "main": [
+        [
+          {
+            "node": "Tag CSIS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RSS Brookings": {
+      "main": [
+        [
+          {
+            "node": "Tag Brookings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RSS Chatham House": {
+      "main": [
+        [
+          {
+            "node": "Tag Chatham House",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RSS Carnegie": {
+      "main": [
+        [
+          {
+            "node": "Tag Carnegie",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RSS RAND": {
+      "main": [
+        [
+          {
+            "node": "Tag RAND",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tag IRSEM": {
+      "main": [
+        [
+          {
+            "node": "Filter Geopolitical",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tag IFRI": {
+      "main": [
+        [
+          {
+            "node": "Filter Geopolitical",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tag CSIS": {
+      "main": [
+        [
+          {
+            "node": "Filter Geopolitical",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tag Brookings": {
+      "main": [
+        [
+          {
+            "node": "Filter Geopolitical",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tag Chatham House": {
+      "main": [
+        [
+          {
+            "node": "Filter Geopolitical",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tag Carnegie": {
+      "main": [
+        [
+          {
+            "node": "Filter Geopolitical",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tag RAND": {
+      "main": [
+        [
+          {
+            "node": "Filter Geopolitical",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Geopolitical": {
+      "main": [
+        [
+          {
+            "node": "Index to ES",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "geon"
+    }
+  ]
+}

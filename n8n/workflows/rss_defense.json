@@ -1,0 +1,498 @@
+{
+  "name": "GEON \u2014 Defense & Security RSS \u2192 Elasticsearch",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "42945900-a6bf-4d8c-aab9-b3633be0a355",
+      "name": "Every 1 hour",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://warontherocks.com/feed/"
+      },
+      "id": "f2a9d412-8073-40ba-bd95-15c49c839c22",
+      "name": "RSS War on the Rocks",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [
+        250,
+        -600
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "34c7fe45-3c55-4bcf-9542-e7b5b3fafe81",
+              "name": "source",
+              "value": "War on the Rocks",
+              "type": "string"
+            },
+            {
+              "id": "79be0322-104f-479d-88a6-210da2198b12",
+              "name": "source_category",
+              "value": "defense",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "df3d89f6-cbfb-476e-adbb-abec70dc9917",
+      "name": "Tag War on the Rocks",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        500,
+        -600
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://news.google.com/rss/search?q=site:lawfaremedia.org&hl=en-US&gl=US&ceid=US:en"
+      },
+      "id": "0f469a47-7703-41b8-b648-3e092cbe0101",
+      "name": "RSS Lawfare",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [
+        250,
+        -360
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c2cdf752-ece6-496a-9c44-f46033626dc0",
+              "name": "source",
+              "value": "Lawfare",
+              "type": "string"
+            },
+            {
+              "id": "bd138804-555f-4311-acd7-b0e868957512",
+              "name": "source_category",
+              "value": "defense",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "5127f869-1a17-4150-ac11-8085c0d477a2",
+      "name": "Tag Lawfare",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        500,
+        -360
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://www.defenseone.com/rss/all/"
+      },
+      "id": "b9799348-a009-4cde-900f-755e46e82582",
+      "name": "RSS Defense One",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [
+        250,
+        -120
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "e0c35bd7-5347-411f-83cc-4147b936d8fd",
+              "name": "source",
+              "value": "Defense One",
+              "type": "string"
+            },
+            {
+              "id": "d952bcb7-73a7-433c-939a-8fe9e9c48b35",
+              "name": "source_category",
+              "value": "defense",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "54aeffd0-a84d-4d83-8014-012b0b9867fd",
+      "name": "Tag Defense One",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        500,
+        -120
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://thediplomat.com/feed/"
+      },
+      "id": "c038c1e9-0fd8-430f-9bed-40a3f3394b50",
+      "name": "RSS The Diplomat",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [
+        250,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "7901f910-22d2-4a42-97cc-7408b15e06cc",
+              "name": "source",
+              "value": "The Diplomat",
+              "type": "string"
+            },
+            {
+              "id": "b167b795-8283-4747-8097-1436435c2c43",
+              "name": "source_category",
+              "value": "defense",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "0c29e6da-356f-4831-935e-0b190b4c842d",
+      "name": "Tag The Diplomat",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        500,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://www.cert.ssi.gouv.fr/feed/"
+      },
+      "id": "6c193880-4a8e-426c-a18e-bb0a2d003c42",
+      "name": "RSS ANSSI / CERT-FR",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [
+        250,
+        360
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "5fe5ee8d-dab4-4195-8778-17b80d7d0b5f",
+              "name": "source",
+              "value": "ANSSI / CERT-FR",
+              "type": "string"
+            },
+            {
+              "id": "965ddc2d-511f-47bf-8364-b73e33592b51",
+              "name": "source_category",
+              "value": "defense",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "da2d600d-fd04-4003-8372-b0005b7b5ecc",
+      "name": "Tag ANSSI / CERT-FR",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        500,
+        360
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://www.cert.ssi.gouv.fr/alerte/feed/"
+      },
+      "id": "b80554d0-637b-4875-98ab-e83bca8bf216",
+      "name": "RSS CERT-FR Alertes",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [
+        250,
+        600
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "9f0c86c0-0633-48f6-879d-b362f73b88af",
+              "name": "source",
+              "value": "CERT-FR Alertes",
+              "type": "string"
+            },
+            {
+              "id": "d9610d7d-6655-47fa-a557-ca397dd90d5e",
+              "name": "source_category",
+              "value": "defense",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "33cd2740-1a7c-4322-af1d-5698cd063339",
+      "name": "Tag CERT-FR Alertes",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        500,
+        600
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const keywords = [\n  'war', 'conflict', 'sanctions', 'military', 'nato', 'ceasefire',\n  'invasion', 'nuclear', 'treaty', 'diplomacy', 'geopolitical',\n  'cyber attack', 'apt', 'espionage', 'intelligence', 'defense',\n  'missile', 'drone', 'territorial', 'sovereignty', 'alliance',\n  'embargo', 'coup', 'insurgency', 'peacekeeping', 'un security council',\n  'arms deal'\n];\n\nconst filtered = [];\nfor (const item of $input.all()) {\n  const text = `${item.json.title || ''} ${item.json.contentSnippet || item.json.content || ''}`.toLowerCase();\n  const matched = keywords.filter(k => text.includes(k));\n  if (matched.length > 0) {\n    filtered.push({\n      json: {\n        title: item.json.title || '',\n        source: item.json.source || 'Unknown',\n        source_category: item.json.source_category || 'unknown',\n        url: item.json.link || item.json.url || '',\n        published_date: new Date(item.json.isoDate || item.json.pubDate || Date.now()).toISOString(),\n        date: new Date(item.json.isoDate || item.json.pubDate || Date.now()).toISOString(),\n        summary: (item.json.contentSnippet || item.json.content || '').substring(0, 500),\n        keywords_matched: matched,\n        ingested_at: new Date().toISOString()\n      }\n    });\n  }\n}\nreturn filtered;"
+      },
+      "id": "26c11d7b-3b0b-448d-abb3-9f36f8936d3f",
+      "name": "Filter Geopolitical",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        750,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://elastic:{{ $env.ELASTIC_PASSWORD }}@elasticsearch:9200/geon-articles-{{ $now.format('yyyy.MM') }}/_doc",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "3a4b0422-2303-4535-89c8-9dc5eb0237b3",
+      "name": "Index to ES",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1000,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Every 1 hour": {
+      "main": [
+        [
+          {
+            "node": "RSS War on the Rocks",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "RSS Lawfare",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "RSS Defense One",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "RSS The Diplomat",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "RSS ANSSI / CERT-FR",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "RSS CERT-FR Alertes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RSS War on the Rocks": {
+      "main": [
+        [
+          {
+            "node": "Tag War on the Rocks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RSS Lawfare": {
+      "main": [
+        [
+          {
+            "node": "Tag Lawfare",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RSS Defense One": {
+      "main": [
+        [
+          {
+            "node": "Tag Defense One",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RSS The Diplomat": {
+      "main": [
+        [
+          {
+            "node": "Tag The Diplomat",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RSS ANSSI / CERT-FR": {
+      "main": [
+        [
+          {
+            "node": "Tag ANSSI / CERT-FR",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RSS CERT-FR Alertes": {
+      "main": [
+        [
+          {
+            "node": "Tag CERT-FR Alertes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tag War on the Rocks": {
+      "main": [
+        [
+          {
+            "node": "Filter Geopolitical",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tag Lawfare": {
+      "main": [
+        [
+          {
+            "node": "Filter Geopolitical",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tag Defense One": {
+      "main": [
+        [
+          {
+            "node": "Filter Geopolitical",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tag The Diplomat": {
+      "main": [
+        [
+          {
+            "node": "Filter Geopolitical",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tag ANSSI / CERT-FR": {
+      "main": [
+        [
+          {
+            "node": "Filter Geopolitical",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tag CERT-FR Alertes": {
+      "main": [
+        [
+          {
+            "node": "Filter Geopolitical",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Geopolitical": {
+      "main": [
+        [
+          {
+            "node": "Index to ES",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "geon"
+    }
+  ]
+}
