@@ -33,6 +33,8 @@ from common.opencti_client import get_opencti_client
 from correlation.alerting import send_alerts
 from correlation.rules.conflict_cyber import ConflictCyberRule
 from correlation.rules.diplomatic_apt import DiplomaticAPTRule
+from correlation.rules.internet_outage import InternetOutageRule
+from correlation.rules.military_buildup import MilitaryBuildupRule
 from correlation.rules.rhetoric_shift import RhetoricShiftRule
 from correlation.rules.sanction_cyber import SanctionCyberRule
 
@@ -96,6 +98,8 @@ RULE_REGISTRY: dict[int, type] = {
     2: SanctionCyberRule,
     3: ConflictCyberRule,
     4: RhetoricShiftRule,
+    5: InternetOutageRule,
+    6: MilitaryBuildupRule,
 }
 
 # Minimum severity to trigger alerting.
@@ -181,7 +185,7 @@ class CorrelationEngine:
         Returns:
             An instance of the rule.
         """
-        if rule_cls is RhetoricShiftRule:
+        if rule_cls in (RhetoricShiftRule, InternetOutageRule):
             return rule_cls(es=self.es)
         if self.octi is None:
             logger.warning(

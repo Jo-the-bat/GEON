@@ -102,6 +102,36 @@ def run_polymarket_enrich() -> None:
         logger.exception("Polymarket enrich cron failed.")
 
 
+def run_sipri() -> None:
+    """Seed/update SIPRI arms transfers and military spending data."""
+    try:
+        from sipri.ingestor import SIPRIIngestor
+        count = SIPRIIngestor().run(seed=True)
+        logger.info("SIPRI cron: %d documents indexed.", count)
+    except Exception:
+        logger.exception("SIPRI cron failed.")
+
+
+def run_prediction_consensus() -> None:
+    """Ingest Metaculus/Manifold prediction markets and compute consensus."""
+    try:
+        from prediction_consensus.ingestor import PredictionConsensusIngestor
+        count = PredictionConsensusIngestor().ingest()
+        logger.info("Prediction consensus cron: %d markets indexed.", count)
+    except Exception:
+        logger.exception("Prediction consensus cron failed.")
+
+
+def run_cloudflare_radar() -> None:
+    """Ingest Cloudflare Radar internet outages."""
+    try:
+        from cloudflare_radar.ingestor import CloudflareRadarIngestor
+        count = CloudflareRadarIngestor().ingest(date_range="7d")
+        logger.info("Cloudflare Radar cron: %d outages indexed.", count)
+    except Exception:
+        logger.exception("Cloudflare Radar cron failed.")
+
+
 def run_risk_scores() -> None:
     """Calculate and index country risk scores."""
     try:
@@ -174,6 +204,9 @@ def main() -> None:
     schedule.every(30).minutes.do(run_correlation)
     schedule.every(1).hours.do(run_polymarket)
     schedule.every(2).hours.do(run_polymarket_enrich)
+    schedule.every(30).minutes.do(run_cloudflare_radar)
+    schedule.every(2).hours.do(run_prediction_consensus)
+    schedule.every().monday.at("02:00").do(run_sipri)
     schedule.every(1).days.at("05:00").do(run_risk_scores)
 
     # Run each once immediately.

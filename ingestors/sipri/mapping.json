@@ -1,0 +1,22 @@
+{
+  "mappings": {
+    "properties": {
+      "year": { "type": "integer" },
+      "supplier_country": { "type": "keyword" },
+      "recipient_country": { "type": "keyword" },
+      "weapon_type": { "type": "keyword" },
+      "weapon_description": { "type": "text", "fields": { "keyword": { "type": "keyword" } } },
+      "quantity": { "type": "integer" },
+      "tiv_value": { "type": "float" },
+      "order_date": { "type": "keyword" },
+      "delivery_date": { "type": "keyword" },
+      "status": { "type": "keyword" },
+      "date": { "type": "date" },
+      "ingested_at": { "type": "date" }
+    }
+  },
+  "settings": {
+    "number_of_shards": 1,
+    "number_of_replicas": 0
+  }
+}
