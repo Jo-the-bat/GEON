@@ -81,6 +81,16 @@ def run_sanctions() -> None:
         logger.exception("Sanctions cron failed.")
 
 
+def run_risk_scores() -> None:
+    """Calculate and index country risk scores."""
+    try:
+        from risk_score.calculator import RiskScoreCalculator
+        count = RiskScoreCalculator().run()
+        logger.info("Risk scores cron: %d countries scored.", count)
+    except Exception:
+        logger.exception("Risk scores cron failed.")
+
+
 def run_correlation() -> None:
     """Run the correlation engine (all 4 rules)."""
     try:
@@ -141,6 +151,7 @@ def main() -> None:
     schedule.every(1).days.at("03:00").do(run_acled)
     schedule.every().sunday.at("04:00").do(run_sanctions)
     schedule.every(30).minutes.do(run_correlation)
+    schedule.every(1).days.at("05:00").do(run_risk_scores)
 
     # Run each once immediately.
     run_gdelt()
@@ -149,6 +160,7 @@ def main() -> None:
     run_acled()
     run_sanctions()
     run_correlation()
+    run_risk_scores()
 
     logger.info(
         "Scheduler started. Jobs: GDELT/15min, OpenCTI export/1h, "
