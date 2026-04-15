@@ -263,10 +263,121 @@
       }
     },
     {
+      "id": 8,
+      "title": "Top Actor Pairs",
+      "type": "table",
+      "gridPos": { "h": 8, "w": 14, "x": 0, "y": 20 },
+      "datasource": { "uid": "elasticsearch" },
+      "targets": [
+        {
+          "refId": "A",
+          "query": "_index:geon-gdelt-* AND NOT actor1_name:\"\" AND NOT actor2_name:\"\"",
+          "alias": "",
+          "metrics": [
+            { "id": "1", "type": "count" }
+          ],
+          "bucketAggs": [
+            {
+              "id": "2",
+              "type": "terms",
+              "field": "actor1_name",
+              "settings": {
+                "size": "15",
+                "order": "desc",
+                "orderBy": "_count",
+                "min_doc_count": "1"
+              }
+            },
+            {
+              "id": "3",
+              "type": "terms",
+              "field": "actor2_name",
+              "settings": {
+                "size": "1",
+                "order": "desc",
+                "orderBy": "_count",
+                "min_doc_count": "1"
+              }
+            }
+          ],
+          "timeField": "date"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "align": "auto", "displayMode": "auto" }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "actor1_name" },
+            "properties": [{ "id": "displayName", "value": "Actor 1" }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "actor2_name" },
+            "properties": [{ "id": "displayName", "value": "Actor 2" }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Count" },
+            "properties": [{ "id": "displayName", "value": "Events" }]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "sortBy": [{ "displayName": "Events", "desc": true }],
+        "footer": { "show": false }
+      }
+    },
+    {
+      "id": 9,
+      "title": "Event Types",
+      "type": "piechart",
+      "gridPos": { "h": 8, "w": 10, "x": 14, "y": 20 },
+      "datasource": { "uid": "elasticsearch" },
+      "targets": [
+        {
+          "refId": "A",
+          "query": "_index:geon-gdelt-* AND quad_class:[1 TO 4]",
+          "alias": "",
+          "metrics": [
+            { "id": "1", "type": "count" }
+          ],
+          "bucketAggs": [
+            {
+              "id": "2",
+              "type": "terms",
+              "field": "quad_class",
+              "settings": {
+                "size": "4",
+                "order": "desc",
+                "orderBy": "_count"
+              }
+            }
+          ],
+          "timeField": "date"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "1" }, "properties": [{ "id": "displayName", "value": "Verbal Cooperation" }, { "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "2" }, "properties": [{ "id": "displayName", "value": "Material Cooperation" }, { "id": "color", "value": { "fixedColor": "blue", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "3" }, "properties": [{ "id": "displayName", "value": "Verbal Conflict" }, { "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "4" }, "properties": [{ "id": "displayName", "value": "Material Conflict" }, { "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }] }
+        ]
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "pieType": "donut",
+        "legend": { "displayMode": "list", "placement": "right" },
+        "tooltip": { "mode": "single" }
+      }
+    },
+    {
       "id": 6,
       "title": "Latest GDELT Events",
       "type": "table",
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 20 },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 28 },
       "datasource": { "uid": "elasticsearch" },
       "targets": [
         {
@@ -325,7 +436,7 @@
       "id": 7,
       "title": "Active Prediction Markets (Top 5 by Volume)",
       "type": "table",
-      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 28 },
+      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 36 },
       "datasource": { "uid": "elasticsearch" },
       "targets": [{
         "refId": "A",
@@ -348,5 +459,5 @@
       }]
     }
   ],
-  "version": 3
+  "version": 4
 }
