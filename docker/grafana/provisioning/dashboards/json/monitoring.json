@@ -18,9 +18,10 @@
   "panels": [
     {
       "id": 1,
-      "title": "Service Health",
+      "title": "Service Health (Prometheus Targets)",
+      "description": "Services with native /metrics endpoints scraped by Prometheus. Other services (Nginx, Redis, MinIO, Authelia, Elasticsearch) are monitored via Docker healthchecks.",
       "type": "stat",
-      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 0 },
+      "gridPos": { "h": 5, "w": 24, "x": 0, "y": 0 },
       "datasource": { "uid": "prometheus" },
       "targets": [
         {
@@ -60,7 +61,7 @@
       "id": 2,
       "title": "Last Ingestion Timestamps",
       "type": "table",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 5 },
       "datasource": { "uid": "elasticsearch" },
       "targets": [
         {
@@ -68,53 +69,33 @@
           "query": "_index:geon-gdelt-*",
           "alias": "GDELT",
           "metrics": [
-            { "id": "1", "type": "max", "field": "date" }
+            { "id": "1", "type": "max", "field": "ingested_at" }
           ],
           "bucketAggs": [],
           "timeField": "date"
         },
         {
           "refId": "B",
-          "query": "_index:geon-acled-*",
-          "alias": "ACLED",
-          "metrics": [
-            { "id": "1", "type": "max", "field": "date" }
-          ],
-          "bucketAggs": [],
-          "timeField": "date"
-        },
-        {
-          "refId": "C",
-          "query": "_index:geon-articles-*",
-          "alias": "Articles (RSS)",
-          "metrics": [
-            { "id": "1", "type": "max", "field": "date" }
-          ],
-          "bucketAggs": [],
-          "timeField": "date"
-        },
-        {
-          "refId": "D",
           "query": "_index:geon-cti-*",
           "alias": "OpenCTI Export",
           "metrics": [
-            { "id": "1", "type": "max", "field": "date" }
+            { "id": "1", "type": "max", "field": "ingested_at" }
           ],
           "bucketAggs": [],
-          "timeField": "date"
+          "timeField": "ingested_at"
         },
         {
-          "refId": "E",
+          "refId": "C",
           "query": "_index:geon-sanctions",
           "alias": "Sanctions",
           "metrics": [
-            { "id": "1", "type": "max", "field": "date" }
+            { "id": "1", "type": "max", "field": "ingested_at" }
           ],
           "bucketAggs": [],
-          "timeField": "date"
+          "timeField": "ingested_at"
         },
         {
-          "refId": "F",
+          "refId": "D",
           "query": "_index:geon-correlations",
           "alias": "Correlations",
           "metrics": [
@@ -134,29 +115,29 @@
     },
     {
       "id": 3,
-      "title": "Index Sizes Over Time",
+      "title": "Prometheus Scrape Duration",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 5 },
       "datasource": { "uid": "prometheus" },
       "targets": [
         {
           "refId": "A",
-          "expr": "elasticsearch_indices_store_size_bytes_total",
-          "legendFormat": "Total Store Size",
+          "expr": "scrape_duration_seconds",
+          "legendFormat": "{{job}}",
           "range": true
         }
       ],
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },
-          "unit": "decbytes",
+          "unit": "s",
           "custom": {
             "drawStyle": "line",
             "lineInterpolation": "smooth",
-            "fillOpacity": 20,
+            "fillOpacity": 10,
             "pointSize": 5,
-            "lineWidth": 2,
-            "showPoints": "auto",
+            "lineWidth": 1,
+            "showPoints": "never",
             "spanNulls": false
           }
         },
@@ -164,14 +145,14 @@
       },
       "options": {
         "legend": { "displayMode": "list", "placement": "bottom" },
-        "tooltip": { "mode": "single" }
+        "tooltip": { "mode": "multi" }
       }
     },
     {
       "id": 4,
       "title": "Total Documents Across All Indices",
       "type": "stat",
-      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 14 },
+      "gridPos": { "h": 5, "w": 24, "x": 0, "y": 13 },
       "datasource": { "uid": "elasticsearch" },
       "targets": [
         {
@@ -193,40 +174,6 @@
         },
         {
           "refId": "B",
-          "query": "_index:geon-acled-*",
-          "alias": "ACLED",
-          "metrics": [
-            { "id": "1", "type": "count" }
-          ],
-          "bucketAggs": [
-            {
-              "id": "2",
-              "type": "date_histogram",
-              "field": "date",
-              "settings": { "interval": "1d", "min_doc_count": "0" }
-            }
-          ],
-          "timeField": "date"
-        },
-        {
-          "refId": "C",
-          "query": "_index:geon-articles-*",
-          "alias": "Articles",
-          "metrics": [
-            { "id": "1", "type": "count" }
-          ],
-          "bucketAggs": [
-            {
-              "id": "2",
-              "type": "date_histogram",
-              "field": "date",
-              "settings": { "interval": "1d", "min_doc_count": "0" }
-            }
-          ],
-          "timeField": "date"
-        },
-        {
-          "refId": "D",
           "query": "_index:geon-cti-*",
           "alias": "CTI",
           "metrics": [
@@ -236,14 +183,14 @@
             {
               "id": "2",
               "type": "date_histogram",
-              "field": "date",
+              "field": "ingested_at",
               "settings": { "interval": "1d", "min_doc_count": "0" }
             }
           ],
-          "timeField": "date"
+          "timeField": "ingested_at"
         },
         {
-          "refId": "E",
+          "refId": "C",
           "query": "_index:geon-sanctions",
           "alias": "Sanctions",
           "metrics": [
@@ -253,14 +200,14 @@
             {
               "id": "2",
               "type": "date_histogram",
-              "field": "date",
+              "field": "ingested_at",
               "settings": { "interval": "1d", "min_doc_count": "0" }
             }
           ],
-          "timeField": "date"
+          "timeField": "ingested_at"
         },
         {
-          "refId": "F",
+          "refId": "D",
           "query": "_index:geon-correlations",
           "alias": "Correlations",
           "metrics": [
@@ -293,5 +240,5 @@
       }
     }
   ],
-  "version": 2
+  "version": 3
 }
