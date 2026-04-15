@@ -33,8 +33,12 @@ from common.opencti_client import get_opencti_client
 from correlation.alerting import send_alerts
 from correlation.rules.conflict_cyber import ConflictCyberRule
 from correlation.rules.diplomatic_apt import DiplomaticAPTRule
+from correlation.rules.arms_escalation import ArmsEscalationRule
 from correlation.rules.internet_outage import InternetOutageRule
 from correlation.rules.military_buildup import MilitaryBuildupRule
+from correlation.rules.multi_signal_convergence import MultiSignalConvergenceRule
+from correlation.rules.outage_apt import OutageAPTRule
+from correlation.rules.prediction_validated import PredictionValidatedRule
 from correlation.rules.rhetoric_shift import RhetoricShiftRule
 from correlation.rules.sanction_cyber import SanctionCyberRule
 
@@ -100,6 +104,10 @@ RULE_REGISTRY: dict[int, type] = {
     4: RhetoricShiftRule,
     5: InternetOutageRule,
     6: MilitaryBuildupRule,
+    7: ArmsEscalationRule,
+    8: PredictionValidatedRule,
+    9: OutageAPTRule,
+    10: MultiSignalConvergenceRule,
 }
 
 # Minimum severity to trigger alerting.
@@ -185,7 +193,12 @@ class CorrelationEngine:
         Returns:
             An instance of the rule.
         """
-        if rule_cls in (RhetoricShiftRule, InternetOutageRule):
+        # Rules that only need Elasticsearch (no OpenCTI dependency).
+        _es_only = (
+            RhetoricShiftRule, InternetOutageRule, ArmsEscalationRule,
+            PredictionValidatedRule, MultiSignalConvergenceRule,
+        )
+        if rule_cls in _es_only:
             return rule_cls(es=self.es)
         if self.octi is None:
             logger.warning(
@@ -442,7 +455,9 @@ def main() -> None:
         default=None,
         help=(
             "Rule numbers to run (1=diplomatic+APT, 2=sanction+cyber, "
-            "3=conflict+cyber, 4=rhetoric shift). Default: all."
+            "3=conflict+cyber, 4=rhetoric shift, 5=internet outage, "
+            "6=military buildup, 7=arms escalation, 8=prediction match, "
+            "9=outage+APT, 10=multi-signal convergence). Default: all."
         ),
     )
     parser.add_argument(
