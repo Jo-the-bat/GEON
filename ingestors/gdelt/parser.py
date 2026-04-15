@@ -458,6 +458,19 @@ def normalize_event(raw_event: dict[str, Any]) -> dict[str, Any]:
         or raw_event.get("actiongeolong"),
     )
 
+    # --- Actors ---
+    actor1_name = (raw_event.get("Actor1Name") or "").strip()
+    actor1_country = source_country  # already resolved above
+    actor1_type = (raw_event.get("Actor1Type1Code") or "").strip()
+    actor2_name = (raw_event.get("Actor2Name") or "").strip()
+    actor2_country = target_country
+    actor2_type = (raw_event.get("Actor2Type1Code") or "").strip()
+    actor1_geo = (raw_event.get("Actor1Geo_FullName") or "").strip()
+    actor2_geo = (raw_event.get("Actor2Geo_FullName") or "").strip()
+
+    # --- QuadClass ---
+    quad_class = _safe_int(raw_event.get("QuadClass"), default=0)
+
     # --- Text arrays ---
     themes = _coerce_list(raw_event.get("themes", []))
     persons = _coerce_list(raw_event.get("persons", []))
@@ -488,6 +501,15 @@ def normalize_event(raw_event: dict[str, Any]) -> dict[str, Any]:
         "date": event_date.isoformat(),
         "source_country": source_country.upper(),
         "target_country": target_country.upper(),
+        "actor1_name": actor1_name,
+        "actor1_country": actor1_country.upper(),
+        "actor1_type": actor1_type,
+        "actor1_geo": actor1_geo,
+        "actor2_name": actor2_name,
+        "actor2_country": actor2_country.upper(),
+        "actor2_type": actor2_type,
+        "actor2_geo": actor2_geo,
+        "quad_class": quad_class,
         "cameo_code": cameo_code,
         "cameo_description": cameo_info["description"],
         "goldstein_scale": goldstein,
