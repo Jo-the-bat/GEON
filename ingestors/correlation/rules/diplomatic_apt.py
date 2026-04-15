@@ -8,8 +8,10 @@ to either country within a +/-30-day window.
 from __future__ import annotations
 
 import hashlib
+import json
 import logging
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Any
 
 from elasticsearch import Elasticsearch
@@ -17,6 +19,16 @@ from pycti import OpenCTIApiClient
 
 from common.config import INDEX_PREFIX
 from common.opencti_client import get_campaigns_by_country
+
+# Load country → APT attribution mapping for validation.
+_MAPPING_PATH = Path(__file__).resolve().parent.parent.parent / "common" / "country_apt_mapping.json"
+_COUNTRY_APT_MAP: dict[str, list[str]] = {}
+try:
+    with _MAPPING_PATH.open() as f:
+        _raw = json.load(f)
+    _COUNTRY_APT_MAP = {k: [a.lower() for a in v] for k, v in _raw.items() if k != "_comment"}
+except Exception:
+    pass  # Mapping file missing — skip validation
 
 logger = logging.getLogger(__name__)
 
@@ -173,6 +185,23 @@ class DiplomaticAPTRule:
             )
             if campaigns:
                 matches.extend(campaigns)
+
+        # Validate against known country-APT attributions.
+        if _COUNTRY_APT_MAP and matches:
+            known_apts: set[str] = set()
+            for c in [country_a, country_b]:
+                known_apts.update(_COUNTRY_APT_MAP.get(c.upper(), []))
+            if known_apts:
+                validated = [
+                    m for m in matches
+                    if m.get("name", "").lower() in known_apts
+                ]
+                if validated:
+                    logger.debug(
+                        "APT validation: %d/%d matches confirmed for %s/%s.",
+                        len(validated), len(matches), country_a, country_b,
+                    )
+                    matches = validated
 
         return matches
 

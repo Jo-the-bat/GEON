@@ -1,0 +1,61 @@
+{
+  "_comment": "Public APT attribution mapping. Sources: MITRE ATT&CK, Mandiant, CrowdStrike, CISA advisories. Used by the correlation engine to validate diplomatic-APT matches.",
+  "RUSSIA": [
+    "APT28", "APT29", "Sandworm Team", "Turla", "Gamaredon Group",
+    "TEMP.Veles", "Dragonfly", "Ember Bear", "Star Blizzard",
+    "Indrik Spider", "Wizard Spider", "ALLANITE"
+  ],
+  "CHINA": [
+    "APT41", "APT10", "APT1", "APT3", "APT17", "APT27", "APT30", "APT31", "APT40",
+    "Volt Typhoon", "Salt Typhoon", "Mustang Panda", "BlackTech",
+    "Hafnium", "Winnti Group", "Ke3chang", "Naikon",
+    "Daggerfly", "Earth Lusca", "Flax Typhoon", "Aquatic Panda"
+  ],
+  "IRAN": [
+    "APT33", "APT34", "APT35", "APT39", "APT42",
+    "MuddyWater", "Silent Librarian", "Charming Kitten",
+    "OilRig", "Fox Kitten", "Moses Staff", "Agrius",
+    "CopyKittens", "Tortoiseshell", "Lyceum"
+  ],
+  "NORTH KOREA": [
+    "Lazarus Group", "Kimsuky", "APT38", "APT43",
+    "Andariel", "BlueNoroff", "ScarCruft", "Stardust Chollima",
+    "TraderTraitor", "Diamond Sleet", "Citrine Sleet"
+  ],
+  "ISRAEL": [
+    "Unit 8200", "Candiru", "NSO Group"
+  ],
+  "UNITED STATES": [
+    "Equation Group", "TAO", "Longhorn"
+  ],
+  "INDIA": [
+    "SideWinder", "Patchwork", "Donot Team", "Dropping Elephant"
+  ],
+  "PAKISTAN": [
+    "Transparent Tribe", "SideCopy", "APT36"
+  ],
+  "VIETNAM": [
+    "APT32", "OceanLotus"
+  ],
+  "TURKEY": [
+    "StrongPity", "Sea Turtle"
+  ],
+  "SOUTH KOREA": [
+    "DarkHotel"
+  ],
+  "UNITED ARAB EMIRATES": [
+    "Stealth Falcon", "Project Raven"
+  ],
+  "LEBANON": [
+    "Dark Caracal", "Volatile Cedar"
+  ],
+  "SYRIA": [
+    "Syrian Electronic Army"
+  ],
+  "UKRAINE": [
+    "Armageddon"
+  ],
+  "BELARUS": [
+    "Ghostwriter", "UNC1151"
+  ]
+}
