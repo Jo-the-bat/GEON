@@ -35,7 +35,7 @@
             }
           ],
           "bucketAggs": [],
-          "timeField": "timestamp"
+          "timeField": "date"
         }
       ],
       "fieldConfig": {
@@ -107,11 +107,11 @@
             {
               "id": "2",
               "type": "date_histogram",
-              "field": "timestamp",
+              "field": "date",
               "settings": { "interval": "1d", "min_doc_count": "0" }
             }
           ],
-          "timeField": "timestamp"
+          "timeField": "date"
         }
       ],
       "fieldConfig": {
@@ -151,11 +151,11 @@
             {
               "id": "2",
               "type": "date_histogram",
-              "field": "timestamp",
+              "field": "date",
               "settings": { "interval": "1d", "min_doc_count": "0" }
             }
           ],
-          "timeField": "timestamp"
+          "timeField": "date"
         }
       ],
       "fieldConfig": {
@@ -190,11 +190,11 @@
             {
               "id": "2",
               "type": "date_histogram",
-              "field": "timestamp",
+              "field": "date",
               "settings": { "interval": "1d", "min_doc_count": "0" }
             }
           ],
-          "timeField": "timestamp"
+          "timeField": "date"
         }
       ],
       "fieldConfig": {
@@ -229,11 +229,11 @@
             {
               "id": "2",
               "type": "date_histogram",
-              "field": "timestamp",
+              "field": "date",
               "settings": { "interval": "1d", "min_doc_count": "0" }
             }
           ],
-          "timeField": "timestamp"
+          "timeField": "date"
         }
       ],
       "fieldConfig": {
@@ -268,11 +268,11 @@
             {
               "id": "2",
               "type": "date_histogram",
-              "field": "timestamp",
+              "field": "date",
               "settings": { "interval": "1d", "min_doc_count": "0" }
             }
           ],
-          "timeField": "timestamp"
+          "timeField": "date"
         }
       ],
       "fieldConfig": {

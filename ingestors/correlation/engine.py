@@ -47,6 +47,7 @@ CORRELATIONS_MAPPING: dict[str, Any] = {
         "properties": {
             "correlation_id": {"type": "keyword"},
             "timestamp": {"type": "date"},
+            "date": {"type": "date"},
             "rule_name": {"type": "keyword"},
             "severity": {"type": "keyword"},
             "countries_involved": {"type": "keyword"},

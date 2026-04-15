@@ -82,7 +82,7 @@
             { "id": "1", "type": "max", "field": "ingested_at" }
           ],
           "bucketAggs": [],
-          "timeField": "ingested_at"
+          "timeField": "date"
         },
         {
           "refId": "C",
@@ -92,7 +92,7 @@
             { "id": "1", "type": "max", "field": "ingested_at" }
           ],
           "bucketAggs": [],
-          "timeField": "ingested_at"
+          "timeField": "date"
         },
         {
           "refId": "D",
@@ -102,7 +102,7 @@
             { "id": "1", "type": "max", "field": "timestamp" }
           ],
           "bucketAggs": [],
-          "timeField": "timestamp"
+          "timeField": "date"
         }
       ],
       "fieldConfig": {
@@ -183,11 +183,11 @@
             {
               "id": "2",
               "type": "date_histogram",
-              "field": "ingested_at",
+              "field": "date",
               "settings": { "interval": "1d", "min_doc_count": "0" }
             }
           ],
-          "timeField": "ingested_at"
+          "timeField": "date"
         },
         {
           "refId": "C",
@@ -200,11 +200,11 @@
             {
               "id": "2",
               "type": "date_histogram",
-              "field": "ingested_at",
+              "field": "date",
               "settings": { "interval": "1d", "min_doc_count": "0" }
             }
           ],
-          "timeField": "ingested_at"
+          "timeField": "date"
         },
         {
           "refId": "D",
@@ -217,11 +217,11 @@
             {
               "id": "2",
               "type": "date_histogram",
-              "field": "timestamp",
+              "field": "date",
               "settings": { "interval": "1d", "min_doc_count": "0" }
             }
           ],
-          "timeField": "timestamp"
+          "timeField": "date"
         }
       ],
       "fieldConfig": {

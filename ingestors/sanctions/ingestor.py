@@ -199,6 +199,7 @@ class SanctionsIngestor:
             "listed_date": listed_date,
             "notes": remarks,
             "ingested_at": datetime.now(tz=timezone.utc).isoformat(),
+            "date": datetime.now(tz=timezone.utc).isoformat(),
         }
 
     # ------------------------------------------------------------------
