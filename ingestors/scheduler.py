@@ -8,8 +8,8 @@ Usage::
     # Normal cron mode (GDELT every 15 min)
     python scheduler.py
 
-    # One-shot seed, then cron
-    python scheduler.py --seed 30d
+    # One-shot seed (N days of 15-min CSV windows), then cron
+    python scheduler.py --seed 1
 """
 
 from __future__ import annotations
@@ -26,30 +26,21 @@ logger = setup_logging(name="scheduler")
 
 
 def run_gdelt() -> None:
-    """Run the GDELT ingestor (15-minute window)."""
+    """Run the GDELT ingestor (latest 15-minute CSV window)."""
     try:
         ingestor = GDELTIngestor()
-        count = ingestor.ingest(timespan="15min")
+        count = ingestor.ingest(windows=1)
         logger.info("GDELT cron: %d events indexed.", count)
     except Exception:
         logger.exception("GDELT cron failed.")
 
 
 def seed_gdelt(days: int) -> None:
-    """Seed GDELT data day-by-day (API caps at 250 results per request)."""
-    logger.info("Seeding GDELT: %d daily windows ...", days)
+    """Seed GDELT data by fetching 15-min CSV exports for *days* days."""
+    windows = days * 96  # 96 fifteen-minute windows per day
+    logger.info("Seeding GDELT: %d windows (%d days) …", windows, days)
     ingestor = GDELTIngestor()
-    total = 0
-    for i in range(days):
-        try:
-            count = ingestor.ingest(timespan="1d",
-                                    start_offset_days=i)
-            total += count
-            logger.info("Seed day -%d: %d events (total: %d)", i, count, total)
-        except Exception:
-            logger.exception("Seed day -%d failed, continuing.", i)
-        # Respect GDELT rate limit (1 req / 5s, we do 2 per ingest cycle)
-        time.sleep(12)
+    total = ingestor.ingest(windows=windows)
     logger.info("GDELT seed complete: %d total events.", total)
 
 
