@@ -118,6 +118,15 @@ class PolymarketIngestor:
         # Detect price shifts by comparing with existing data.
         self._detect_price_shifts(docs)
 
+        # Pre-enrich before indexing: fill in related_* counts.
+        for doc in docs:
+            countries = doc.get("countries_involved", [])
+            if countries:
+                doc["related_gdelt_events"] = self._count_gdelt(countries)
+                doc["related_correlations"] = self._count_correlations(countries)
+                doc["related_sanctions"] = self._count_sanctions(countries)
+                doc["related_apt_groups"] = self._get_apt_groups(countries)
+
         # Bulk index with case_id as _id for upsert.
         from elasticsearch import helpers
         actions = [{"_index": INDEX_NAME, "_id": d["case_id"], "_source": d} for d in docs]
@@ -247,13 +256,18 @@ class PolymarketIngestor:
     # ------------------------------------------------------------------
 
     def _count_gdelt(self, countries: list[str]) -> int:
+        if not countries:
+            return 0
         try:
             result = self.es.count(
                 index=f"{INDEX_PREFIX}-gdelt-*",
                 body={
                     "query": {"bool": {"filter": [
                         {"range": {"date": {"gte": "now-7d"}}},
-                        {"terms": {"source_country": countries}},
+                        {"bool": {"should": [
+                            {"terms": {"source_country": countries}},
+                            {"terms": {"target_country": countries}},
+                        ], "minimum_should_match": 1}},
                     ]}}
                 },
             )
@@ -262,6 +276,8 @@ class PolymarketIngestor:
             return 0
 
     def _count_correlations(self, countries: list[str]) -> int:
+        if not countries:
+            return 0
         try:
             result = self.es.count(
                 index=f"{INDEX_PREFIX}-correlations",
