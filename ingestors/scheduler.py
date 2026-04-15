@@ -81,6 +81,27 @@ def run_sanctions() -> None:
         logger.exception("Sanctions cron failed.")
 
 
+def run_polymarket() -> None:
+    """Ingest and enrich Polymarket geopolitical prediction markets."""
+    try:
+        from polymarket.ingestor import PolymarketIngestor
+        ing = PolymarketIngestor()
+        count = ing.ingest()
+        logger.info("Polymarket cron: %d cases indexed.", count)
+    except Exception:
+        logger.exception("Polymarket cron failed.")
+
+
+def run_polymarket_enrich() -> None:
+    """Enrich existing Polymarket cases with GEON context."""
+    try:
+        from polymarket.ingestor import PolymarketIngestor
+        count = PolymarketIngestor().enrich()
+        logger.info("Polymarket enrich cron: %d cases updated.", count)
+    except Exception:
+        logger.exception("Polymarket enrich cron failed.")
+
+
 def run_risk_scores() -> None:
     """Calculate and index country risk scores."""
     try:
@@ -151,6 +172,8 @@ def main() -> None:
     schedule.every(1).days.at("03:00").do(run_acled)
     schedule.every().sunday.at("04:00").do(run_sanctions)
     schedule.every(30).minutes.do(run_correlation)
+    schedule.every(1).hours.do(run_polymarket)
+    schedule.every(2).hours.do(run_polymarket_enrich)
     schedule.every(1).days.at("05:00").do(run_risk_scores)
 
     # Run each once immediately.
@@ -160,6 +183,7 @@ def main() -> None:
     run_acled()
     run_sanctions()
     run_correlation()
+    run_polymarket()
     run_risk_scores()
 
     logger.info(
