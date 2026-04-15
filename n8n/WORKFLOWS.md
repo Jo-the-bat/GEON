@@ -1,8 +1,26 @@
 # GEON n8n Workflows
 
 This document describes the n8n workflows used by the GEON platform for RSS
-aggregation, alert dispatching, and OpenCTI enrichment. Each workflow should
-be recreated manually in the n8n web UI at `https://geon.joranbatty.fr/n8n/`.
+aggregation, alert dispatching, and OpenCTI enrichment.
+
+## Quick Start — Import Ready-Made Workflow
+
+A ready-to-import workflow JSON is available at `n8n/workflows/rss_world_news.json`.
+
+1. Open n8n at `https://geon.joranbatty.fr/n8n/`
+2. Go to **Workflows** > **Import from File** > select `rss_world_news.json`
+3. Create an **HTTP Basic Auth** credential for Elasticsearch (`elastic` / password from `.env`)
+4. Activate the workflow
+
+This workflow fetches BBC World RSS every 30 min, filters for geopolitical/cyber
+keywords, and indexes matching articles into `geon-articles-YYYY.MM`.
+
+For additional sources, duplicate and change the RSS URL and source name.
+
+---
+
+The workflows below describe the full intended architecture. They can be
+recreated manually in the n8n web UI at `https://geon.joranbatty.fr/n8n/`.
 
 ---
 

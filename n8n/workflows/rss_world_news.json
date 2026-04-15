@@ -1,0 +1,59 @@
+{
+  "name": "GEON — World News RSS → Elasticsearch",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": { "interval": [{ "field": "minutes", "minutesInterval": 30 }] }
+      },
+      "id": "schedule-trigger",
+      "name": "Every 30 min",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "url": "https://feeds.bbci.co.uk/news/world/rss.xml"
+      },
+      "id": "rss-feed",
+      "name": "BBC World RSS",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const keywords = [\n  'military', 'war', 'conflict', 'attack', 'sanctions',\n  'nuclear', 'missile', 'troops', 'invasion', 'ceasefire',\n  'diplomat', 'embassy', 'NATO', 'cyber', 'espionage',\n  'coup', 'terrorism', 'intelligence', 'drone', 'weapon',\n  'protest', 'uprising', 'refugee', 'blockade', 'treaty',\n  'APT', 'hack', 'ransomware', 'phishing', 'malware'\n];\n\nconst filtered = [];\nfor (const item of $input.all()) {\n  const text = `${item.json.title || ''} ${item.json.contentSnippet || ''}`.toLowerCase();\n  const matched = keywords.filter(k => text.includes(k));\n  if (matched.length > 0) {\n    item.json.matched_keywords = matched;\n    filtered.push(item);\n  }\n}\nreturn filtered;"
+      },
+      "id": "filter-geopolitical",
+      "name": "Filter Geopolitical",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://elasticsearch:9200/geon-articles-{{ $now.format('yyyy.MM') }}/_doc",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"title\": \"{{ $json.title }}\",\n  \"url\": \"{{ $json.link }}\",\n  \"source\": \"BBC World\",\n  \"published_date\": \"{{ $json.isoDate }}\",\n  \"summary\": \"{{ $json.contentSnippet }}\",\n  \"keywords\": {{ JSON.stringify($json.matched_keywords || []) }},\n  \"ingested_at\": \"{{ $now.toISO() }}\"\n}",
+        "options": {}
+      },
+      "id": "elasticsearch-index",
+      "name": "Index to ES",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [660, 0]
+    }
+  ],
+  "connections": {
+    "Every 30 min": { "main": [[{ "node": "BBC World RSS", "type": "main", "index": 0 }]] },
+    "BBC World RSS": { "main": [[{ "node": "Filter Geopolitical", "type": "main", "index": 0 }]] },
+    "Filter Geopolitical": { "main": [[{ "node": "Index to ES", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "tags": [{ "name": "geon" }]
+}

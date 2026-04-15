@@ -53,7 +53,7 @@ MAPPING_PATH = Path(__file__).resolve().parent / "mapping.json"
 INDEX_NAME = f"{INDEX_PREFIX}-sanctions"
 
 # XML namespace used by the OFAC SDN schema.
-NS = {"sdn": "http://tempuri.org/sdnList.xsd"}
+NS = {"sdn": "https://sanctionslistservice.ofac.treas.gov/api/PublicationPreview/exports/XML"}
 
 
 class SanctionsIngestor:
