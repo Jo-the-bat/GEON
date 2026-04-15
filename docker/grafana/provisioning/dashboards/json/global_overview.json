@@ -320,6 +320,32 @@
           }
         }
       ]
+    },
+    {
+      "id": 7,
+      "title": "Active Prediction Markets (Top 5 by Volume)",
+      "type": "table",
+      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 28 },
+      "datasource": { "uid": "elasticsearch" },
+      "targets": [{
+        "refId": "A",
+        "query": "_index:geon-polymarket-cases AND status:active",
+        "metrics": [{ "id": "1", "type": "raw_data", "settings": { "size": "5" } }],
+        "bucketAggs": [],
+        "timeField": "date"
+      }],
+      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "options": {
+        "showHeader": true,
+        "sortBy": [{ "displayName": "volume", "desc": true }]
+      },
+      "transformations": [{
+        "id": "organize",
+        "options": {
+          "includeByName": { "question": true, "outcome_yes_price": true, "volume": true, "trend": true, "countries_involved": true },
+          "indexByName": { "question": 0, "outcome_yes_price": 1, "volume": 2, "trend": 3, "countries_involved": 4 }
+        }
+      }]
     }
   ],
   "version": 3

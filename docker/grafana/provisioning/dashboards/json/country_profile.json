@@ -312,7 +312,64 @@
           }
         }
       ]
+    },
+    {
+      "id": 8,
+      "title": "Risk Score \u2014 $country",
+      "type": "gauge",
+      "gridPos": { "h": 6, "w": 8, "x": 0, "y": 30 },
+      "datasource": { "uid": "elasticsearch" },
+      "targets": [{
+        "refId": "A",
+        "query": "_index:geon-risk-scores AND country:\"$country\"",
+        "metrics": [{ "id": "1", "type": "raw_data", "settings": { "size": "1" } }],
+        "bucketAggs": [],
+        "timeField": "date"
+      }],
+      "fieldConfig": {
+        "defaults": {
+          "min": 0, "max": 100,
+          "thresholds": { "mode": "absolute", "steps": [
+            { "color": "green", "value": null },
+            { "color": "yellow", "value": 25 },
+            { "color": "orange", "value": 50 },
+            { "color": "red", "value": 75 }
+          ]}
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "/.*risk_score.*/", "values": false },
+        "showThresholdLabels": true
+      },
+      "transformations": [{
+        "id": "filterFieldsByName",
+        "options": { "include": { "names": ["risk_score"] } }
+      }]
+    },
+    {
+      "id": 9,
+      "title": "Polymarket Cases \u2014 $country",
+      "type": "table",
+      "gridPos": { "h": 6, "w": 16, "x": 8, "y": 30 },
+      "datasource": { "uid": "elasticsearch" },
+      "targets": [{
+        "refId": "A",
+        "query": "_index:geon-polymarket-cases AND countries_involved:\"$country\"",
+        "metrics": [{ "id": "1", "type": "raw_data", "settings": { "size": "10" } }],
+        "bucketAggs": [],
+        "timeField": "date"
+      }],
+      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "options": { "showHeader": true },
+      "transformations": [{
+        "id": "organize",
+        "options": {
+          "includeByName": { "question": true, "outcome_yes_price": true, "volume": true, "trend": true },
+          "indexByName": { "question": 0, "outcome_yes_price": 1, "volume": 2, "trend": 3 }
+        }
+      }]
     }
   ],
-  "version": 2
+  "version": 3
 }
