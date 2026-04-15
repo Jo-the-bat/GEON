@@ -491,6 +491,7 @@ services:
       - GENERIC_TIMEZONE=Europe/Paris
       - DB_TYPE=sqlite
       - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
     volumes:
       - geon_n8n_data:/home/node/.n8n
     networks:

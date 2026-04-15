@@ -1,0 +1,429 @@
+{
+  "name": "GEON \u2014 Regional Media RSS \u2192 Elasticsearch",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "7446dc5d-b83c-4e4b-a0a3-555da2a32f7b",
+      "name": "Every 1 hour",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://www.aljazeera.com/xml/rss/all.xml"
+      },
+      "id": "04a76f77-303d-4277-bb17-35f27b1497b6",
+      "name": "RSS Al Jazeera",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [
+        250,
+        -480
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "74ec07d4-ec06-4ad9-aac0-ed1e0c735b63",
+              "name": "source",
+              "value": "Al Jazeera",
+              "type": "string"
+            },
+            {
+              "id": "1f25f4bb-7e2f-40c2-b981-59ae8608c254",
+              "name": "source_category",
+              "value": "regional",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "f5d4e1a7-3674-43a1-8870-16093fb14b0c",
+      "name": "Tag Al Jazeera",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        500,
+        -480
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://www.scmp.com/rss/91/feed"
+      },
+      "id": "b9546900-18b5-4f9c-be83-ed70aaa73da2",
+      "name": "RSS SCMP",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [
+        250,
+        -240
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "0a11babc-14ed-4d63-8029-2292c5ddebd0",
+              "name": "source",
+              "value": "SCMP",
+              "type": "string"
+            },
+            {
+              "id": "37c7b042-147e-4af9-be65-143a791d0b01",
+              "name": "source_category",
+              "value": "regional",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "1ecd4ecf-4b7a-4ef3-9172-786e102b4b01",
+      "name": "Tag SCMP",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        500,
+        -240
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://www.themoscowtimes.com/rss/news"
+      },
+      "id": "0ee57642-00b3-48c2-862c-309a0d384d85",
+      "name": "RSS Moscow Times",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [
+        250,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "d17be17b-d29a-44d3-9ac8-89478b1ff09c",
+              "name": "source",
+              "value": "Moscow Times",
+              "type": "string"
+            },
+            {
+              "id": "c49213c7-2c24-40de-a3d8-f65f5603f614",
+              "name": "source_category",
+              "value": "regional",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "b4a98b15-9f08-4e33-a0d1-0e09edceebc7",
+      "name": "Tag Moscow Times",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        500,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://news.google.com/rss/search?q=site:theafricareport.com&hl=en-US&gl=US&ceid=US:en"
+      },
+      "id": "d83eff03-82e5-4ea7-9e8e-e4bd3fcc777c",
+      "name": "RSS The Africa Report",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [
+        250,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "034cfc1a-867e-4ff4-9f86-daa582778bf9",
+              "name": "source",
+              "value": "The Africa Report",
+              "type": "string"
+            },
+            {
+              "id": "163dc996-d327-4537-9b3b-6cba2501d907",
+              "name": "source_category",
+              "value": "regional",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "77437964-0e15-4d4a-bcd0-5ae0eece52c1",
+      "name": "Tag The Africa Report",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        500,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://www.middleeasteye.net/rss"
+      },
+      "id": "fd1e5d1a-e8c4-4e48-a822-b067d13b979d",
+      "name": "RSS Middle East Eye",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [
+        250,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "69f21411-ae3b-4741-bbf4-2417930d53a0",
+              "name": "source",
+              "value": "Middle East Eye",
+              "type": "string"
+            },
+            {
+              "id": "29cd6ba9-e8fe-47cc-a85c-8915ada2c906",
+              "name": "source_category",
+              "value": "regional",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "9f64f78a-57e5-4109-b5e9-236d072e5601",
+      "name": "Tag Middle East Eye",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        500,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const keywords = [\n  'war', 'conflict', 'sanctions', 'military', 'nato', 'ceasefire',\n  'invasion', 'nuclear', 'treaty', 'diplomacy', 'geopolitical',\n  'cyber attack', 'apt', 'espionage', 'intelligence', 'defense',\n  'missile', 'drone', 'territorial', 'sovereignty', 'alliance',\n  'embargo', 'coup', 'insurgency', 'peacekeeping', 'un security council',\n  'arms deal'\n];\n\nconst filtered = [];\nfor (const item of $input.all()) {\n  const text = `${item.json.title || ''} ${item.json.contentSnippet || item.json.content || ''}`.toLowerCase();\n  const matched = keywords.filter(k => text.includes(k));\n  if (matched.length > 0) {\n    filtered.push({\n      json: {\n        title: item.json.title || '',\n        source: item.json.source || 'Unknown',\n        source_category: item.json.source_category || 'unknown',\n        url: item.json.link || item.json.url || '',\n        published_date: new Date(item.json.isoDate || item.json.pubDate || Date.now()).toISOString(),\n        date: new Date(item.json.isoDate || item.json.pubDate || Date.now()).toISOString(),\n        summary: (item.json.contentSnippet || item.json.content || '').substring(0, 500),\n        keywords_matched: matched,\n        ingested_at: new Date().toISOString()\n      }\n    });\n  }\n}\nreturn filtered;"
+      },
+      "id": "c733ce80-709c-4827-89a5-0f66a2bad189",
+      "name": "Filter Geopolitical",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        750,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://elastic:{{ $env.ELASTIC_PASSWORD }}@elasticsearch:9200/geon-articles-{{ $now.format('yyyy.MM') }}/_doc",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "65d152b0-95e2-4e47-9bd6-66367ab60a4b",
+      "name": "Index to ES",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1000,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Every 1 hour": {
+      "main": [
+        [
+          {
+            "node": "RSS Al Jazeera",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "RSS SCMP",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "RSS Moscow Times",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "RSS The Africa Report",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "RSS Middle East Eye",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RSS Al Jazeera": {
+      "main": [
+        [
+          {
+            "node": "Tag Al Jazeera",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RSS SCMP": {
+      "main": [
+        [
+          {
+            "node": "Tag SCMP",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RSS Moscow Times": {
+      "main": [
+        [
+          {
+            "node": "Tag Moscow Times",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RSS The Africa Report": {
+      "main": [
+        [
+          {
+            "node": "Tag The Africa Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RSS Middle East Eye": {
+      "main": [
+        [
+          {
+            "node": "Tag Middle East Eye",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tag Al Jazeera": {
+      "main": [
+        [
+          {
+            "node": "Filter Geopolitical",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tag SCMP": {
+      "main": [
+        [
+          {
+            "node": "Filter Geopolitical",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tag Moscow Times": {
+      "main": [
+        [
+          {
+            "node": "Filter Geopolitical",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tag The Africa Report": {
+      "main": [
+        [
+          {
+            "node": "Filter Geopolitical",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tag Middle East Eye": {
+      "main": [
+        [
+          {
+            "node": "Filter Geopolitical",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Geopolitical": {
+      "main": [
+        [
+          {
+            "node": "Index to ES",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "geon"
+    }
+  ]
+}
