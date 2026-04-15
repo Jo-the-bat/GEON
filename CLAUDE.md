@@ -146,11 +146,12 @@ echo "net.ipv4.ip_unprivileged_port_start=80" | sudo tee -a /etc/sysctl.d/99-unp
 - Filtrage geographique par pays/regions d'interet
 - Score de tonalite (Goldstein scale) pour detecter les pics negatifs
 
-**Ingestion** : Script Python avec cron toutes les 15 minutes.
-- Requete l'API GDELT
-- Parse et structure les evenements
+**Ingestion** : GDELT v2 Events Export CSV (pas DOC API). Cron toutes les 15 minutes.
+- Telecharge le dernier fichier CSV ZIP depuis `data.gdeltproject.org/gdeltv2/lastupdate.txt`
+- Parse les 61 colonnes tab-separated (CAMEO codes, Goldstein, acteurs, geo, tone)
+- Filtre par CAMEO codes pertinents (04-06, 13-20)
+- Resout les codes pays CAMEO/ISO vers noms lisibles (150 pays)
 - Indexe dans Elasticsearch (index `geon-gdelt-events-YYYY.MM`)
-- Cree des entites dans OpenCTI si pertinent (pays, organisations)
 
 **Index Elasticsearch** :
 ```json
@@ -159,6 +160,13 @@ echo "net.ipv4.ip_unprivileged_port_start=80" | sudo tee -a /etc/sysctl.d/99-unp
   "date": "datetime",
   "source_country": "string",
   "target_country": "string",
+  "actor1_name": "string",
+  "actor1_country": "string",
+  "actor1_type": "string",
+  "actor2_name": "string",
+  "actor2_country": "string",
+  "actor2_type": "string",
+  "quad_class": "integer (1=Verbal Coop, 2=Material Coop, 3=Verbal Conflict, 4=Material Conflict)",
   "cameo_code": "string",
   "cameo_description": "string",
   "goldstein_scale": "float",
@@ -166,12 +174,23 @@ echo "net.ipv4.ip_unprivileged_port_start=80" | sudo tee -a /etc/sysctl.d/99-unp
   "num_articles": "integer",
   "geo_lat": "float",
   "geo_lon": "float",
+  "geo_location": "geo_point",
   "source_url": "string",
-  "themes": ["string"],
-  "persons": ["string"],
-  "organizations": ["string"]
+  "severity": "string (low|medium|high|critical)"
 }
 ```
+
+### 1b. GDELT GKG (Global Knowledge Graph)
+
+**Role** : Enrichissement thematique des evenements — themes, personnes, organisations, analyse de tonalite detaillee, GCAM.
+
+**Source** : Fichier GKG CSV ZIP depuis `data.gdeltproject.org/gdeltv2/lastupdate.txt` (3e fichier liste).
+
+**Ingestion** : Cron toutes les 15 minutes, juste apres les Events.
+
+**Index** : `geon-gkg-YYYY.MM`
+
+**Champs** : date, source_url, source_name, themes, persons, organizations, locations (nested avec lat/lon), tone (6 composantes), gcam_scores
 
 ### 2. ACLED (Armed Conflict Location & Event Data)
 
@@ -242,7 +261,36 @@ echo "net.ipv4.ip_unprivileged_port_start=80" | sudo tee -a /etc/sysctl.d/99-unp
 - CVE (NVD)
 - Red Flag Domains (optionnel, deja configure sur le serveur SOC)
 
-**Export vers Elasticsearch** : Utiliser le connecteur Elastic officiel ou un script custom qui interroge l'API GraphQL d'OpenCTI et indexe dans `geon-cti-*`.
+**Export vers Elasticsearch** : Script Python `opencti_export/exporter.py` qui interroge l'API GraphQL pycti et indexe intrusion sets, campaigns, malware, indicators dans `geon-cti-threats`, `geon-cti-campaigns`, `geon-cti-indicators`. Cron horaire.
+
+### 6. Polymarket (Marches predictifs geopolitiques)
+
+**Role** : Dimension predictive — les marches de prediction refletent le consensus des participants sur la probabilite d'evenements geopolitiques futurs.
+
+**API** : `https://gamma-api.polymarket.com/markets`
+
+**Ingestion** : Cron horaire.
+- Filtre les marches geopolitiques par tags et mots-cles (war, sanctions, election, NATO, etc.)
+- Exclut sports, crypto, entertainment
+- Extrait les pays impliques depuis la question
+- Indexe dans `geon-polymarket-cases`
+
+**Enrichissement** : Cron toutes les 2h.
+- Pour chaque case active, requete GDELT, correlations, sanctions, APT pour les pays concernes
+- Detection de mouvements significatifs (>10% en 24h) → alerte dans `geon-correlations`
+
+### 7. Score de risque composite par pays
+
+**Module** : `risk_score/calculator.py`
+
+Score 0-100 par pays, agregant 5 facteurs ponderes :
+- Evenements GDELT negatifs (Goldstein < 0, 30j) — 30%
+- Conflits ACLED (si disponible) — 20%
+- Sanctions actives — 15%
+- Groupes APT attribues (via `country_apt_mapping.json`) — 15%
+- Correlations detectees — 20%
+
+Index : `geon-risk-scores` (1 doc/pays, mis a jour quotidiennement a 05:00)
 
 ---
 
@@ -363,6 +411,13 @@ Grafana se connecte a Elasticsearch en tant que datasource pour visualiser toute
 - Volume d'index Elasticsearch
 - Alertes de monitoring
 
+### Dashboard 6 : Prediction Markets (Polymarket)
+- Nombre de marches geopolitiques actifs
+- Mouvements de prix significatifs (>10%) cette semaine
+- Volume total USD
+- Table des marches actifs avec prix YES/NO, volume, trend, pays impliques, evenements GEON lies
+- Alertes de mouvements de prix recents
+
 ---
 
 ## Structure du repository
@@ -422,6 +477,20 @@ geon/
 |   +-- opencti_export/
 |   |   +-- __init__.py
 |   |   +-- exporter.py                 # Export OpenCTI -> Elasticsearch
+|   |   +-- mapping.json
+|   +-- gkg/
+|   |   +-- __init__.py
+|   |   +-- ingestor.py                 # GDELT GKG ingestor
+|   |   +-- parser.py                   # GKG CSV parser
+|   |   +-- mapping.json
+|   +-- polymarket/
+|   |   +-- __init__.py
+|   |   +-- ingestor.py                 # Polymarket geopolitical markets
+|   |   +-- parser.py                   # Market filtering and normalization
+|   |   +-- mapping.json
+|   +-- risk_score/
+|   |   +-- __init__.py
+|   |   +-- calculator.py               # Composite risk score per country
 |   |   +-- mapping.json
 |   +-- correlation/
 |       +-- __init__.py
