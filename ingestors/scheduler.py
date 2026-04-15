@@ -75,9 +75,8 @@ def run_correlation() -> None:
     """Run the correlation engine (all 4 rules)."""
     try:
         from correlation.engine import CorrelationEngine
-        results = CorrelationEngine().run()
-        total = sum(r.get("indexed", 0) for r in results.values())
-        logger.info("Correlation cron: %d correlations indexed.", total)
+        CorrelationEngine().run()
+        logger.info("Correlation cron completed.")
     except Exception:
         logger.exception("Correlation cron failed.")
 
