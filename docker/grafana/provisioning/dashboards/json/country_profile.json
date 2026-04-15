@@ -370,6 +370,110 @@
         }
       }]
     }
+    ,{
+      "id": 10,
+      "title": "Internet Outages History \u2014 $country",
+      "type": "table",
+      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 36 },
+      "datasource": { "uid": "elasticsearch" },
+      "targets": [{
+        "refId": "A",
+        "query": "_index:geon-outages AND country:\"$country\"",
+        "metrics": [{ "id": "1", "type": "raw_data", "settings": { "size": "20" } }],
+        "bucketAggs": [],
+        "timeField": "date"
+      }],
+      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "options": { "showHeader": true, "sortBy": [{ "displayName": "start_time", "desc": true }] },
+      "transformations": [{
+        "id": "organize",
+        "options": {
+          "includeByName": { "start_time": true, "type": true, "severity": true, "duration_hours": true, "status": true },
+          "indexByName": { "start_time": 0, "type": 1, "severity": 2, "duration_hours": 3, "status": 4 }
+        }
+      }]
+    },
+    {
+      "id": 11,
+      "title": "Arms Imports/Exports \u2014 $country",
+      "type": "barchart",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 36 },
+      "datasource": { "uid": "elasticsearch" },
+      "targets": [
+        {
+          "refId": "A",
+          "query": "_index:geon-arms-transfers AND recipient_country:\"$country\"",
+          "alias": "Imports (TIV)",
+          "metrics": [{ "id": "1", "type": "sum", "field": "tiv_value" }],
+          "bucketAggs": [{ "id": "2", "type": "terms", "field": "supplier_country", "settings": { "size": "10", "order": "desc", "orderBy": "1" } }],
+          "timeField": "date"
+        },
+        {
+          "refId": "B",
+          "query": "_index:geon-arms-transfers AND supplier_country:\"$country\"",
+          "alias": "Exports (TIV)",
+          "metrics": [{ "id": "1", "type": "sum", "field": "tiv_value" }],
+          "bucketAggs": [{ "id": "2", "type": "terms", "field": "recipient_country", "settings": { "size": "10", "order": "desc", "orderBy": "1" } }],
+          "timeField": "date"
+        }
+      ],
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" } }, "overrides": [] },
+      "options": { "orientation": "horizontal", "barWidth": 0.8, "showValue": "auto", "stacking": "none" }
+    },
+    {
+      "id": 12,
+      "title": "Military Spending Trend \u2014 $country",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 16, "x": 0, "y": 44 },
+      "datasource": { "uid": "elasticsearch" },
+      "targets": [{
+        "refId": "A",
+        "query": "_index:geon-military-spending AND country:\"$country\"",
+        "alias": "Spending (USD M)",
+        "metrics": [{ "id": "1", "type": "max", "field": "spending_usd_millions" }],
+        "bucketAggs": [{ "id": "2", "type": "date_histogram", "field": "date", "settings": { "interval": "1y", "min_doc_count": "0" } }],
+        "timeField": "date"
+      }],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "color": { "mode": "palette-classic" },
+          "custom": { "drawStyle": "bars", "fillOpacity": 60, "lineWidth": 1, "showPoints": "never" }
+        },
+        "overrides": []
+      },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "single" } }
+    },
+    {
+      "id": 13,
+      "title": "Military Spending % GDP \u2014 $country",
+      "type": "stat",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 44 },
+      "datasource": { "uid": "elasticsearch" },
+      "targets": [{
+        "refId": "A",
+        "query": "_index:geon-military-spending AND country:\"$country\"",
+        "metrics": [{ "id": "1", "type": "raw_data", "settings": { "size": "1" } }],
+        "bucketAggs": [],
+        "timeField": "date"
+      }],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [
+            { "color": "green", "value": null }, { "color": "yellow", "value": 2 },
+            { "color": "orange", "value": 3 }, { "color": "red", "value": 5 }
+          ]}
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "/.*spending_pct_gdp.*/", "values": false },
+        "colorMode": "background", "graphMode": "none", "textMode": "auto"
+      },
+      "transformations": [{ "id": "filterFieldsByName", "options": { "include": { "names": ["spending_pct_gdp"] } } }]
+    }
   ],
-  "version": 3
+  "version": 4
 }

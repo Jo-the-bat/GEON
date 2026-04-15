@@ -1,0 +1,18 @@
+{
+  "mappings": {
+    "properties": {
+      "year": { "type": "integer" },
+      "country": { "type": "keyword" },
+      "country_code": { "type": "keyword" },
+      "spending_usd_millions": { "type": "float" },
+      "spending_pct_gdp": { "type": "float" },
+      "spending_change_yoy_pct": { "type": "float" },
+      "date": { "type": "date" },
+      "ingested_at": { "type": "date" }
+    }
+  },
+  "settings": {
+    "number_of_shards": 1,
+    "number_of_replicas": 0
+  }
+}

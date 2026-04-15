@@ -123,6 +123,35 @@ class RiskScoreCalculator:
         """Count known APT groups attributed to a country."""
         return len(_COUNTRY_APT_MAP.get(country, []))
 
+    def _get_military_spending_yoy(self, country: str) -> float:
+        """Get latest YoY military spending change for a country."""
+        try:
+            result = self.es.search(
+                index=f"{INDEX_PREFIX}-military-spending",
+                query={"term": {"country": country}},
+                size=1,
+                sort=[{"year": "desc"}],
+            )
+            hits = result.get("hits", {}).get("hits", [])
+            if hits:
+                return hits[0]["_source"].get("spending_change_yoy_pct", 0)
+        except Exception:
+            pass
+        return 0
+
+    def _count_arms_imports(self, country: str) -> float:
+        """Sum TIV value of recent arms imports for a country."""
+        try:
+            result = self.es.search(
+                index=f"{INDEX_PREFIX}-arms-transfers",
+                query={"term": {"recipient_country": country}},
+                aggs={"total_tiv": {"sum": {"field": "tiv_value"}}},
+                size=0,
+            )
+            return result["aggregations"]["total_tiv"]["value"] or 0
+        except Exception:
+            return 0
+
     def _count_correlations(self, country: str) -> int:
         """Count correlations involving a country in last 30 days."""
         try:
@@ -156,12 +185,24 @@ class RiskScoreCalculator:
         return 50.0 * value / mid
 
     def calculate(self, country: str) -> dict[str, Any]:
-        """Calculate risk score for a single country."""
+        """Calculate risk score for a single country.
+
+        Weights (v2, with SIPRI factors):
+          - GDELT negative events — 25%
+          - ACLED conflicts — 15%
+          - Sanctions — 10%
+          - APT groups — 15%
+          - Correlations — 20%
+          - Military spending increase — 10%
+          - Arms imports — 5%
+        """
         gdelt_neg = self._count_gdelt_negative(country)
         acled = self._count_acled(country)
         sanctions = self._count_sanctions(country)
         apt_count = self._count_apt_groups(country)
         correlations = self._count_correlations(country)
+        milex_yoy = self._get_military_spending_yoy(country)
+        arms_tiv = self._count_arms_imports(country)
 
         # Normalize each component to 0-100.
         gdelt_score = self._normalize(gdelt_neg, (100, 1000, 5000))
@@ -169,14 +210,18 @@ class RiskScoreCalculator:
         sanctions_score = self._normalize(sanctions, (5, 50, 200))
         apt_score = self._normalize(apt_count, (1, 3, 10))
         corr_score = self._normalize(correlations, (1, 5, 20))
+        milex_score = self._normalize(int(max(milex_yoy, 0)), (5, 15, 30))
+        arms_score = self._normalize(int(arms_tiv), (500, 3000, 10000))
 
-        # Weighted composite.
+        # Weighted composite (v2).
         risk_score = (
-            gdelt_score * 0.30
-            + acled_score * 0.20
-            + sanctions_score * 0.15
+            gdelt_score * 0.25
+            + acled_score * 0.15
+            + sanctions_score * 0.10
             + apt_score * 0.15
             + corr_score * 0.20
+            + milex_score * 0.10
+            + arms_score * 0.05
         )
         risk_score = min(100.0, max(0.0, round(risk_score, 1)))
 
@@ -204,6 +249,10 @@ class RiskScoreCalculator:
             "apt_score": round(apt_score, 1),
             "correlations_count": correlations,
             "correlations_score": round(corr_score, 1),
+            "milex_yoy_pct": round(milex_yoy, 1),
+            "milex_score": round(milex_score, 1),
+            "arms_imports_tiv": round(arms_tiv, 0),
+            "arms_score": round(arms_score, 1),
             "risk_level": risk_level,
         }
 

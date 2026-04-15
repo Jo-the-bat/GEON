@@ -14,6 +14,10 @@
       "apt_score": { "type": "float" },
       "correlations_count": { "type": "integer" },
       "correlations_score": { "type": "float" },
+      "milex_yoy_pct": { "type": "float" },
+      "milex_score": { "type": "float" },
+      "arms_imports_tiv": { "type": "float" },
+      "arms_score": { "type": "float" },
       "risk_level": { "type": "keyword" }
     }
   },
