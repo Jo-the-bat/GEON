@@ -52,7 +52,7 @@ CAMEO_SUBCODES: dict[str, str] = {
     "043": "Host a visit",
     "044": "Meet at a third location",
     "045": "Mediate",
-    "046": "Engage in geontiation",
+    "046": "Engage in negotiation",
     # Diplomatic cooperation (05x)
     "050": "Engage in diplomatic cooperation, not specified",
     "051": "Praise or endorse",
@@ -79,14 +79,43 @@ CAMEO_SUBCODES: dict[str, str] = {
     "137": "Threaten to attack critical infrastructure",
     "138": "Threaten with cyber attack",
     "139": "Threaten unconventional violence",
+    # Protest (14x)
+    "140": "Protest, not specified",
+    "141": "Demonstrate or rally",
+    "142": "Conduct hunger strike",
+    "143": "Conduct strike or boycott",
+    "144": "Obstruct passage or block",
+    "145": "Protest violently / riot",
+    # Exhibit military posture (15x)
+    "150": "Exhibit military posture, not specified",
+    "151": "Increase police alert status",
+    "152": "Increase military alert status",
+    "153": "Mobilize or increase armed forces",
+    "154": "Fortify, not specified",
+    "155": "Increase military buildup",
     # Reduce relations / sanctions (16x)
     "160": "Reduce relations, not specified",
     "161": "Reduce or break diplomatic relations",
     "162": "Reduce or stop material aid",
     "163": "Impose embargo, boycott, or sanctions",
-    "164": "Halt geontiations",
+    "164": "Halt negotiations",
     "165": "Halt mediation",
     "166": "Expel or withdraw",
+    # Coerce (17x)
+    "170": "Coerce, not specified",
+    "171": "Seize or damage property",
+    "172": "Impose administrative sanctions",
+    "173": "Arrest, detain, or charge with legal action",
+    "174": "Expel or deport individuals",
+    "175": "Use tactics of violent repression",
+    # Assault (18x)
+    "180": "Use unconventional violence, not specified",
+    "181": "Abduct, hijack, or take hostage",
+    "182": "Physically assault",
+    "183": "Conduct bombing or explosion",
+    "184": "Use as combatants",
+    "185": "Attempt to assassinate",
+    "186": "Assassinate",
     # Fight (19x)
     "190": "Use conventional military force, not specified",
     "191": "Impose blockade / restrict movement",
@@ -452,6 +481,8 @@ def normalize_event(raw_event: dict[str, Any]) -> dict[str, Any]:
         or _generate_event_id(raw_event)
     )
 
+    has_geo = geo_lat != 0.0 or geo_lon != 0.0
+
     doc: dict[str, Any] = {
         "event_id": str(event_id),
         "date": event_date.isoformat(),
@@ -462,8 +493,6 @@ def normalize_event(raw_event: dict[str, Any]) -> dict[str, Any]:
         "goldstein_scale": goldstein,
         "tone": tone,
         "num_articles": num_articles,
-        "geo_lat": geo_lat,
-        "geo_lon": geo_lon,
         "source_url": source_url,
         "themes": themes,
         "persons": persons,
@@ -472,8 +501,11 @@ def normalize_event(raw_event: dict[str, Any]) -> dict[str, Any]:
         "ingested_at": datetime.now(tz=timezone.utc).isoformat(),
     }
 
-    # Add geo_location for Kibana maps (only when coordinates are valid).
-    if geo_lat != 0.0 or geo_lon != 0.0:
+    # Only include geo fields when coordinates are valid (0,0 = Gulf of
+    # Guinea is almost always a GDELT geocoding miss, not a real event).
+    if has_geo:
+        doc["geo_lat"] = geo_lat
+        doc["geo_lon"] = geo_lon
         doc["geo_location"] = {"lat": geo_lat, "lon": geo_lon}
 
     return doc

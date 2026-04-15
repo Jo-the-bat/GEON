@@ -28,16 +28,13 @@
           "query": "geo_location:*",
           "alias": "Events",
           "metrics": [
-            { "id": "1", "type": "count" }
-          ],
-          "bucketAggs": [
             {
-              "id": "3",
-              "type": "geohash_grid",
-              "field": "geo_location",
-              "settings": { "precision": "3" }
+              "id": "1",
+              "type": "raw_data",
+              "settings": { "size": "500" }
             }
           ],
+          "bucketAggs": [],
           "timeField": "date"
         }
       ],
@@ -54,12 +51,21 @@
         },
         "layers": [
           {
-            "type": "heatmap",
+            "type": "markers",
             "name": "GDELT Events",
+            "location": {
+              "mode": "coords",
+              "latitude": "geo_lat",
+              "longitude": "geo_lon"
+            },
             "config": {
-              "weight": { "fixed": 1 },
-              "radius": { "fixed": 20 },
-              "blur": { "fixed": 15 }
+              "showLegend": false,
+              "style": {
+                "size": { "fixed": 4 },
+                "color": { "fixed": "semi-dark-red" },
+                "opacity": 0.6,
+                "symbol": { "fixed": "circle" }
+              }
             }
           }
         ]
