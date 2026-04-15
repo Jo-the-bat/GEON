@@ -92,6 +92,10 @@ See [docs/installation.md](docs/installation.md) for the complete step-by-step g
 | **OFAC / EU / UN** | Sanctions | Weekly | Sanctioned persons, organizations, countries |
 | **RSS via n8n** | Articles | Continuous | Think tanks, agencies, defense publications |
 | **OpenCTI Connectors** | Cyber threats | Continuous | MITRE ATT&CK, AlienVault OTX, CISA KEV, CVE |
+| **Polymarket** | Prediction markets | Hourly | Geopolitical prediction markets -- probability of wars, sanctions, elections. Filtered by tags/keywords, enriched with GDELT correlations |
+| **Cloudflare Radar** | Internet outages | Every 30 min | National and regional internet shutdowns via Cloudflare's API. Indexes into `geon-outages`. Requires `CLOUDFLARE_RADAR_TOKEN` |
+| **Metaculus + Manifold Markets** | Prediction consensus | Every 2 hours | Cross-platform geopolitical predictions from Manifold (public) and Metaculus (token required). Computes consensus scores and divergence against Polymarket cases. Index: `geon-predictions` |
+| **SIPRI** | Arms transfers / military spending | Weekly | Arms transfers and military spending data from the Stockholm International Peace Research Institute. Embedded seed data for major transfers and top 25 military spenders. Indices: `geon-arms-transfers`, `geon-military-spending` |
 
 See [docs/data_sources.md](docs/data_sources.md) for API details and configuration.
 
@@ -99,12 +103,14 @@ See [docs/data_sources.md](docs/data_sources.md) for API details and configurati
 
 ## Correlation Rules
 
-The correlation engine runs hourly and applies four detection rules:
+The correlation engine runs hourly and applies six detection rules:
 
 1. **Diplomatic Escalation + APT Activity** -- Goldstein score < -5 between two countries combined with an APT campaign attributed to one of them within 30 days.
 2. **Sanction + Cyber Spike** -- New sanction against a country followed by a >200% increase in related indicators of compromise within 60 days.
 3. **Armed Conflict + Cyber Infrastructure** -- ACLED battle or civilian violence event coinciding with cyber operations from the same geographic area.
 4. **Rhetoric Shift** -- Tone variation exceeding 2 standard deviations over 7 days for a country pair, flagged as a weak signal.
+5. **Internet Outage + Diplomatic/Military Escalation** -- Cloudflare Radar detects a national or regional internet shutdown coinciding with a diplomatic or military escalation (Goldstein < -5 or ACLED event) in the same country or region.
+6. **Military Spending Increase + APT Activity** -- SIPRI data shows a significant increase in military spending for a country combined with new or intensified APT campaigns attributed to that country within the same period.
 
 See [docs/correlation_rules.md](docs/correlation_rules.md) for trigger conditions, severity calculation, and examples.
 
@@ -117,7 +123,7 @@ All dashboards are built in Grafana using Elasticsearch as the datasource:
 | Dashboard | Description |
 |-----------|-------------|
 | **Global Overview** | World map (Geomap panel) with GDELT events, ACLED conflicts, and APT campaigns. 30-day timeline. |
-| **Country Profile** | Per-country timeline, attributed APT groups, active sanctions, risk score. Uses template variables for country selection. |
+| **Country Profile** | Per-country timeline, attributed APT groups, active sanctions, composite risk score (7 factors: GDELT events, ACLED conflicts, sanctions, APT groups, correlations, internet outages, military spending). Uses template variables for country selection. |
 | **Correlations** | Detected cross-domain patterns with severity filters and dual timelines. |
 | **Article Feed** | Ingested articles from RSS sources (via n8n) with keyword trends. |
 | **Monitoring** | Service health (Prometheus datasource), ingestion timestamps, index volumes. |
