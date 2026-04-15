@@ -1,0 +1,36 @@
+{
+  "mappings": {
+    "properties": {
+      "gkg_id": { "type": "keyword" },
+      "date": { "type": "date" },
+      "source_url": { "type": "keyword" },
+      "source_name": { "type": "keyword" },
+      "themes": { "type": "keyword" },
+      "persons": { "type": "text", "fields": { "keyword": { "type": "keyword" } } },
+      "organizations": { "type": "text", "fields": { "keyword": { "type": "keyword" } } },
+      "locations": {
+        "type": "nested",
+        "properties": {
+          "name": { "type": "text", "fields": { "keyword": { "type": "keyword" } } },
+          "country_code": { "type": "keyword" },
+          "lat": { "type": "float" },
+          "lon": { "type": "float" }
+        }
+      },
+      "tone": { "type": "float" },
+      "tone_positive": { "type": "float" },
+      "tone_negative": { "type": "float" },
+      "tone_polarity": { "type": "float" },
+      "tone_activity_density": { "type": "float" },
+      "tone_self_group_density": { "type": "float" },
+      "tone_word_count": { "type": "integer" },
+      "gcam_scores": { "type": "object", "enabled": false },
+      "num_articles": { "type": "integer" },
+      "ingested_at": { "type": "date" }
+    }
+  },
+  "settings": {
+    "number_of_shards": 1,
+    "number_of_replicas": 0
+  }
+}

@@ -38,6 +38,16 @@ def run_gdelt() -> None:
         logger.exception("GDELT cron failed.")
 
 
+def run_gkg() -> None:
+    """Run the GDELT GKG ingestor (latest 15-minute CSV window)."""
+    try:
+        from gkg.ingestor import GKGIngestor
+        count = GKGIngestor().ingest(windows=1)
+        logger.info("GKG cron: %d documents indexed.", count)
+    except Exception:
+        logger.exception("GKG cron failed.")
+
+
 def run_opencti_export() -> None:
     """Export CTI entities from OpenCTI → Elasticsearch."""
     try:
@@ -126,6 +136,7 @@ def main() -> None:
 
     # --- Schedule recurring jobs ---
     schedule.every(15).minutes.do(run_gdelt)
+    schedule.every(15).minutes.do(run_gkg)
     schedule.every(1).hours.do(run_opencti_export)
     schedule.every(1).days.at("03:00").do(run_acled)
     schedule.every().sunday.at("04:00").do(run_sanctions)
@@ -133,6 +144,7 @@ def main() -> None:
 
     # Run each once immediately.
     run_gdelt()
+    run_gkg()
     run_opencti_export()
     run_acled()
     run_sanctions()
