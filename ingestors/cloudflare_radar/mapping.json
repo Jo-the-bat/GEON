@@ -1,0 +1,24 @@
+{
+  "mappings": {
+    "properties": {
+      "outage_id": { "type": "keyword" },
+      "date": { "type": "date" },
+      "country": { "type": "keyword" },
+      "country_code": { "type": "keyword" },
+      "asn": { "type": "integer" },
+      "asn_name": { "type": "keyword" },
+      "type": { "type": "keyword" },
+      "scope": { "type": "keyword" },
+      "duration_hours": { "type": "float" },
+      "severity": { "type": "keyword" },
+      "status": { "type": "keyword" },
+      "start_time": { "type": "date" },
+      "end_time": { "type": "date" },
+      "ingested_at": { "type": "date" }
+    }
+  },
+  "settings": {
+    "number_of_shards": 1,
+    "number_of_replicas": 0
+  }
+}
