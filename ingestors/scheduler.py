@@ -217,6 +217,9 @@ def main() -> None:
     run_sanctions()
     run_correlation()
     run_polymarket()
+    run_sipri()
+    run_cloudflare_radar()
+    run_prediction_consensus()
     run_risk_scores()
 
     logger.info(
