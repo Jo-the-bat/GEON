@@ -235,6 +235,7 @@ class ConflictCyberRule:
         return {
             "correlation_id": correlation_id,
             "timestamp": now,
+            "date": now,
             "rule_name": self.RULE_NAME,
             "severity": severity,
             "countries_involved": [country],

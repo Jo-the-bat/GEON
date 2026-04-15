@@ -136,6 +136,7 @@ class OpenCTIExporter:
             "created_by": created_by,
             "external_references": ext_refs,
             "ingested_at": datetime.now(tz=timezone.utc).isoformat(),
+            "date": datetime.now(tz=timezone.utc).isoformat(),
         }
 
     # ------------------------------------------------------------------
