@@ -198,6 +198,7 @@ class SanctionsIngestor:
             "sanctions_source": "OFAC",
             "listed_date": listed_date,
             "notes": remarks,
+            "ingested_at": datetime.now(tz=timezone.utc).isoformat(),
         }
 
     # ------------------------------------------------------------------
