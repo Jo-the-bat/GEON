@@ -3,24 +3,28 @@
   "RUSSIA": [
     "APT28", "APT29", "Sandworm Team", "Turla", "Gamaredon Group",
     "TEMP.Veles", "Dragonfly", "Ember Bear", "Star Blizzard",
-    "Indrik Spider", "Wizard Spider", "ALLANITE"
+    "Indrik Spider", "Wizard Spider", "ALLANITE", "Silence",
+    "Saint Bear", "RTM"
   ],
   "CHINA": [
     "APT41", "APT10", "APT1", "APT3", "APT17", "APT27", "APT30", "APT31", "APT40",
     "Volt Typhoon", "Salt Typhoon", "Mustang Panda", "BlackTech",
     "Hafnium", "Winnti Group", "Ke3chang", "Naikon",
-    "Daggerfly", "Earth Lusca", "Flax Typhoon", "Aquatic Panda"
+    "Daggerfly", "Earth Lusca", "Flax Typhoon", "Aquatic Panda",
+    "TA459", "Deep Panda", "Tonto Team", "GALLIUM", "Suckfly"
   ],
   "IRAN": [
     "APT33", "APT34", "APT35", "APT39", "APT42",
     "MuddyWater", "Silent Librarian", "Charming Kitten",
     "OilRig", "Fox Kitten", "Moses Staff", "Agrius",
-    "CopyKittens", "Tortoiseshell", "Lyceum"
+    "CopyKittens", "Tortoiseshell", "Lyceum", "Magic Hound",
+    "CURIUM", "CyberAv3ngers", "Ferocious Kitten"
   ],
   "NORTH KOREA": [
     "Lazarus Group", "Kimsuky", "APT38", "APT43",
     "Andariel", "BlueNoroff", "ScarCruft", "Stardust Chollima",
-    "TraderTraitor", "Diamond Sleet", "Citrine Sleet"
+    "TraderTraitor", "Diamond Sleet", "Citrine Sleet",
+    "Moonstone Sleet", "Contagious Interview"
   ],
   "ISRAEL": [
     "Unit 8200", "Candiru", "NSO Group"
@@ -52,8 +56,8 @@
   "SYRIA": [
     "Syrian Electronic Army"
   ],
-  "UKRAINE": [
-    "Armageddon"
+  "PALESTINE": [
+    "Molerats", "APT-C-23"
   ],
   "BELARUS": [
     "Ghostwriter", "UNC1151"
