@@ -15,27 +15,43 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-# Keywords that indicate a geopolitical market.
-GEO_KEYWORDS: set[str] = {
-    "war", "invasion", "ceasefire", "nato", "nuclear", "sanctions",
-    "treaty", "annexation", "coup", "election", "president",
-    "prime minister", "military", "troops", "missile", "drone",
-    "conflict", "peace", "ambassador", "diplomat", "embargo",
-    "referendum", "independence", "occupation", "blockade",
-    "parliament", "congress", "defense", "alliance", "coalition",
-    "terrorism", "insurgency", "regime", "dictator", "revolution",
-    "sovereignty", "border", "genocide", "humanitarian",
-    "refugee", "asylum", "extradition", "espionage", "cyber",
-    "intelligence", "surveillance", "assassination",
+# Keywords that strongly indicate international geopolitics.
+CONFLICT_KEYWORDS: set[str] = {
+    "war", "invasion", "ceasefire", "nuclear", "sanctions",
+    "treaty", "annexation", "coup", "missile", "drone strike",
+    "occupation", "blockade", "genocide", "humanitarian crisis",
+    "refugee", "espionage", "cyber attack", "assassination",
+    "airstrike", "artillery", "naval", "submarine",
 }
 
-# Tags that indicate geopolitical content.
-GEO_TAGS: set[str] = {
-    "politics", "geopolitics", "war", "conflict", "elections",
-    "sanctions", "world-politics", "international",
+# Broader keywords — only valid when combined with >=2 countries or intl org.
+CONTEXT_KEYWORDS: set[str] = {
+    "military", "troops", "conflict", "peace", "diplomat",
+    "embassy", "ambassador", "embargo", "alliance",
+    "terrorism", "insurgency", "sovereignty", "border",
+    "independence", "extradition", "intelligence",
 }
 
-# Tags to exclude (sports, crypto, entertainment, etc.).
+# International organizations that signal geopolitics.
+INTL_ORGS: set[str] = {
+    "nato", "otan", "united nations", "un security council",
+    "european union", "brics", "asean", "g7", "g20",
+    "african union", "arab league", "iaea", "icc",
+    "international court", "who", "imf", "world bank",
+    "opec", "oecd",
+}
+
+# Patterns to EXCLUDE — US domestic politics, celebrities, etc.
+EXCLUDE_PATTERNS: list[re.Pattern[str]] = [
+    re.compile(r"will .+ (be arrested|resign|say |tweet|endorse)", re.I),
+    re.compile(r"will .+ win the 202\d (democrat|republican|gop)", re.I),
+    re.compile(r"(gubernatorial|mayoral|senate race|house race)", re.I),
+    re.compile(r"(super bowl|world series|nfl|nba|nhl|mlb|ufc)", re.I),
+    re.compile(r"(bitcoin|ethereum|crypto|token|nft|defi)", re.I),
+    re.compile(r"(movie|tv show|album|grammy|oscar|emmy|box office)", re.I),
+]
+
+# Tags to exclude.
 EXCLUDE_TAGS: set[str] = {
     "sports", "nfl", "nba", "mlb", "nhl", "soccer", "football",
     "cricket", "tennis", "golf", "boxing", "mma", "ufc",
@@ -74,18 +90,57 @@ SHORT_TO_CANONICAL: dict[str, str] = {
 
 
 def is_geopolitical(market: dict[str, Any]) -> bool:
-    """Return True if a Polymarket market is geopolitical."""
+    """Return True only for genuinely international geopolitical markets.
+
+    Requirements (at least one must be true):
+      1. Contains a strong conflict keyword (war, ceasefire, sanctions, etc.)
+         AND involves at least 1 country or intl org.
+      2. Involves >=2 distinct countries.
+      3. Mentions an international organization (NATO, UN, EU, etc.).
+
+    Excludes US domestic politics, celebrities, sports, crypto.
+    """
     tags = {t.lower() for t in (market.get("tags") or [])}
     if tags & EXCLUDE_TAGS:
         return False
-    if tags & GEO_TAGS:
-        return True
 
     question = (market.get("question") or market.get("title") or "").lower()
     description = (market.get("description") or "").lower()
     text = f"{question} {description}"
 
-    return bool(GEO_KEYWORDS & set(re.findall(r'\b\w+\b', text)))
+    # Explicit exclusion patterns.
+    for pat in EXCLUDE_PATTERNS:
+        if pat.search(text):
+            return False
+
+    # Extract countries and check for intl orgs.
+    countries = extract_countries(text)
+    has_intl_org = any(org in text for org in INTL_ORGS)
+
+    # Path 1: strong conflict keyword + at least 1 country or intl org.
+    words = set(text.split())
+    has_conflict = bool(CONFLICT_KEYWORDS & {w.strip(".,!?") for w in words})
+    # Also check multi-word conflict terms.
+    if not has_conflict:
+        for kw in CONFLICT_KEYWORDS:
+            if " " in kw and kw in text:
+                has_conflict = True
+                break
+
+    if has_conflict and (countries or has_intl_org):
+        return True
+
+    # Path 2: >=2 distinct countries mentioned.
+    if len(countries) >= 2:
+        return True
+
+    # Path 3: international organization mentioned + context keyword.
+    if has_intl_org:
+        context_words = {w.strip(".,!?") for w in words}
+        if CONTEXT_KEYWORDS & context_words:
+            return True
+
+    return False
 
 
 def extract_countries(text: str) -> list[str]:
@@ -131,8 +186,9 @@ def normalize_market(market: dict[str, Any]) -> dict[str, Any]:
             no_price = 1.0 - yes_price
 
     countries = extract_countries(f"{question} {description}")
+    all_keywords = CONFLICT_KEYWORDS | CONTEXT_KEYWORDS
     keywords = sorted(
-        GEO_KEYWORDS & set(re.findall(r'\b\w+\b', f"{question} {description}".lower()))
+        all_keywords & set(re.findall(r'\b\w+\b', f"{question} {description}".lower()))
     )
 
     end_date = market.get("end_date_iso") or market.get("endDate") or None
