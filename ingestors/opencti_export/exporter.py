@@ -311,12 +311,19 @@ class OpenCTIExporter:
             else:
                 logger.info("No prior CTI data — performing full export.")
 
-        # --- Export each object type ---
-        threats = self._export_intrusion_sets(since)
-        campaigns = self._export_campaigns(since)
-        indicators = self._export_indicators(since)
-        malware_docs = self._export_malware(since)
-        vuln_docs = self._export_vulnerabilities(since)
+        # --- Export each object type (skip gracefully on schema errors) ---
+        def _safe_export(fn, label):
+            try:
+                return fn(since)
+            except Exception:
+                logger.warning("Export %s failed, skipping.", label, exc_info=True)
+                return []
+
+        threats = _safe_export(self._export_intrusion_sets, "intrusion_sets")
+        campaigns = _safe_export(self._export_campaigns, "campaigns")
+        indicators = _safe_export(self._export_indicators, "indicators")
+        malware_docs = _safe_export(self._export_malware, "malware")
+        vuln_docs = _safe_export(self._export_vulnerabilities, "vulnerabilities")
 
         # Merge threats + malware + vulnerabilities into the threats index.
         all_threats = threats + malware_docs + vuln_docs
