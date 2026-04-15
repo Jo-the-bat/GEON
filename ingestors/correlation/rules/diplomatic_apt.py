@@ -186,7 +186,10 @@ class DiplomaticAPTRule:
             if campaigns:
                 matches.extend(campaigns)
 
-        # Validate against known country-APT attributions.
+        # Strict validation against known country-APT attributions.
+        # Only keep APTs that are actually attributed to one of the two
+        # countries.  If none match, return empty — do NOT fall through
+        # to unfiltered results (the root cause of cross-contamination).
         if _COUNTRY_APT_MAP and matches:
             known_apts: set[str] = set()
             for c in [country_a, country_b]:
@@ -196,12 +199,11 @@ class DiplomaticAPTRule:
                     m for m in matches
                     if m.get("name", "").lower() in known_apts
                 ]
-                if validated:
-                    logger.debug(
-                        "APT validation: %d/%d matches confirmed for %s/%s.",
-                        len(validated), len(matches), country_a, country_b,
-                    )
-                    matches = validated
+                logger.debug(
+                    "APT validation: %d/%d matches confirmed for %s/%s.",
+                    len(validated), len(matches), country_a, country_b,
+                )
+                matches = validated  # strict: empty if no match
 
         return matches
 
