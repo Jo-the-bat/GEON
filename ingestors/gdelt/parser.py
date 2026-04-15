@@ -6,7 +6,9 @@ ready for Elasticsearch indexation.
 
 from __future__ import annotations
 
+import csv
 import hashlib
+import io
 import logging
 from datetime import datetime, timezone
 from typing import Any
@@ -116,6 +118,93 @@ RELEVANT_CAMEO_PREFIXES: set[str] = {
     "20",  # Unconventional mass violence
 }
 
+# ---------------------------------------------------------------------------
+# GDELT v2 Events Export CSV definitions
+# https://www.gdeltproject.org/data/documentation/GDELT-Event_Codebook-V2.0.pdf
+# ---------------------------------------------------------------------------
+
+GDELT_CSV_COLUMNS: list[str] = [
+    "GlobalEventID", "Day", "MonthYear", "Year", "FractionDate",
+    "Actor1Code", "Actor1Name", "Actor1CountryCode", "Actor1KnownGroupCode",
+    "Actor1EthnicCode", "Actor1Religion1Code", "Actor1Religion2Code",
+    "Actor1Type1Code", "Actor1Type2Code", "Actor1Type3Code",
+    "Actor2Code", "Actor2Name", "Actor2CountryCode", "Actor2KnownGroupCode",
+    "Actor2EthnicCode", "Actor2Religion1Code", "Actor2Religion2Code",
+    "Actor2Type1Code", "Actor2Type2Code", "Actor2Type3Code",
+    "IsRootEvent", "EventCode", "EventBaseCode", "EventRootCode", "QuadClass",
+    "GoldsteinScale", "NumMentions", "NumSources", "NumArticles", "AvgTone",
+    "Actor1Geo_Type", "Actor1Geo_FullName", "Actor1Geo_CountryCode",
+    "Actor1Geo_ADM1Code", "Actor1Geo_ADM2Code", "Actor1Geo_Lat",
+    "Actor1Geo_Long", "Actor1Geo_FeatureID",
+    "Actor2Geo_Type", "Actor2Geo_FullName", "Actor2Geo_CountryCode",
+    "Actor2Geo_ADM1Code", "Actor2Geo_ADM2Code", "Actor2Geo_Lat",
+    "Actor2Geo_Long", "Actor2Geo_FeatureID",
+    "ActionGeo_Type", "ActionGeo_FullName", "ActionGeo_CountryCode",
+    "ActionGeo_ADM1Code", "ActionGeo_ADM2Code", "ActionGeo_Lat",
+    "ActionGeo_Long", "ActionGeo_FeatureID",
+    "DATEADDED", "SOURCEURL",
+]
+
+# 3-letter CAMEO/ISO 3166-1 alpha-3 country codes used in Actor*CountryCode.
+COUNTRY_CODE_TO_NAME: dict[str, str] = {
+    "AFG": "AFGHANISTAN", "ALB": "ALBANIA", "DZA": "ALGERIA",
+    "AGO": "ANGOLA", "ARG": "ARGENTINA", "ARM": "ARMENIA",
+    "AUS": "AUSTRALIA", "AUT": "AUSTRIA", "AZE": "AZERBAIJAN",
+    "BHR": "BAHRAIN", "BGD": "BANGLADESH", "BLR": "BELARUS",
+    "BEL": "BELGIUM", "BEN": "BENIN", "BTN": "BHUTAN",
+    "BOL": "BOLIVIA", "BIH": "BOSNIA AND HERZEGOVINA", "BWA": "BOTSWANA",
+    "BRA": "BRAZIL", "BRN": "BRUNEI", "BGR": "BULGARIA",
+    "BFA": "BURKINA FASO", "BDI": "BURUNDI", "KHM": "CAMBODIA",
+    "CMR": "CAMEROON", "CAN": "CANADA", "CAF": "CENTRAL AFRICAN REPUBLIC",
+    "TCD": "CHAD", "CHL": "CHILE", "CHN": "CHINA",
+    "COL": "COLOMBIA", "COD": "CONGO (DRC)", "COG": "CONGO (REPUBLIC)",
+    "CRI": "COSTA RICA", "CIV": "COTE D'IVOIRE", "HRV": "CROATIA",
+    "CUB": "CUBA", "CYP": "CYPRUS", "CZE": "CZECH REPUBLIC",
+    "DNK": "DENMARK", "DJI": "DJIBOUTI", "DOM": "DOMINICAN REPUBLIC",
+    "ECU": "ECUADOR", "EGY": "EGYPT", "SLV": "EL SALVADOR",
+    "GNQ": "EQUATORIAL GUINEA", "ERI": "ERITREA", "EST": "ESTONIA",
+    "SWZ": "ESWATINI", "ETH": "ETHIOPIA", "FIN": "FINLAND",
+    "FRA": "FRANCE", "GAB": "GABON", "GMB": "GAMBIA",
+    "GEO": "GEORGIA", "DEU": "GERMANY", "GHA": "GHANA",
+    "GRC": "GREECE", "GTM": "GUATEMALA", "GIN": "GUINEA",
+    "GUY": "GUYANA", "HTI": "HAITI", "HND": "HONDURAS",
+    "HUN": "HUNGARY", "ISL": "ICELAND", "IND": "INDIA",
+    "IDN": "INDONESIA", "IRN": "IRAN", "IRQ": "IRAQ",
+    "IRL": "IRELAND", "ISR": "ISRAEL", "ITA": "ITALY",
+    "JAM": "JAMAICA", "JPN": "JAPAN", "JOR": "JORDAN",
+    "KAZ": "KAZAKHSTAN", "KEN": "KENYA", "PRK": "NORTH KOREA",
+    "KOR": "SOUTH KOREA", "KWT": "KUWAIT", "KGZ": "KYRGYZSTAN",
+    "LAO": "LAOS", "LVA": "LATVIA", "LBN": "LEBANON",
+    "LSO": "LESOTHO", "LBR": "LIBERIA", "LBY": "LIBYA",
+    "LTU": "LITHUANIA", "LUX": "LUXEMBOURG", "MKD": "NORTH MACEDONIA",
+    "MDG": "MADAGASCAR", "MWI": "MALAWI", "MYS": "MALAYSIA",
+    "MLI": "MALI", "MLT": "MALTA", "MRT": "MAURITANIA",
+    "MUS": "MAURITIUS", "MEX": "MEXICO", "MDA": "MOLDOVA",
+    "MNG": "MONGOLIA", "MNE": "MONTENEGRO", "MAR": "MOROCCO",
+    "MOZ": "MOZAMBIQUE", "MMR": "MYANMAR", "NAM": "NAMIBIA",
+    "NPL": "NEPAL", "NLD": "NETHERLANDS", "NZL": "NEW ZEALAND",
+    "NIC": "NICARAGUA", "NER": "NIGER", "NGA": "NIGERIA",
+    "NOR": "NORWAY", "OMN": "OMAN", "PAK": "PAKISTAN",
+    "PAN": "PANAMA", "PNG": "PAPUA NEW GUINEA", "PRY": "PARAGUAY",
+    "PER": "PERU", "PHL": "PHILIPPINES", "POL": "POLAND",
+    "PRT": "PORTUGAL", "QAT": "QATAR", "ROU": "ROMANIA",
+    "RUS": "RUSSIA", "RWA": "RWANDA", "SAU": "SAUDI ARABIA",
+    "SEN": "SENEGAL", "SRB": "SERBIA", "SLE": "SIERRA LEONE",
+    "SGP": "SINGAPORE", "SVK": "SLOVAKIA", "SVN": "SLOVENIA",
+    "SOM": "SOMALIA", "ZAF": "SOUTH AFRICA", "SSD": "SOUTH SUDAN",
+    "ESP": "SPAIN", "LKA": "SRI LANKA", "SDN": "SUDAN",
+    "SUR": "SURINAME", "SWE": "SWEDEN", "CHE": "SWITZERLAND",
+    "SYR": "SYRIA", "TWN": "TAIWAN", "TJK": "TAJIKISTAN",
+    "TZA": "TANZANIA", "THA": "THAILAND", "TGO": "TOGO",
+    "TTO": "TRINIDAD AND TOBAGO", "TUN": "TUNISIA", "TUR": "TURKEY",
+    "TKM": "TURKMENISTAN", "UGA": "UGANDA", "UKR": "UKRAINE",
+    "ARE": "UNITED ARAB EMIRATES", "GBR": "UNITED KINGDOM",
+    "USA": "UNITED STATES", "URY": "URUGUAY", "UZB": "UZBEKISTAN",
+    "VEN": "VENEZUELA", "VNM": "VIETNAM", "YEM": "YEMEN",
+    "ZMB": "ZAMBIA", "ZWE": "ZIMBABWE", "PSE": "PALESTINE",
+    "XKX": "KOSOVO",
+}
+
 
 # ---------------------------------------------------------------------------
 # CAMEO helpers
@@ -140,6 +229,15 @@ def extract_cameo_info(cameo_code: str) -> dict[str, str]:
         "category": category,
         "category_description": CAMEO_CODES.get(category, "Unknown"),
     }
+
+
+def resolve_country_name(code: str) -> str:
+    """Convert a CAMEO/ISO 3-letter country code to a readable name.
+
+    Returns the uppercase code itself if no mapping is found (e.g. actor
+    type codes like ``"GOV"`` or ``"MIL"``).
+    """
+    return COUNTRY_CODE_TO_NAME.get(code.strip().upper(), code.strip().upper()) if code else ""
 
 
 # ---------------------------------------------------------------------------
@@ -256,8 +354,10 @@ def normalize_event(raw_event: dict[str, Any]) -> dict[str, Any]:
     # --- Resolve date ---
     date_raw = (
         raw_event.get("seendate")
+        or raw_event.get("DATEADDED")
         or raw_event.get("dateadded")
         or raw_event.get("SQLDATE")
+        or raw_event.get("Day")
         or raw_event.get("date")
         or ""
     )
@@ -346,7 +446,11 @@ def normalize_event(raw_event: dict[str, Any]) -> dict[str, Any]:
     severity = calculate_severity(goldstein, num_articles, tone)
 
     # --- Build document ---
-    event_id = raw_event.get("event_id") or _generate_event_id(raw_event)
+    event_id = (
+        raw_event.get("event_id")
+        or raw_event.get("GlobalEventID")
+        or _generate_event_id(raw_event)
+    )
 
     doc: dict[str, Any] = {
         "event_id": str(event_id),
@@ -391,6 +495,39 @@ def _coerce_list(value: Any) -> list[str]:
 # ---------------------------------------------------------------------------
 # API response parsers
 # ---------------------------------------------------------------------------
+
+def parse_events_csv(csv_text: str) -> list[dict[str, Any]]:
+    """Parse a GDELT v2 Events Export CSV into a list of raw event dicts.
+
+    The Events Export is a tab-separated file with 61 columns and no header
+    row.  Each row is a distinct CAMEO-coded event with full metadata
+    including Goldstein scale, geolocation, actors, and tone.
+
+    Actor country codes are resolved to human-readable names via
+    :data:`COUNTRY_CODE_TO_NAME`.
+
+    Args:
+        csv_text: Raw CSV content (tab-delimited, UTF-8).
+
+    Returns:
+        List of raw event dicts keyed by :data:`GDELT_CSV_COLUMNS`.
+    """
+    events: list[dict[str, Any]] = []
+    reader = csv.reader(io.StringIO(csv_text), delimiter="\t")
+    for row in reader:
+        if len(row) < len(GDELT_CSV_COLUMNS):
+            continue
+        event = dict(zip(GDELT_CSV_COLUMNS, row))
+        # Resolve 3-letter country codes to readable names.
+        for key in ("Actor1CountryCode", "Actor2CountryCode"):
+            raw_code = event.get(key, "").strip()
+            if raw_code:
+                event[key] = resolve_country_name(raw_code)
+        events.append(event)
+
+    logger.info("Events CSV: parsed %d rows.", len(events))
+    return events
+
 
 def parse_doc_api_response(response_json: dict[str, Any]) -> list[dict[str, Any]]:
     """Parse a GDELT DOC API (v2) JSON response into a list of raw events.

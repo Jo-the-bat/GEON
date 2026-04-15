@@ -1,8 +1,8 @@
 """GEON GDELT ingestor.
 
-Fetches geopolitical events from the GDELT Project APIs, normalizes them,
-and bulk-indexes them into Elasticsearch.  Designed to run via cron every
-15 minutes.
+Fetches geopolitical events from the GDELT v2 Events Export CSV files,
+normalizes them, and bulk-indexes them into Elasticsearch.  Designed to
+run via cron every 15 minutes.
 
 Usage::
 
@@ -15,8 +15,11 @@ Usage::
 
 from __future__ import annotations
 
+import io
 import logging
 import sys
+import time
+import zipfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -40,8 +43,7 @@ from common.es_client import bulk_index, ensure_index, get_es_client
 from gdelt.parser import (
     RELEVANT_CAMEO_PREFIXES,
     normalize_event,
-    parse_doc_api_response,
-    parse_geo_api_response,
+    parse_events_csv,
 )
 
 logger = logging.getLogger(__name__)
@@ -50,13 +52,18 @@ logger = logging.getLogger(__name__)
 # Constants
 # ---------------------------------------------------------------------------
 
-GDELT_DOC_API_URL: str = "https://api.gdeltproject.org/api/v2/doc/doc"
-GDELT_GEO_API_URL: str = "https://api.gdeltproject.org/api/v2/geo/geo"
+GDELT_EVENTS_LASTUPDATE_URL: str = (
+    "http://data.gdeltproject.org/gdeltv2/lastupdate.txt"
+)
+GDELT_EVENTS_BASE_URL: str = "http://data.gdeltproject.org/gdeltv2"
 
 MAPPING_PATH: Path = Path(__file__).resolve().parent / "mapping.json"
 
-# Default request timeout for GDELT API calls (seconds).
-REQUEST_TIMEOUT: int = 60
+# Default request timeout for GDELT downloads (seconds).
+REQUEST_TIMEOUT: int = 90
+
+# Delay between successive CSV downloads to respect rate limits.
+FETCH_DELAY_SECONDS: float = 2.0
 
 
 class GDELTIngestor:
@@ -87,38 +94,7 @@ class GDELTIngestor:
         ensure_index(self.es, self.index_name, MAPPING_PATH)
 
     # ------------------------------------------------------------------
-    # Query builder
-    # ------------------------------------------------------------------
-
-    @staticmethod
-    def build_query() -> str:
-        """Build a GDELT query string filtering for relevant CAMEO categories.
-
-        The query targets events in the conflict, diplomacy, and sanctions
-        families of CAMEO codes.  GDELT DOC API ``query`` parameter supports
-        keyword-style queries; we use theme-based filters.
-
-        Returns:
-            Query string suitable for the GDELT DOC API ``query`` param.
-        """
-        # GDELT DOC API supports thematic filters via the "theme:" prefix.
-        # Keep the list short — GDELT rejects queries that are too long.
-        themes: list[str] = [
-            "MILITARY",
-            "ARMED_CONFLICT",
-            "SANCTIONS",
-            "DIPLOMACY",
-            "CYBER_ATTACK",
-            "TERROR",
-            "PROTEST",
-            "WMD",
-        ]
-        theme_query = " OR ".join(f"theme:{t}" for t in themes)
-        query = f"({theme_query}) (sourcelang:eng OR sourcelang:fra)"
-        return query
-
-    # ------------------------------------------------------------------
-    # API fetchers
+    # CSV fetchers
     # ------------------------------------------------------------------
 
     @retry(
@@ -127,118 +103,59 @@ class GDELTIngestor:
         wait=wait_exponential(min=5, max=60),
         reraise=True,
     )
-    def fetch_events(
-        self,
-        query: str,
-        timespan: str = "15min",
-        max_records: int = 250,
-        start_datetime: str | None = None,
-        end_datetime: str | None = None,
-    ) -> dict[str, Any]:
-        """Call the GDELT DOC API v2 and return the JSON response.
+    def _download_csv_zip(self, url: str) -> str:
+        """Download a GDELT Events Export ZIP and return the CSV text."""
+        self.logger.debug("Downloading %s", url)
+        response = requests.get(url, timeout=REQUEST_TIMEOUT)
+        response.raise_for_status()
+        with zipfile.ZipFile(io.BytesIO(response.content)) as zf:
+            csv_names = [n for n in zf.namelist() if n.upper().endswith(".CSV")]
+            if not csv_names:
+                raise ValueError(f"No CSV found in {url}")
+            return zf.read(csv_names[0]).decode("utf-8", errors="replace")
 
-        Args:
-            query: GDELT query string (see :meth:`build_query`).
-            timespan: Look-back window (e.g. ``"15min"``, ``"1h"``,
-                ``"1d"``).
-            max_records: Maximum number of records to return.
+    def fetch_latest_csv(self) -> list[dict[str, Any]]:
+        """Fetch the most recent GDELT Events Export CSV.
+
+        Downloads ``lastupdate.txt``, finds the ``.export.CSV.zip`` URL,
+        downloads and parses it.
 
         Returns:
-            Decoded JSON dict from the API.
-
-        Raises:
-            requests.HTTPError: On non-2xx responses.
+            List of raw event dicts from :func:`parse_events_csv`.
         """
-        params: dict[str, str | int] = {
-            "query": query,
-            "mode": "ArtList",
-            "maxrecords": max_records,
-            "format": "json",
-            "sort": "DateDesc",
-        }
-        if start_datetime and end_datetime:
-            params["startdatetime"] = start_datetime
-            params["enddatetime"] = end_datetime
-        else:
-            params["timespan"] = timespan
+        self.logger.info("Fetching GDELT lastupdate.txt …")
+        resp = requests.get(GDELT_EVENTS_LASTUPDATE_URL, timeout=30)
+        resp.raise_for_status()
 
-        self.logger.info(
-            "Fetching GDELT DOC API — timespan=%s, maxrecords=%d",
-            timespan,
-            max_records,
-        )
-        self.logger.debug("Query: %s", query)
+        csv_url: str | None = None
+        for line in resp.text.strip().splitlines():
+            parts = line.split()
+            if len(parts) >= 3 and ".export.CSV" in parts[2]:
+                csv_url = parts[2]
+                break
 
-        response = requests.get(
-            GDELT_DOC_API_URL,
-            params=params,
-            timeout=REQUEST_TIMEOUT,
-        )
-        response.raise_for_status()
+        if not csv_url:
+            raise ValueError("No .export.CSV.zip URL in lastupdate.txt")
 
-        # GDELT returns plain text errors or empty body on bad queries.
-        body = response.text.strip()
-        if not body:
-            self.logger.warning("GDELT DOC API returned an empty body.")
-            return {}
+        self.logger.info("Latest export: %s", csv_url.rsplit("/", 1)[-1])
+        csv_text = self._download_csv_zip(csv_url)
+        return parse_events_csv(csv_text)
 
-        try:
-            return response.json()
-        except Exception:
-            self.logger.warning("GDELT DOC API returned non-JSON: %s", body[:200])
-            return {}
-
-    @retry(
-        retry=retry_if_exception_type((requests.ConnectionError, requests.Timeout, requests.HTTPError)),
-        stop=stop_after_attempt(RETRY_MAX_ATTEMPTS),
-        wait=wait_exponential(min=5, max=60),
-        reraise=True,
-    )
-    def fetch_geo_events(
-        self,
-        query: str,
-        timespan: str = "15min",
-    ) -> dict[str, Any]:
-        """Call the GDELT GEO API v2 and return the GeoJSON response.
+    def fetch_csv_for_timestamp(self, dt: datetime) -> list[dict[str, Any]]:
+        """Fetch the Events Export CSV for a specific 15-minute window.
 
         Args:
-            query: GDELT query string.
-            timespan: Look-back window.
+            dt: Any datetime; rounded down to the nearest 15-minute mark.
 
         Returns:
-            Decoded GeoJSON dict from the API.
-
-        Raises:
-            requests.HTTPError: On non-2xx responses.
+            List of raw event dicts.
         """
-        params: dict[str, str] = {
-            "query": query,
-            "timespan": timespan,
-            "format": "GeoJSON",
-        }
-
-        self.logger.info(
-            "Fetching GDELT GEO API — timespan=%s",
-            timespan,
-        )
-
-        response = requests.get(
-            GDELT_GEO_API_URL,
-            params=params,
-            timeout=REQUEST_TIMEOUT,
-        )
-        response.raise_for_status()
-
-        body = response.text.strip()
-        if not body:
-            self.logger.warning("GDELT GEO API returned an empty body.")
-            return {}
-
-        try:
-            return response.json()
-        except Exception:
-            self.logger.warning("GDELT GEO API returned non-JSON: %s", body[:200])
-            return {}
+        minute = (dt.minute // 15) * 15
+        rounded = dt.replace(minute=minute, second=0, microsecond=0)
+        ts = rounded.strftime("%Y%m%d%H%M%S")
+        url = f"{GDELT_EVENTS_BASE_URL}/{ts}.export.CSV.zip"
+        csv_text = self._download_csv_zip(url)
+        return parse_events_csv(csv_text)
 
     # ------------------------------------------------------------------
     # CAMEO filtering
@@ -248,100 +165,90 @@ class GDELTIngestor:
     def _is_relevant_cameo(cameo_code: str) -> bool:
         """Return True if *cameo_code* falls within a relevant category."""
         if not cameo_code:
-            return True  # Keep events without codes (DOC API articles).
+            return False
         prefix = str(cameo_code)[:2]
         return prefix in RELEVANT_CAMEO_PREFIXES
 
     # ------------------------------------------------------------------
-    # Main ingestion pipeline
+    # Processing helpers
     # ------------------------------------------------------------------
 
-    def ingest(
-        self,
-        timespan: str = "15min",
-        start_offset_days: int = 0,
-    ) -> int:
-        """Run the full ingestion pipeline.
-
-        Args:
-            timespan: GDELT look-back window.  Defaults to ``"15min"``.
-            start_offset_days: Shift the query window back by N days
-                (for historical seeding).  When > 0, *timespan* is used
-                as the window width and the window ends N days ago.
+    def _process_and_index(self, raw_events: list[dict[str, Any]]) -> int:
+        """Normalize, CAMEO-filter, and bulk-index a batch of raw events.
 
         Returns:
             Number of documents successfully indexed.
         """
-        self._ensure_index()
-
-        query = self.build_query()
-
-        # Build absolute datetime window when seeding historical data.
-        start_dt = end_dt = None
-        if start_offset_days > 0:
-            end = datetime.now(tz=timezone.utc) - timedelta(days=start_offset_days)
-            start = end - timedelta(days=1)
-            start_dt = start.strftime("%Y%m%d%H%M%S")
-            end_dt = end.strftime("%Y%m%d%H%M%S")
-            self.logger.info("Historical window: %s → %s", start_dt, end_dt)
-
-        # --- DOC API ---
-        all_events: list[dict[str, Any]] = []
-        try:
-            doc_response = self.fetch_events(
-                query, timespan=timespan,
-                start_datetime=start_dt, end_datetime=end_dt,
-            )
-            doc_articles = parse_doc_api_response(doc_response)
-            all_events.extend(doc_articles)
-        except Exception:
-            self.logger.exception("Failed to fetch/parse GDELT DOC API.")
-
-        # GEO API v2 is currently returning 404 — disabled to avoid
-        # wasting rate-limit budget on retries.  Re-enable when the
-        # endpoint comes back online.
-
-        if not all_events:
-            self.logger.info("No events returned from GDELT APIs for timespan=%s.", timespan)
-            return 0
-
-        self.logger.info("Total raw events fetched: %d", len(all_events))
-
-        # --- Normalize ---
         normalized: list[dict[str, Any]] = []
-        for raw in all_events:
+        for raw in raw_events:
             try:
                 doc = normalize_event(raw)
                 normalized.append(doc)
             except Exception:
-                self.logger.warning(
-                    "Failed to normalize event, skipping.",
-                    exc_info=True,
-                )
+                self.logger.warning("Failed to normalize event, skipping.", exc_info=True)
 
-        # --- CAMEO filter ---
         filtered = [
             e for e in normalized
             if self._is_relevant_cameo(e.get("cameo_code", ""))
         ]
         self.logger.info(
-            "After normalization: %d events (%d after CAMEO filter).",
-            len(normalized),
-            len(filtered),
+            "Batch: %d raw → %d normalized → %d after CAMEO filter.",
+            len(raw_events), len(normalized), len(filtered),
         )
 
         if not filtered:
-            self.logger.info("No relevant events after CAMEO filtering.")
             return 0
 
-        # --- Bulk index ---
-        count = bulk_index(
-            self.es,
-            self.index_name,
-            filtered,
-            id_field="event_id",
-        )
-        return count
+        return bulk_index(self.es, self.index_name, filtered, id_field="event_id")
+
+    # ------------------------------------------------------------------
+    # Main ingestion pipeline
+    # ------------------------------------------------------------------
+
+    def ingest(self, windows: int = 1) -> int:
+        """Run the full ingestion pipeline.
+
+        Args:
+            windows: Number of 15-minute CSV windows to fetch.
+                ``1`` (default) fetches only the latest update.
+                Use ``96`` for ~1 day, ``672`` for ~1 week.
+
+        Returns:
+            Number of documents successfully indexed.
+        """
+        self._ensure_index()
+        total = 0
+
+        if windows <= 1:
+            # Fast path: just the latest update.
+            try:
+                raw = self.fetch_latest_csv()
+                total += self._process_and_index(raw)
+            except Exception:
+                self.logger.exception("Failed to fetch/process latest GDELT CSV.")
+            return total
+
+        # Historical / seed: iterate backwards through 15-min windows.
+        now = datetime.now(tz=timezone.utc)
+        for i in range(windows):
+            dt = now - timedelta(minutes=15 * i)
+            try:
+                raw = self.fetch_csv_for_timestamp(dt)
+                total += self._process_and_index(raw)
+            except Exception:
+                self.logger.warning(
+                    "Window %d/%d (%s) failed, skipping.",
+                    i + 1, windows, dt.strftime("%Y%m%d%H%M%S"),
+                )
+            if i < windows - 1:
+                time.sleep(FETCH_DELAY_SECONDS)
+            if (i + 1) % 48 == 0:
+                self.logger.info(
+                    "Seed progress: %d/%d windows, %d events indexed.",
+                    i + 1, windows, total,
+                )
+
+        return total
 
     # ------------------------------------------------------------------
     # Entry point
@@ -368,9 +275,9 @@ class GDELTIngestor:
 def main() -> None:
     """Create a :class:`GDELTIngestor` and run it."""
     setup_logging(level="INFO")
-    timespan = sys.argv[1] if len(sys.argv) > 1 else "15min"
+    windows = int(sys.argv[1]) if len(sys.argv) > 1 else 1
     ingestor = GDELTIngestor()
-    ingestor.ingest(timespan=timespan)
+    ingestor.ingest(windows=windows)
 
 
 if __name__ == "__main__":
