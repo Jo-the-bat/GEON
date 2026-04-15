@@ -117,8 +117,18 @@ def normalize_market(market: dict[str, Any]) -> dict[str, Any]:
         elif outcome == "no":
             no_price = price
     if not tokens:
-        yes_price = float(market.get("outcomePrices", [0, 0])[0] if market.get("outcomePrices") else 0)
-        no_price = 1.0 - yes_price if yes_price else 0.0
+        raw_prices = market.get("outcomePrices")
+        if isinstance(raw_prices, str):
+            try:
+                raw_prices = json.loads(raw_prices)
+            except (json.JSONDecodeError, TypeError):
+                raw_prices = None
+        if isinstance(raw_prices, list) and len(raw_prices) >= 2:
+            yes_price = float(raw_prices[0])
+            no_price = float(raw_prices[1])
+        elif isinstance(raw_prices, list) and len(raw_prices) == 1:
+            yes_price = float(raw_prices[0])
+            no_price = 1.0 - yes_price
 
     countries = extract_countries(f"{question} {description}")
     keywords = sorted(
