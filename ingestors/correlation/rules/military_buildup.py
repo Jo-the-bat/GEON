@@ -93,12 +93,14 @@ class MilitaryBuildupRule:
         if not known_apts:
             return []
 
-        # Then check OpenCTI for active campaigns
+        # Then check OpenCTI for active campaigns, validated against mapping
+        known_lower = {a.lower() for a in known_apts}
         if self.octi:
             try:
                 campaigns = get_campaigns_by_country(self.octi, country, days_back=365)
-                if campaigns:
-                    return campaigns
+                validated = [c for c in campaigns if c.get("name", "").lower() in known_lower]
+                if validated:
+                    return validated
             except Exception:
                 pass
 

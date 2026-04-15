@@ -187,23 +187,23 @@ class DiplomaticAPTRule:
                 matches.extend(campaigns)
 
         # Strict validation against known country-APT attributions.
-        # Only keep APTs that are actually attributed to one of the two
-        # countries.  If none match, return empty — do NOT fall through
-        # to unfiltered results (the root cause of cross-contamination).
-        if _COUNTRY_APT_MAP and matches:
+        # OpenCTI returns unfiltered results (country field is empty),
+        # so we MUST validate every match against our mapping.
+        # If neither country has entries in the mapping, we cannot
+        # validate — return empty to avoid false positives.
+        if _COUNTRY_APT_MAP:
             known_apts: set[str] = set()
             for c in [country_a, country_b]:
                 known_apts.update(_COUNTRY_APT_MAP.get(c.upper(), []))
-            if known_apts:
-                validated = [
-                    m for m in matches
-                    if m.get("name", "").lower() in known_apts
-                ]
-                logger.debug(
-                    "APT validation: %d/%d matches confirmed for %s/%s.",
-                    len(validated), len(matches), country_a, country_b,
-                )
-                matches = validated  # strict: empty if no match
+            validated = [
+                m for m in matches
+                if m.get("name", "").lower() in known_apts
+            ]
+            logger.debug(
+                "APT validation: %d/%d matches confirmed for %s/%s.",
+                len(validated), len(matches), country_a, country_b,
+            )
+            matches = validated
 
         return matches
 
