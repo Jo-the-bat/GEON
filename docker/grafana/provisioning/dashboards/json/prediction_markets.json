@@ -151,12 +151,26 @@
           "indexByName": {
             "question": 0,
             "outcome_yes_price": 1,
-            "volume": 2,
-            "trend": 3,
-            "countries_involved": 4,
-            "related_gdelt_events": 5,
-            "related_correlations": 6,
-            "source_url": 7
+            "consensus.consensus_score": 2,
+            "consensus.divergence": 3,
+            "volume": 4,
+            "trend": 5,
+            "countries_involved": 6,
+            "related_gdelt_events": 7,
+            "related_correlations": 8,
+            "source_url": 9
+          },
+          "includeByName": {
+            "question": true,
+            "outcome_yes_price": true,
+            "consensus.consensus_score": true,
+            "consensus.divergence": true,
+            "volume": true,
+            "trend": true,
+            "countries_involved": true,
+            "related_gdelt_events": true,
+            "related_correlations": true,
+            "source_url": true
           }
         }
       }]
@@ -192,6 +206,77 @@
         }
       }]
     }
+    ,{
+      "id": 7,
+      "title": "Platform Divergences (>10%)",
+      "type": "table",
+      "gridPos": { "h": 8, "w": 18, "x": 0, "y": 24 },
+      "datasource": { "uid": "elasticsearch" },
+      "targets": [{
+        "refId": "A",
+        "query": "_index:geon-polymarket-cases AND consensus.divergence:>0.10",
+        "metrics": [{ "id": "1", "type": "raw_data", "settings": { "size": "20" } }],
+        "bucketAggs": [],
+        "timeField": "date"
+      }],
+      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "options": {
+        "showHeader": true,
+        "sortBy": [{ "displayName": "consensus.divergence", "desc": true }]
+      },
+      "transformations": [{
+        "id": "organize",
+        "options": {
+          "includeByName": {
+            "question": true,
+            "consensus.polymarket_yes": true,
+            "consensus.metaculus_median": true,
+            "consensus.manifold_yes": true,
+            "consensus.divergence": true,
+            "consensus.platforms_count": true
+          },
+          "indexByName": {
+            "question": 0,
+            "consensus.polymarket_yes": 1,
+            "consensus.metaculus_median": 2,
+            "consensus.manifold_yes": 3,
+            "consensus.divergence": 4,
+            "consensus.platforms_count": 5
+          }
+        }
+      }]
+    },
+    {
+      "id": 8,
+      "title": "Avg Consensus Divergence",
+      "type": "stat",
+      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 24 },
+      "datasource": { "uid": "elasticsearch" },
+      "targets": [{
+        "refId": "A",
+        "query": "_index:geon-polymarket-cases AND consensus.divergence:>0",
+        "metrics": [{ "id": "1", "type": "avg", "field": "consensus.divergence" }],
+        "bucketAggs": [{ "id": "2", "type": "date_histogram", "field": "date", "settings": { "interval": "1d", "min_doc_count": "0" } }],
+        "timeField": "date"
+      }],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [
+            { "color": "green", "value": null },
+            { "color": "yellow", "value": 0.10 },
+            { "color": "orange", "value": 0.15 },
+            { "color": "red", "value": 0.20 }
+          ]}
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "background", "graphMode": "area", "textMode": "auto"
+      }
+    }
   ],
-  "version": 1
+  "version": 2
 }

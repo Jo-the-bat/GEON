@@ -1,0 +1,21 @@
+{
+  "mappings": {
+    "properties": {
+      "market_id": { "type": "keyword" },
+      "question": { "type": "text", "fields": { "keyword": { "type": "keyword" } } },
+      "source": { "type": "keyword" },
+      "source_url": { "type": "keyword" },
+      "probability": { "type": "float" },
+      "volume": { "type": "float" },
+      "status": { "type": "keyword" },
+      "countries_involved": { "type": "keyword" },
+      "close_time": { "type": "date" },
+      "date": { "type": "date" },
+      "ingested_at": { "type": "date" }
+    }
+  },
+  "settings": {
+    "number_of_shards": 1,
+    "number_of_replicas": 0
+  }
+}
