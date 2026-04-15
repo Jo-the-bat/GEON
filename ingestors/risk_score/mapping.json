@@ -1,0 +1,24 @@
+{
+  "mappings": {
+    "properties": {
+      "country": { "type": "keyword" },
+      "date": { "type": "date" },
+      "risk_score": { "type": "float" },
+      "gdelt_negative_events": { "type": "integer" },
+      "gdelt_score": { "type": "float" },
+      "acled_conflicts": { "type": "integer" },
+      "acled_score": { "type": "float" },
+      "sanctions_count": { "type": "integer" },
+      "sanctions_score": { "type": "float" },
+      "apt_groups_count": { "type": "integer" },
+      "apt_score": { "type": "float" },
+      "correlations_count": { "type": "integer" },
+      "correlations_score": { "type": "float" },
+      "risk_level": { "type": "keyword" }
+    }
+  },
+  "settings": {
+    "number_of_shards": 1,
+    "number_of_replicas": 0
+  }
+}
