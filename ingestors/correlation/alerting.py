@@ -187,7 +187,7 @@ def send_discord_alert(correlation: dict[str, Any]) -> bool:
 
     fields.append({
         "name": "Dashboard",
-        "value": f"[Open in Kibana]({DASHBOARD_BASE_URL})",
+        "value": f"[Open in Grafana]({DASHBOARD_BASE_URL})",
         "inline": False,
     })
 
@@ -346,7 +346,7 @@ def _build_email_html(correlation: dict[str, Any]) -> str:
       <p style="margin-top:16px;">
         <a href="{DASHBOARD_BASE_URL}"
            style="background:#0066cc;color:#fff;padding:10px 20px;text-decoration:none;border-radius:4px;">
-          View in Kibana
+          View in Grafana
         </a>
       </p>
     </div>

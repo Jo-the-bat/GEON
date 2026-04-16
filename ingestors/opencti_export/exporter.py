@@ -2,7 +2,7 @@
 
 Exports CTI data (threat actors, campaigns, indicators, malware,
 vulnerabilities) from OpenCTI into Elasticsearch indices so they can be
-queried by the correlation engine and visualised in Kibana dashboards.
+queried by the correlation engine and visualised in Grafana dashboards.
 
 Usage::
 

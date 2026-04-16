@@ -2,7 +2,7 @@
 
 ## Identite du projet
 
-GEON est une plateforme d'intelligence geopolitique et cyber qui correle automatiquement les evenements diplomatiques/militaires avec l'activite des menaces cyber (APT, campagnes, IoC). Le nom est un acronyme de la stack technique (**n**8n, **E**lasticsearch, **G**DELT, **O**penCTI) et evoque la geonciation, concept central des relations internationales.
+GEON est une plateforme d'intelligence geopolitique et cyber qui correle automatiquement les evenements diplomatiques/militaires avec l'activite des menaces cyber (APT, campagnes, IoC). Le nom est avant tout un acronyme de la stack technique (**n**8n, **E**lasticsearch, **G**DELT, **O**penCTI). La "geonciation" est un neologisme assume par l'auteur (portmanteau de "geo" et "enonciation") pour evoquer ce que fait la plateforme — nommer, rendre enonçables des motifs latents entre geopolitique et cyber. Ce n'est pas un terme etabli en relations internationales.
 
 **Positionnement** : Aucun outil open source existant ne fait la convergence entre CTI structuree (OpenCTI/STIX2) et donnees geopolitiques (GDELT/ACLED). World Monitor fait du geopolitique sans CTI. Les integrations OpenCTI/Elastic existantes font de la CTI sans geopolitique. GEON comble ce gap.
 
@@ -429,7 +429,7 @@ Dashboard: https://geon.example.com/grafana/d/correlations
 
 ## Dashboards Grafana
 
-Grafana se connecte a Elasticsearch en tant que datasource pour visualiser toutes les donnees indexees. Il remplace Kibana dans cette architecture, offrant un point unique pour les dashboards geopolitiques, CTI et monitoring.
+Grafana se connecte a Elasticsearch en tant que datasource pour visualiser toutes les donnees indexees, offrant un point unique pour les dashboards geopolitiques, CTI et monitoring. GEON ne deploie pas Kibana.
 
 ### Dashboard 1 : Vue globale (landing)
 - Carte mondiale avec les evenements GDELT (points) + conflits ACLED (zones) + campagnes APT (vecteurs) via le panel Geomap

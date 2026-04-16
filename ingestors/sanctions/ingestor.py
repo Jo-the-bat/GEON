@@ -59,8 +59,9 @@ NS = {"sdn": "https://sanctionslistservice.ofac.treas.gov/api/PublicationPreview
 class SanctionsIngestor:
     """Fetches sanctions data and indexes it in Elasticsearch / OpenCTI.
 
-    Currently implements the OFAC SDN list.  EU and UN sources are marked
-    with TODOs for future implementation.
+    Implements OFAC SDN, EU Consolidated Sanctions, and UN Security Council
+    sanctions lists. Individual Person entities in OpenCTI remain a future
+    enhancement.
 
     Attributes:
         es: Elasticsearch client instance.
@@ -300,7 +301,7 @@ class SanctionsIngestor:
         logger.info("Created/updated %d entities in OpenCTI.", created)
 
     # ------------------------------------------------------------------
-    # EU / UN sources (stubs)
+    # EU / UN sources
     # ------------------------------------------------------------------
 
     def _fetch_eu_sanctions(self) -> list[dict[str, Any]]:
@@ -485,10 +486,10 @@ class SanctionsIngestor:
         xml_data = self._fetch_ofac_xml()
         documents = self._parse_ofac_xml(xml_data)
 
-        # --- EU (stub) ---
+        # --- EU ---
         documents.extend(self._fetch_eu_sanctions())
 
-        # --- UN (stub) ---
+        # --- UN ---
         documents.extend(self._fetch_un_sanctions())
 
         if not documents:

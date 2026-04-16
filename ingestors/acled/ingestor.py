@@ -1,7 +1,7 @@
 """GEON ACLED ingestor.
 
 Fetches armed-conflict events from the ACLED API and indexes them into
-Elasticsearch for use in correlation analysis and Kibana dashboards.
+Elasticsearch for use in correlation analysis and Grafana dashboards.
 
 Usage::
 

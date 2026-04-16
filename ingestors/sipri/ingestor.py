@@ -1,14 +1,16 @@
 """GEON SIPRI arms transfers and military spending ingestor.
 
-SIPRI does not provide a public REST API. This module:
-1. Seeds from embedded datasets (curated from SIPRI public databases)
-2. Optionally reads updated CSV files from ``data/`` directory
-3. Scrapes SIPRI Fact Sheets for latest spending data
+Seeds arms transfers and military spending from an embedded dataset
+(curated from SIPRI public databases). Optionally loads updated CSV files
+from ``ingestors/sipri/data/`` if the directory exists. SIPRI does not
+provide a public API, so there is no live fetch — re-runs overwrite the
+same documents via deterministic IDs (``{country}:{year}`` for spending,
+hashed fields for transfers).
 
 Usage::
 
-    python -m sipri.ingestor              # seed + update
-    python -m sipri.ingestor --seed-only  # seed embedded data only
+    python -m sipri.ingestor              # seed + optional CSV updates
+    python -m sipri.ingestor --seed-only  # seed only, skip CSV directory
 """
 
 from __future__ import annotations
@@ -109,11 +111,14 @@ class SIPRIIngestor:
     def __init__(self) -> None:
         self.es = get_es_client()
 
-    def run(self, seed: bool = True) -> int:
+    def run(self, seed: bool = True, load_csv: bool = True) -> int:
         """Seed embedded data and optionally load CSV updates.
 
         Args:
-            seed: If True, seed from embedded data.
+            seed: If True, seed from the embedded dataset.
+            load_csv: If True, also scan ``sipri/data/`` for ``*transfers*.csv``
+                and ``*spending*.csv`` updates. When ``--seed-only`` is passed
+                on the CLI this is set to False.
 
         Returns:
             Total documents indexed.
@@ -127,8 +132,8 @@ class SIPRIIngestor:
             total += self._seed_transfers()
             total += self._seed_spending()
 
-        # Load CSV files from data/ directory if any exist
-        total += self._load_csv_updates()
+        if load_csv:
+            total += self._load_csv_updates()
 
         logger.info("SIPRI ingestor done. %d total documents indexed.", total)
         return total
@@ -194,10 +199,14 @@ class SIPRIIngestor:
 def main() -> None:
     setup_logging("sipri.ingestor")
     parser = argparse.ArgumentParser()
-    parser.add_argument("--seed-only", action="store_true")
+    parser.add_argument(
+        "--seed-only",
+        action="store_true",
+        help="Seed only from the embedded dataset; skip scanning sipri/data/ CSVs.",
+    )
     args = parser.parse_args()
     ing = SIPRIIngestor()
-    ing.run(seed=True)
+    ing.run(seed=True, load_csv=not args.seed_only)
 
 
 if __name__ == "__main__":

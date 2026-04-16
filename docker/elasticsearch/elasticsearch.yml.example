@@ -54,7 +54,7 @@ xpack.license.self_generated.type: basic
 bootstrap.memory_lock: true
 
 # Index defaults
-action.auto_create_index: "+geon-*,+.kibana*,+.security*,+.apm*,+opencti*,+.internal*,+.transform*,+.async*,+.reporting*"
+action.auto_create_index: "+geon-*,+.security*,+.apm*,+opencti*,+.internal*,+.transform*,+.async*,+.reporting*"
 
 # ---------------------------------------------------------------------------
 # ILM — Index Lifecycle Management
