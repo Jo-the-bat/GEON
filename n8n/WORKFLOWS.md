@@ -63,9 +63,28 @@ python3 n8n/workflows/generate_workflows.py
 
 Edit source lists and URLs in that script, then regenerate and reimport.
 
-## ES credentials
+## Credentials to create before import
 
-The workflows authenticate to Elasticsearch via `$env.ELASTIC_PASSWORD` (set in the n8n container's environment via docker-compose).
+Each workflow references an n8n credential named **`ElasticsearchGeonWriter`**
+to authenticate its POST to Elasticsearch. Create it once in the n8n UI, before
+importing or activating any of the workflows:
+
+1. Open n8n at `https://geon.example.com/n8n`.
+2. Go to **Credentials → New → Basic Auth**.
+3. Fill in:
+   - **Credential Name**: `ElasticsearchGeonWriter`
+   - **User**: `geon_ingestor`
+   - **Password**: the value of `GEON_INGESTOR_PASSWORD` from `.env`
+4. Save.
+
+After import, each `Index to ES` HTTP Request node auto-binds by credential
+name. If you see a "Credential not found" warning, open the node and pick
+`ElasticsearchGeonWriter` from the dropdown.
+
+> **Why a credential and not an env-var URL?** Embedding `$env.ELASTIC_PASSWORD`
+> inline in the request URL leaks the password to any n8n user who can read the
+> workflow definition or logs. A credential keeps the password encrypted at rest
+> (via `N8N_ENCRYPTION_KEY`) and scoped to users who have credential permissions.
 
 ## Geopolitical keyword filter
 

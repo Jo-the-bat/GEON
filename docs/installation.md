@@ -166,6 +166,34 @@ curl -sk https://geon.example.com/opencti/health
 
 ---
 
+## Step 6bis: Create Dedicated Elasticsearch Users
+
+GEON uses three distinct Elasticsearch identities to enforce least-privilege:
+
+| User | Role | Privileges |
+|------|------|------------|
+| `elastic` | superuser | bootstrap only — do **not** embed in app configs |
+| `geon_grafana_reader` | `geon_reader` | read + view metadata on `geon-*` |
+| `geon_ingestor` | `geon_writer` | create/write + read on `geon-*` |
+
+Once Elasticsearch is healthy on first boot, run:
+
+```bash
+./scripts/create_es_users.sh
+```
+
+The script is idempotent — safe to re-run. It reads `GRAFANA_ES_PASSWORD` and
+`GEON_INGESTOR_PASSWORD` from `.env` and registers the two roles and users via
+the ES Security API.
+
+After it succeeds, restart the services that pick up the new credentials:
+
+```bash
+docker compose -f docker/docker-compose.yml restart grafana ingestor
+```
+
+---
+
 ## Step 7: Set Up Grafana Datasources
 
 Grafana datasources are provisioned automatically via `docker/grafana/datasources.yml`. If you need to verify or adjust them:

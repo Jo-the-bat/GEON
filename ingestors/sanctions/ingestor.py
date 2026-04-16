@@ -15,12 +15,12 @@ import argparse
 import hashlib
 import logging
 import sys
-import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 import requests
+from defusedxml import ElementTree as ET
 from tenacity import (
     retry,
     retry_if_exception_type,
@@ -113,7 +113,7 @@ class SanctionsIngestor:
         Returns:
             List of normalised sanctions entity dicts.
         """
-        root = ET.fromstring(xml_data)  # noqa: S314 — trusted source
+        root = ET.fromstring(xml_data)
         entries = root.findall(".//sdn:sdnEntry", NS)
         logger.info("Found %d SDN entries in XML.", len(entries))
 
@@ -317,7 +317,11 @@ class SanctionsIngestor:
             logger.warning("Failed to download EU sanctions, skipping.", exc_info=True)
             return []
 
-        root = ET.fromstring(resp.content)
+        try:
+            root = ET.fromstring(resp.content)
+        except ET.ParseError:
+            logger.warning("EU sanctions XML is malformed, skipping.", exc_info=True)
+            return []
         # EU XML uses default namespace
         ns_match = root.tag.split("}")[0] + "}" if "}" in root.tag else ""
 
@@ -381,7 +385,11 @@ class SanctionsIngestor:
             logger.warning("Failed to download UN sanctions, skipping.", exc_info=True)
             return []
 
-        root = ET.fromstring(resp.content)
+        try:
+            root = ET.fromstring(resp.content)
+        except ET.ParseError:
+            logger.warning("UN sanctions XML is malformed, skipping.", exc_info=True)
+            return []
 
         documents: list[dict[str, Any]] = []
         for individual in root.iter("INDIVIDUAL"):

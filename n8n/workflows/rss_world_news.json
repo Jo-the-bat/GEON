@@ -46,7 +46,13 @@
       "name": "Index to ES",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [660, 0]
+      "position": [660, 0],
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "",
+          "name": "ElasticsearchGeonWriter"
+        }
+      }
     }
   ],
   "connections": {

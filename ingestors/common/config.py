@@ -23,8 +23,12 @@ load_dotenv(dotenv_path=_ENV_PATH)
 # ---------------------------------------------------------------------------
 ES_HOST: str = os.getenv("ES_HOST", "localhost")
 ES_PORT: int = int(os.getenv("ES_PORT", "9200"))
-ES_USER: str = os.getenv("ES_USER", "elastic")
-ES_PASSWORD: str = os.getenv("ELASTIC_PASSWORD", "")
+# Default to the dedicated ingestor user created by scripts/create_es_users.sh.
+# Fall back to "elastic" only if a caller explicitly overrides ES_USER.
+ES_USER: str = os.getenv("ES_USER", "geon_ingestor")
+# Prefer the dedicated password; fall back to ELASTIC_PASSWORD for local/dev runs
+# where the dedicated user may not have been created yet.
+ES_PASSWORD: str = os.getenv("GEON_INGESTOR_PASSWORD") or os.getenv("ELASTIC_PASSWORD", "")
 ES_SCHEME: str = os.getenv("ES_SCHEME", "https")
 ES_VERIFY_CERTS: bool = os.getenv("ES_VERIFY_CERTS", "false").lower() in (
     "true",

@@ -148,6 +148,11 @@ else
     warn "docker-compose.yml not found at ${COMPOSE_FILE}. Skipping image pull."
 fi
 
+# --- 8. Reminder: create dedicated Elasticsearch users ---
+info "Reminder: after 'docker compose up' completes and Elasticsearch is healthy, run:"
+echo "      ./scripts/create_es_users.sh"
+echo "      (creates the geon_grafana_reader and geon_ingestor users with least-privilege roles)"
+
 # --- Summary ---
 echo ""
 echo -e "${CYAN}============================================${NC}"
