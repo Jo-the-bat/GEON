@@ -12,6 +12,7 @@
       "country": { "type": "keyword" },
       "first_seen": { "type": "date" },
       "last_seen": { "type": "date" },
+      "valid_from": { "type": "date" },
       "confidence": { "type": "integer" },
       "labels": { "type": "keyword" },
       "kill_chain_phases": { "type": "keyword" },

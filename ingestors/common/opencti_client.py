@@ -148,6 +148,46 @@ def create_organization(
 # Query helpers for the correlation engine
 # ---------------------------------------------------------------------------
 
+def _resolve_country_location(
+    client: OpenCTIApiClient,
+    country_name: str,
+) -> dict[str, Any] | None:
+    """Resolve a country name to its STIX ``Location`` entity in OpenCTI.
+
+    The Location entity is typically imported by the ``opencti-datasets``
+    connector (``geography.json``). Returns ``None`` if not found.
+
+    Args:
+        client: Authenticated OpenCTI client.
+        country_name: Country name (English, as in OpenCTI geography dataset).
+
+    Returns:
+        Location dict with at least ``id`` / ``standard_id``, or ``None``.
+    """
+    try:
+        return client.location.read(
+            filters={
+                "mode": "and",
+                "filters": [
+                    {"key": "name", "values": [country_name], "operator": "eq"},
+                    {"key": "entity_type", "values": ["Country"], "operator": "eq"},
+                ],
+                "filterGroups": [],
+            }
+        )
+    except Exception:
+        logger.exception(
+            "Failed to resolve Location for country '%s'.", country_name
+        )
+        return None
+
+
+def _relationship_from_id(rel: dict[str, Any]) -> str | None:
+    """Extract the source entity ID from a STIX relationship dict."""
+    from_obj = rel.get("from") or {}
+    return from_obj.get("id") or from_obj.get("standard_id")
+
+
 @retry(
     retry=retry_if_exception_type((ConnectionError, TimeoutError)),
     stop=stop_after_attempt(RETRY_MAX_ATTEMPTS),
@@ -159,75 +199,103 @@ def get_campaigns_by_country(
     country_name: str,
     days_back: int = 30,
 ) -> list[dict[str, Any]]:
-    """Query campaigns and intrusion sets attributed to a country.
+    """Returns campaigns and intrusion sets linked to *country_name* via STIX
+    ``originates-from`` or ``attributed-to`` relationships.
 
-    Searches for :class:`Campaign` and :class:`IntrusionSet` objects whose
-    ``originatesFrom`` or ``targets`` relationships reference *country_name*
-    and that were created or modified within *days_back* days.
+    Requires the Location entity for the country to exist in OpenCTI (imported
+    by the ``opencti-datasets`` connector). If the Location cannot be resolved,
+    returns an empty list rather than falling back on a full-text search — the
+    full-text fallback produced massive false positives (e.g. the intrusion set
+    ``APT28`` matching on an article about "Russian dissidents targeted by
+    APT28" and being mis-attributed to Russia).
 
     Args:
         client: Authenticated OpenCTI client.
-        country_name: Country name to search for (e.g. ``"Russia"``).
-        days_back: How many days back to search.  Defaults to 30.
+        country_name: Country name (e.g. ``"Russia"``).
+        days_back: Only include relationships whose ``start_time`` is within
+            this many days. Defaults to 30.
 
     Returns:
-        List of campaign / intrusion-set dicts (may be empty).
+        List of Intrusion-Set / Campaign dicts, each tagged with
+        ``_geon_type`` for downstream callers. May be empty.
     """
     since = (datetime.now(tz=timezone.utc) - timedelta(days=days_back)).isoformat()
-    results: list[dict[str, Any]] = []
 
-    try:
-        # --- Intrusion Sets ---
-        intrusion_sets = client.intrusion_set.list(
-            filters={
-                "mode": "and",
-                "filters": [
-                    {
-                        "key": "modified",
-                        "values": [since],
-                        "operator": "gte",
-                    },
-                ],
-                "filterGroups": [],
-            },
-            search=country_name,
-        )
-        if intrusion_sets:
-            for item in intrusion_sets:
-                item["_geon_type"] = "intrusion-set"
-            results.extend(intrusion_sets)
-
-        # --- Campaigns ---
-        campaigns = client.campaign.list(
-            filters={
-                "mode": "and",
-                "filters": [
-                    {
-                        "key": "modified",
-                        "values": [since],
-                        "operator": "gte",
-                    },
-                ],
-                "filterGroups": [],
-            },
-            search=country_name,
-        )
-        if campaigns:
-            for item in campaigns:
-                item["_geon_type"] = "campaign"
-            results.extend(campaigns)
-
-    except Exception:
-        logger.exception(
-            "Failed to query campaigns/intrusion-sets for country '%s'.",
+    location = _resolve_country_location(client, country_name)
+    if not location:
+        logger.warning(
+            "Location '%s' not found in OpenCTI — rule cannot attribute APTs by relationship",
             country_name,
         )
+        return []
+
+    location_id = location.get("id") or location.get("standard_id")
+    if not location_id:
+        logger.warning(
+            "Location entity for '%s' has no usable id/standard_id; skipping.",
+            country_name,
+        )
+        return []
+
+    try:
+        relationships = client.stix_core_relationship.list(
+            filters={
+                "mode": "and",
+                "filters": [
+                    {
+                        "key": "relationship_type",
+                        "values": ["originates-from", "attributed-to"],
+                        "operator": "eq",
+                    },
+                    {"key": "toId", "values": [location_id], "operator": "eq"},
+                    {
+                        "key": "fromTypes",
+                        "values": ["Intrusion-Set", "Campaign"],
+                        "operator": "eq",
+                    },
+                    {"key": "start_time", "values": [since], "operator": "gte"},
+                ],
+                "filterGroups": [],
+            },
+        )
+    except Exception:
+        logger.exception(
+            "Failed to query STIX relationships for country '%s' (location=%s).",
+            country_name, location_id,
+        )
+        return []
+
+    results: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for rel in relationships or []:
+        src_id = _relationship_from_id(rel)
+        if not src_id or src_id in seen:
+            continue
+        seen.add(src_id)
+
+        # pycti usually includes ``from`` already partially populated; only call
+        # stix_domain_object.read() when we're missing the name/type.
+        from_obj = rel.get("from") or {}
+        entity_type = (from_obj.get("entity_type") or "").strip()
+        if not from_obj.get("name") or not entity_type:
+            try:
+                fetched = client.stix_domain_object.read(id=src_id)
+            except Exception:
+                logger.debug("Could not resolve source entity %s", src_id)
+                continue
+            if not fetched:
+                continue
+            from_obj = fetched
+            entity_type = (from_obj.get("entity_type") or "").strip()
+
+        # Normalise _geon_type to lower-kebab-case ("intrusion-set", "campaign")
+        from_obj["_geon_type"] = entity_type.lower().replace(" ", "-") or "unknown"
+        results.append(from_obj)
 
     logger.info(
-        "Found %d campaigns/intrusion-sets linked to '%s' in the last %d days.",
-        len(results),
-        country_name,
-        days_back,
+        "Found %d campaigns/intrusion-sets linked to '%s' via STIX relationships "
+        "(days_back=%d).",
+        len(results), country_name, days_back,
     )
     return results
 
@@ -243,49 +311,82 @@ def get_indicators_by_country(
     country_name: str,
     days_back: int = 60,
 ) -> list[dict[str, Any]]:
-    """Query indicators (IoC) linked to a country.
+    """Returns indicators linked to *country_name* via STIX ``located-at`` or
+    ``targets`` relationships.
 
-    Searches for :class:`Indicator` objects whose relationships reference
-    *country_name* and that were created within *days_back* days.
+    Same semantics as :func:`get_campaigns_by_country`: the Location must
+    exist in OpenCTI (via the ``opencti-datasets`` connector). Full-text
+    search was removed to eliminate false positives. If the Location cannot
+    be resolved, returns an empty list.
 
     Args:
         client: Authenticated OpenCTI client.
-        country_name: Country name to search for.
-        days_back: How many days back to search.  Defaults to 60.
+        country_name: Country name.
+        days_back: Only include relationships whose ``start_time`` is within
+            this many days. Defaults to 60.
 
     Returns:
-        List of indicator dicts (may be empty).
+        List of Indicator dicts. May be empty.
     """
     since = (datetime.now(tz=timezone.utc) - timedelta(days=days_back)).isoformat()
-    results: list[dict[str, Any]] = []
+
+    location = _resolve_country_location(client, country_name)
+    if not location:
+        logger.warning(
+            "Location '%s' not found in OpenCTI — rule cannot attribute IoCs by relationship",
+            country_name,
+        )
+        return []
+
+    location_id = location.get("id") or location.get("standard_id")
+    if not location_id:
+        return []
 
     try:
-        indicators = client.indicator.list(
+        relationships = client.stix_core_relationship.list(
             filters={
                 "mode": "and",
                 "filters": [
                     {
-                        "key": "created",
-                        "values": [since],
-                        "operator": "gte",
+                        "key": "relationship_type",
+                        "values": ["located-at", "targets"],
+                        "operator": "eq",
                     },
+                    {"key": "toId", "values": [location_id], "operator": "eq"},
+                    {"key": "fromTypes", "values": ["Indicator"], "operator": "eq"},
+                    {"key": "start_time", "values": [since], "operator": "gte"},
                 ],
                 "filterGroups": [],
             },
-            search=country_name,
         )
-        if indicators:
-            results.extend(indicators)
     except Exception:
         logger.exception(
-            "Failed to query indicators for country '%s'.",
+            "Failed to query STIX relationships (indicators) for country '%s'.",
             country_name,
         )
+        return []
+
+    results: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for rel in relationships or []:
+        src_id = _relationship_from_id(rel)
+        if not src_id or src_id in seen:
+            continue
+        seen.add(src_id)
+
+        from_obj = rel.get("from") or {}
+        if not from_obj.get("pattern") and not from_obj.get("name"):
+            try:
+                fetched = client.stix_domain_object.read(id=src_id)
+            except Exception:
+                continue
+            if not fetched:
+                continue
+            from_obj = fetched
+        results.append(from_obj)
 
     logger.info(
-        "Found %d indicators linked to '%s' in the last %d days.",
-        len(results),
-        country_name,
-        days_back,
+        "Found %d indicators linked to '%s' via STIX relationships (days_back=%d).",
+        len(results), country_name, days_back,
     )
     return results

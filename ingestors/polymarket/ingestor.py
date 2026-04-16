@@ -18,7 +18,7 @@ import argparse
 import json
 import logging
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -51,6 +51,10 @@ except Exception:
     pass
 
 PRICE_SHIFT_THRESHOLD = 0.10  # 10% shift triggers alert
+
+# Max samples kept in the per-case price history (≈ 7.5 days at the hourly cron
+# frequency, enough to compute both 24h and 7d windows).
+PRICE_HISTORY_MAX_SAMPLES = 180
 
 
 class PolymarketIngestor:
@@ -191,26 +195,103 @@ class PolymarketIngestor:
     # ------------------------------------------------------------------
 
     def _detect_price_shifts(self, new_docs: list[dict[str, Any]]) -> None:
-        """Compare new prices with existing ones and flag significant shifts."""
+        """Append current price to each case's rolling history, then compute
+        proper 24h and 7d changes by windowing that history.
+
+        Leaves ``price_change_24h`` / ``price_change_7d`` as ``None`` when the
+        history doesn't yet span the corresponding window — downstream rules
+        treat ``None`` as "no data", distinct from ``0.0`` (= "no movement").
+        """
+        now_iso = datetime.now(tz=timezone.utc).isoformat()
+
         for doc in new_docs:
+            history: list[dict[str, Any]] = []
             try:
                 existing = self.es.get(index=INDEX_NAME, id=doc["case_id"])
-                old_yes = existing["_source"].get("outcome_yes_price", 0)
-                new_yes = doc["outcome_yes_price"]
-                change = abs(new_yes - old_yes)
-                doc["price_change_24h"] = round(new_yes - old_yes, 4)
-
-                if new_yes > old_yes:
-                    doc["trend"] = "rising"
-                elif new_yes < old_yes:
-                    doc["trend"] = "falling"
-                else:
-                    doc["trend"] = "stable"
-
-                if change >= PRICE_SHIFT_THRESHOLD:
-                    self._create_shift_correlation(doc, old_yes, new_yes)
+                history = existing["_source"].get("price_history_samples") or []
             except Exception:
-                pass  # New case, no prior data.
+                pass  # New case, no prior history.
+
+            current_price = doc.get("outcome_yes_price", 0) or 0.0
+
+            # Append the new sample and keep only the last N.
+            history.append({"timestamp": now_iso, "yes_price": current_price})
+            history = history[-PRICE_HISTORY_MAX_SAMPLES:]
+            doc["price_history_samples"] = history
+
+            # Compute windowed changes. Missing window → None.
+            price_24h_ago = self._sample_closest_to(history, hours_ago=24)
+            price_7d_ago = self._sample_closest_to(history, hours_ago=24 * 7)
+
+            doc["price_change_24h"] = (
+                round(current_price - price_24h_ago, 4)
+                if price_24h_ago is not None
+                else None
+            )
+            doc["price_change_7d"] = (
+                round(current_price - price_7d_ago, 4)
+                if price_7d_ago is not None
+                else None
+            )
+
+            # Trend: based on the 24h change if available, else 7d, else "stable".
+            reference = doc["price_change_24h"]
+            if reference is None:
+                reference = doc["price_change_7d"]
+            if reference is None or reference == 0:
+                doc["trend"] = "stable"
+            elif reference > 0:
+                doc["trend"] = "rising"
+            else:
+                doc["trend"] = "falling"
+
+            # Fire a correlation alert for a significant 24h shift (unchanged
+            # semantics relative to the previous behaviour).
+            if (
+                doc["price_change_24h"] is not None
+                and abs(doc["price_change_24h"]) >= PRICE_SHIFT_THRESHOLD
+            ):
+                self._create_shift_correlation(
+                    doc,
+                    current_price - doc["price_change_24h"],
+                    current_price,
+                )
+
+    @staticmethod
+    def _sample_closest_to(
+        history: list[dict[str, Any]],
+        hours_ago: int,
+    ) -> float | None:
+        """Return the yes_price of the sample closest to ``now - hours_ago``.
+
+        Returns ``None`` if the history does not cover that window (i.e. the
+        oldest sample is more recent than ``now - hours_ago - 1h`` tolerance).
+        """
+        if not history:
+            return None
+        now_utc = datetime.now(tz=timezone.utc)
+        target = now_utc - timedelta(hours=hours_ago)
+        tolerance = timedelta(hours=1)
+
+        oldest_sample_time: datetime | None = None
+        best: tuple[timedelta, float] | None = None  # (delta_abs, yes_price)
+
+        for sample in history:
+            ts_raw = sample.get("timestamp", "")
+            try:
+                ts = datetime.fromisoformat(str(ts_raw).replace("Z", "+00:00"))
+            except (ValueError, TypeError):
+                continue
+            if oldest_sample_time is None or ts < oldest_sample_time:
+                oldest_sample_time = ts
+            delta = abs(ts - target)
+            if best is None or delta < best[0]:
+                best = (delta, float(sample.get("yes_price", 0) or 0))
+
+        # Insufficient history to cover the requested window.
+        if oldest_sample_time is None or oldest_sample_time > target + tolerance:
+            return None
+        return best[1] if best else None
 
     def _create_shift_correlation(
         self, doc: dict[str, Any], old_price: float, new_price: float,

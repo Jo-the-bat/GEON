@@ -1,14 +1,20 @@
 """GEON country risk score calculator.
 
-Computes a composite risk score (0-100) per country by aggregating:
-  - GDELT negative events (Goldstein < 0) over 30 days — 30% weight
-  - ACLED armed conflicts (if available) — 20% weight
-  - Active sanctions — 15% weight
-  - Attributed APT groups — 15% weight
-  - Detected correlations — 20% weight
+Computes a composite risk score (0-100) per country by aggregating seven
+weighted components (v2, matches the current code below):
 
-Indexed into ``geon-risk-scores`` with one document per country,
-updated daily.
+  - GDELT negative events (Goldstein < 0, 30d) — 25%
+  - ACLED armed conflicts (30d)               — 15%
+  - Active sanctions                          — 10%
+  - Attributed APT groups                     — 15%
+  - Detected correlations (30d)               — 20%
+  - Military spending YoY increase            — 10%
+  - Arms imports (TIV)                        — 5%
+
+Indexed into ``geon-risk-scores``. One document per ``(country, day)``: the
+``_id`` is ``"{country}:{YYYY-MM-DD}"`` so re-running the calculator on the
+same day overwrites that day's score, but historical days are preserved and
+dashboards can query a proper time series of risk evolution.
 
 Usage::
 
@@ -57,7 +63,12 @@ TARGET_COUNTRIES: list[str] = [
 
 
 class RiskScoreCalculator:
-    """Calculates and indexes composite risk scores per country."""
+    """Calculates and indexes composite risk scores per country.
+
+    One document per (country, day). Dashboards can now query time series of
+    risk evolution (see the "Military Spending Trend" panel on the country
+    profile dashboard for an example).
+    """
 
     def __init__(self) -> None:
         self.es = get_es_client()
@@ -269,12 +280,13 @@ class RiskScoreCalculator:
         if not docs:
             return 0
 
-        # Use country as _id for upsert semantics.
+        # Historise: one document per (country, day). Re-runs on the same day
+        # overwrite, but historical days are preserved for trend dashboards.
         actions = []
         for doc in docs:
             actions.append({
                 "_index": INDEX_NAME,
-                "_id": doc["country"],
+                "_id": f"{doc['country']}:{doc['date'][:10]}",
                 "_source": doc,
             })
 

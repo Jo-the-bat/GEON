@@ -130,6 +130,10 @@ class OpenCTIExporter:
             "country": countries,
             "first_seen": obj.get("first_seen", obj.get("created", "")),
             "last_seen": obj.get("last_seen", obj.get("modified", "")),
+            # STIX 2.1 ``valid_from`` (indicators only — STIX DomainObjects
+            # that don't define it fall back to ``None``). Correlation rules
+            # query this field to know when the indicator became active.
+            "valid_from": obj.get("valid_from"),
             "confidence": obj.get("confidence", 0) or 0,
             "labels": labels,
             "kill_chain_phases": kill_chain,

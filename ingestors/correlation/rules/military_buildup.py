@@ -67,7 +67,15 @@ class MilitaryBuildupRule:
         return correlations
 
     def _find_high_increase_countries(self) -> list[dict[str, Any]]:
-        """Find countries with YoY spending increase > threshold."""
+        """Find countries with YoY spending increase > threshold.
+
+        Only considers YoY changes from the current or previous calendar year
+        (covers the January transition where SIPRI data for the current year
+        isn't published yet). Without this filter, the rule fires every time
+        the calculator runs on any old SIPRI record still in ES, which
+        produces stale correlations long after the buildup ended.
+        """
+        current_year = datetime.now(tz=timezone.utc).year
         try:
             resp = self.es.search(
                 index=SPENDING_INDEX,
@@ -75,6 +83,7 @@ class MilitaryBuildupRule:
                     "bool": {
                         "filter": [
                             {"range": {"spending_change_yoy_pct": {"gt": YOY_THRESHOLD}}},
+                            {"range": {"year": {"gte": current_year - 1}}},
                         ]
                     }
                 },

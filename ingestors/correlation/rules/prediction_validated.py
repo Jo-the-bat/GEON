@@ -60,9 +60,17 @@ class PredictionValidatedRule:
         return correlations
 
     def _find_significant_movers(self) -> list[dict[str, Any]]:
-        """Find Polymarket cases with >10% price change in recent window."""
+        """Find Polymarket cases with >10% price change in recent window.
+
+        Cases whose ``price_change_24h`` / ``price_change_7d`` is ``null``
+        (insufficient price history) are excluded — applying a threshold to a
+        missing value would otherwise treat ``null`` as ``0.0`` and silently
+        drop (or wrongly include) the case.
+        """
         try:
-            # Look for cases with significant 24h or 7d price changes
+            # A should-clause matches when either the 24h or the 7d window
+            # has a value AND exceeds the threshold. The `exists` filter on
+            # each sub-clause is what keeps null-valued cases out.
             resp = self.es.search(
                 index=POLYMARKET_INDEX,
                 query={
@@ -72,10 +80,22 @@ class PredictionValidatedRule:
                             {"range": {"date": {"gte": "now-7d"}}},
                         ],
                         "should": [
-                            {"range": {"price_change_24h": {"gt": PRICE_SHIFT_THRESHOLD}}},
-                            {"range": {"price_change_24h": {"lt": -PRICE_SHIFT_THRESHOLD}}},
-                            {"range": {"price_change_7d": {"gt": PRICE_SHIFT_THRESHOLD}}},
-                            {"range": {"price_change_7d": {"lt": -PRICE_SHIFT_THRESHOLD}}},
+                            {"bool": {"must": [
+                                {"exists": {"field": "price_change_24h"}},
+                                {"range": {"price_change_24h": {"gt": PRICE_SHIFT_THRESHOLD}}},
+                            ]}},
+                            {"bool": {"must": [
+                                {"exists": {"field": "price_change_24h"}},
+                                {"range": {"price_change_24h": {"lt": -PRICE_SHIFT_THRESHOLD}}},
+                            ]}},
+                            {"bool": {"must": [
+                                {"exists": {"field": "price_change_7d"}},
+                                {"range": {"price_change_7d": {"gt": PRICE_SHIFT_THRESHOLD}}},
+                            ]}},
+                            {"bool": {"must": [
+                                {"exists": {"field": "price_change_7d"}},
+                                {"range": {"price_change_7d": {"lt": -PRICE_SHIFT_THRESHOLD}}},
+                            ]}},
                         ],
                         "minimum_should_match": 1,
                     }
