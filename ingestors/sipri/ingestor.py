@@ -17,13 +17,12 @@ from __future__ import annotations
 
 import argparse
 import logging
-import sys
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from common.config import INDEX_PREFIX, setup_logging
 from common.es_client import bulk_index, ensure_index, get_es_client
+
 from sipri.parser import normalize_spending, normalize_transfer
 
 logger = logging.getLogger(__name__)

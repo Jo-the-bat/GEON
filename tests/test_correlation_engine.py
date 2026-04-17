@@ -9,10 +9,8 @@ from __future__ import annotations
 from unittest.mock import MagicMock
 
 import pytest
-
 from correlation.rules.diplomatic_apt import DiplomaticAPTRule
 from correlation.rules.sanction_cyber import MIN_BASELINE_COUNT, SanctionCyberRule
-
 
 # ---------------------------------------------------------------------------
 # DiplomaticAPTRule._compute_severity — severity matrix
@@ -146,7 +144,7 @@ class TestSanctionCyberSeverity:
 class TestCorrelationDedup:
     """The deduplicator drops correlations whose ID already exists in ES."""
 
-    def _engine(self) -> "CorrelationEngine":
+    def _engine(self):  # type: ignore[return]
         # Import here so conftest has already patched sys.path / env vars.
         from correlation.engine import CorrelationEngine
 

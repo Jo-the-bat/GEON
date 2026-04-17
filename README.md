@@ -1,7 +1,10 @@
 # GEON
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![CI](https://github.com/Jo-the-bat/GEON/actions/workflows/ci.yml/badge.svg)](https://github.com/Jo-the-bat/GEON/actions/workflows/ci.yml)
+[![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)](https://python.org)
 [![Docker](https://img.shields.io/badge/Docker-rootless-2496ED?logo=docker&logoColor=white)](https://docs.docker.com/engine/security/rootless/)
+[![Lint: ruff](https://img.shields.io/badge/lint-ruff-D7FF64?logo=ruff&logoColor=black)](https://docs.astral.sh/ruff/)
 
 **Geopolitical & Cyber Threat Intelligence Platform**
 
@@ -134,12 +137,12 @@ All dashboards are built in Grafana using Elasticsearch as the datasource:
 
 - [x] Phase 1 -- Infrastructure: Nginx, Elasticsearch, Grafana, Authelia, TLS
 - [x] Phase 2 -- OpenCTI: platform, connectors, STIX2 graph
-- [ ] Phase 3 -- GDELT ingestion and first Grafana dashboards
-- [ ] Phase 4 -- ACLED and sanctions ingestion
-- [ ] Phase 5 -- n8n RSS workflows
-- [ ] Phase 6 -- Correlation engine and alerting
-- [ ] Phase 7 -- Monitoring, backups, crontab
-- [ ] Phase 8 -- Documentation and use cases
+- [x] Phase 3 -- GDELT ingestion and first Grafana dashboards
+- [x] Phase 4 -- ACLED and sanctions ingestion
+- [x] Phase 5 -- n8n RSS workflows
+- [x] Phase 6 -- Correlation engine and alerting
+- [x] Phase 7 -- Monitoring, backups, crontab
+- [x] Phase 8 -- Documentation and use cases
 
 ---
 

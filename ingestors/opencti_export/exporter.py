@@ -15,17 +15,9 @@ from __future__ import annotations
 import argparse
 import logging
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
-
-from pycti import OpenCTIApiClient
-from tenacity import (
-    retry,
-    retry_if_exception_type,
-    stop_after_attempt,
-    wait_exponential,
-)
 
 from common.config import (
     INDEX_PREFIX,
@@ -36,6 +28,13 @@ from common.config import (
 )
 from common.es_client import bulk_index, ensure_index, get_es_client, get_latest_timestamp
 from common.opencti_client import get_opencti_client
+from pycti import OpenCTIApiClient
+from tenacity import (
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential,
+)
 
 logger = logging.getLogger(__name__)
 

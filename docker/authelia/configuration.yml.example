@@ -77,12 +77,13 @@ access_control:
       resources:
         - '^/auth([/?].*)?$'
 
-    # Landing page is public
+    # Landing page and demo page are public
     - domain: 'geon.example.com'
       policy: 'bypass'
       resources:
         - '^/$'
         - '^/index\.html$'
+        - '^/demo\.html$'
         - '^/style\.css$'
         - '^/assets(/.*)?$'
         - '^/favicon\.ico$'

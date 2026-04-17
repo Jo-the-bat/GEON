@@ -23,6 +23,12 @@ from pathlib import Path
 from typing import Any
 
 import requests
+from common.config import (
+    INDEX_PREFIX,
+    RETRY_MAX_ATTEMPTS,
+    setup_logging,
+)
+from common.es_client import bulk_index, ensure_index, get_es_client
 from tenacity import (
     retry,
     retry_if_exception_type,
@@ -30,12 +36,6 @@ from tenacity import (
     wait_exponential,
 )
 
-from common.config import (
-    INDEX_PREFIX,
-    RETRY_MAX_ATTEMPTS,
-    setup_logging,
-)
-from common.es_client import bulk_index, ensure_index, get_es_client
 from gkg.parser import parse_gkg_csv
 
 logger = logging.getLogger(__name__)

@@ -14,11 +14,10 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-from elasticsearch import Elasticsearch
-from pycti import OpenCTIApiClient
-
 from common.config import INDEX_PREFIX
 from common.opencti_client import get_campaigns_by_country
+from elasticsearch import Elasticsearch
+from pycti import OpenCTIApiClient
 
 # Load country → APT attribution mapping for validation.
 _MAPPING_PATH = Path(__file__).resolve().parent.parent.parent / "common" / "country_apt_mapping.json"

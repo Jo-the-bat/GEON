@@ -14,9 +14,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-from elasticsearch import Elasticsearch
-
 from common.config import INDEX_PREFIX
+from elasticsearch import Elasticsearch
 
 logger = logging.getLogger(__name__)
 

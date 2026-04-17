@@ -21,7 +21,6 @@ import argparse
 import time
 
 import schedule
-
 from common.config import ACLED_API_KEY, setup_logging
 
 logger = setup_logging(name="scheduler")

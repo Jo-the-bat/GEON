@@ -20,14 +20,6 @@ from pathlib import Path
 from typing import Any
 
 import requests
-from defusedxml import ElementTree as ET
-from tenacity import (
-    retry,
-    retry_if_exception_type,
-    stop_after_attempt,
-    wait_exponential,
-)
-
 from common.config import (
     INDEX_PREFIX,
     RETRY_MAX_ATTEMPTS,
@@ -39,6 +31,13 @@ from common.es_client import bulk_index, ensure_index, get_es_client
 from common.opencti_client import (
     create_organization,
     get_opencti_client,
+)
+from defusedxml import ElementTree as ET
+from tenacity import (
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential,
 )
 
 logger = logging.getLogger(__name__)

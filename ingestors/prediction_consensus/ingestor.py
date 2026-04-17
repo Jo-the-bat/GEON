@@ -14,12 +14,13 @@ from __future__ import annotations
 import hashlib
 import logging
 import os
-import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 import requests
+from common.config import INDEX_PREFIX, setup_logging
+from common.es_client import bulk_index, ensure_index, get_es_client
 from tenacity import (
     retry,
     retry_if_exception_type,
@@ -27,12 +28,8 @@ from tenacity import (
     wait_exponential,
 )
 
-from common.config import INDEX_PREFIX, setup_logging
-from common.es_client import bulk_index, ensure_index, get_es_client
 from prediction_consensus.matcher import compute_consensus, find_matches
 from prediction_consensus.parser import (
-    extract_countries,
-    is_geopolitical,
     normalize_manifold_market,
     normalize_metaculus_question,
 )

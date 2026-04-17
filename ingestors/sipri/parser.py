@@ -15,7 +15,6 @@ import hashlib
 import logging
 from datetime import datetime, timezone
 from io import StringIO
-from pathlib import Path
 from typing import Any
 
 logger = logging.getLogger(__name__)

@@ -15,12 +15,12 @@ from __future__ import annotations
 
 import logging
 import os
-import sys
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 import requests
+from common.config import INDEX_PREFIX, setup_logging
+from common.es_client import bulk_index, ensure_index, get_es_client
 from tenacity import (
     retry,
     retry_if_exception_type,
@@ -29,8 +29,6 @@ from tenacity import (
 )
 
 from cloudflare_radar.parser import normalize_outage
-from common.config import INDEX_PREFIX, setup_logging
-from common.es_client import bulk_index, ensure_index, get_es_client
 
 logger = logging.getLogger(__name__)
 

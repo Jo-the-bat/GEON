@@ -17,12 +17,13 @@ from __future__ import annotations
 import argparse
 import json
 import logging
-import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
 import requests
+from common.config import INDEX_PREFIX, setup_logging
+from common.es_client import ensure_index, get_es_client
 from tenacity import (
     retry,
     retry_if_exception_type,
@@ -30,9 +31,7 @@ from tenacity import (
     wait_exponential,
 )
 
-from common.config import INDEX_PREFIX, setup_logging
-from common.es_client import ensure_index, get_es_client
-from polymarket.parser import extract_countries, is_geopolitical, normalize_market
+from polymarket.parser import is_geopolitical, normalize_market
 
 logger = logging.getLogger(__name__)
 

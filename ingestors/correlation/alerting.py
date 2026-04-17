@@ -20,13 +20,6 @@ from email.mime.text import MIMEText
 from typing import Any
 
 import requests
-from tenacity import (
-    retry,
-    retry_if_exception_type,
-    stop_after_attempt,
-    wait_exponential,
-)
-
 from common.config import (
     ALERT_EMAIL_FROM,
     ALERT_EMAIL_PASSWORD,
@@ -39,6 +32,12 @@ from common.config import (
     RETRY_WAIT_MIN,
 )
 from common.es_client import get_es_client
+from tenacity import (
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -356,7 +355,8 @@ def _build_email_html(correlation: dict[str, Any]) -> str:
       </table>
       <p style="margin-top:16px;">
         <a href="{DASHBOARD_BASE_URL}"
-           style="background:#0066cc;color:#fff;padding:10px 20px;text-decoration:none;border-radius:4px;">
+           style="background:#0066cc;color:#fff;padding:10px 20px;
+                  text-decoration:none;border-radius:4px;">
           View in Grafana
         </a>
       </p>

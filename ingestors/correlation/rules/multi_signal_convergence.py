@@ -21,9 +21,8 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from elasticsearch import Elasticsearch
-
 from common.config import INDEX_PREFIX
+from elasticsearch import Elasticsearch
 
 logger = logging.getLogger(__name__)
 

@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GEON Demo -- Dashboard Preview</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="icon" type="image/svg+xml" href="assets/logo.svg">
+    <style>
+        .demo-section { padding: 120px 0 80px; }
+        .demo-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 48px;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        .demo-item { text-align: center; }
+        .demo-item h3 {
+            font-size: 18px;
+            font-weight: 600;
+            color: #fff;
+            margin-bottom: 8px;
+        }
+        .demo-item p {
+            font-size: 14px;
+            color: var(--color-text-muted);
+            margin-bottom: 16px;
+            line-height: 1.6;
+        }
+        .demo-placeholder {
+            background-color: var(--color-bg-card);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius);
+            padding: 80px 24px;
+            color: var(--color-text-muted);
+            font-size: 14px;
+            font-style: italic;
+        }
+        .back-link {
+            display: inline-block;
+            margin-bottom: 32px;
+            color: var(--color-accent);
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        .back-link:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+
+    <header class="header">
+        <div class="container header-inner">
+            <a href="/" class="logo-link">
+                <img src="assets/logo.svg" alt="GEON" class="logo-img">
+            </a>
+            <nav class="nav">
+                <a href="/" class="nav-link">Home</a>
+            </nav>
+        </div>
+    </header>
+
+    <main>
+        <section class="demo-section">
+            <div class="container">
+                <a href="/" class="back-link">&larr; Back to home</a>
+                <h2 class="section-title">Dashboard Preview</h2>
+                <p style="text-align:center; color:var(--color-text-muted); margin-top:-32px; margin-bottom:48px;">
+                    These are representative screenshots of GEON's Grafana dashboards.
+                    Live dashboards require authentication.
+                </p>
+
+                <div class="demo-grid">
+                    <div class="demo-item">
+                        <h3>Global Overview</h3>
+                        <p>
+                            World Geomap panel showing GDELT events, ACLED conflict zones,
+                            and APT campaign vectors. 30-day rolling timeline with
+                            top-10 countries by event count.
+                        </p>
+                        <div class="demo-placeholder">
+                            Screenshot: replace this placeholder with a capture of
+                            the Global Overview dashboard (grafana/d/global-overview).
+                        </div>
+                    </div>
+
+                    <div class="demo-item">
+                        <h3>Country Profile</h3>
+                        <p>
+                            Per-country deep dive with composite risk score (7 factors),
+                            attributed APT groups, active sanctions, and a cross-source
+                            event timeline.
+                        </p>
+                        <div class="demo-placeholder">
+                            Screenshot: replace this placeholder with a capture of
+                            the Country Profile dashboard (grafana/d/country-profile).
+                        </div>
+                    </div>
+
+                    <div class="demo-item">
+                        <h3>Correlations</h3>
+                        <p>
+                            Detected cross-domain patterns with severity filters.
+                            Dual timeline overlays diplomatic and cyber events on
+                            the same axis.
+                        </p>
+                        <div class="demo-placeholder">
+                            Screenshot: replace this placeholder with a capture of
+                            the Correlations dashboard (grafana/d/correlations).
+                        </div>
+                    </div>
+
+                    <div class="demo-item">
+                        <h3>Prediction Markets</h3>
+                        <p>
+                            Polymarket geopolitical cases with price trends, consensus
+                            scores from Metaculus and Manifold, and linked GEON events.
+                        </p>
+                        <div class="demo-placeholder">
+                            Screenshot: replace this placeholder with a capture of
+                            the Prediction Markets dashboard (grafana/d/predictions).
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <div class="container footer-inner">
+            <p class="footer-text">
+                Built by <a href="https://github.com/Jo-the-bat" class="footer-link">GEON</a>
+            </p>
+            <a href="https://github.com/Jo-the-bat/GEON" class="footer-link github-link">
+                <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
+                    <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
+                </svg>
+                GitHub
+            </a>
+        </div>
+    </footer>
+
+</body>
+</html>
