@@ -194,6 +194,22 @@ docker compose -f docker/docker-compose.yml restart grafana ingestor
 
 ---
 
+## Step 6ter: Install ILM policy + index templates
+
+GEON's volume-heavy indices (GDELT events, GDELT GKG, ACLED events) roll
+over monthly. To cap disk growth and keep queries snappy, install the
+`geon-monthly-rollover` ILM policy once:
+
+```bash
+./scripts/setup_ilm.sh
+```
+
+This attaches an `hot → warm (30d) → delete (90d)` policy to the matching
+index templates. The script is idempotent — existing policies and
+templates are replaced in place (ES returns 200 or 409, both accepted).
+
+---
+
 ## Step 7: Set Up Grafana Datasources
 
 Grafana datasources are provisioned automatically via `docker/grafana/datasources.yml`. If you need to verify or adjust them:

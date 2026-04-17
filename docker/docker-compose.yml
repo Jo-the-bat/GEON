@@ -40,6 +40,10 @@ volumes:
   geon_n8n_data:
     name: docker_geon_n8n_data
     external: true
+  # Dedicated volume for Elasticsearch snapshot repository. Must match
+  # path.repo in elasticsearch.yml. scripts/backup.sh writes snapshots here.
+  geon_es_backups:
+    name: geon_es_backups
 
 services:
   # ===========================================================================
@@ -93,6 +97,7 @@ services:
         hard: 65536
     volumes:
       - geon_elasticsearch_data:/usr/share/elasticsearch/data
+      - geon_es_backups:/usr/share/elasticsearch/backups
       - ./elasticsearch/elasticsearch.yml:/usr/share/elasticsearch/config/elasticsearch.yml:ro
     networks:
       - geon_net
@@ -244,11 +249,10 @@ services:
       - "geon.role=cti-platform"
 
   # ===========================================================================
-  # OPENCTI WORKERS — Background Processing
+  # OPENCTI WORKERS — Background Processing (3 identical workers)
   # ===========================================================================
-  opencti-worker-1:
+  x-opencti-worker: &opencti-worker
     image: opencti/worker:${OPENCTI_VERSION}
-    container_name: geon-opencti-worker-1
     restart: unless-stopped
     environment:
       - OPENCTI_URL=http://opencti:8080/opencti
@@ -268,52 +272,18 @@ services:
     labels:
       - "geon.service=opencti-worker"
       - "geon.role=cti-worker"
+
+  opencti-worker-1:
+    <<: *opencti-worker
+    container_name: geon-opencti-worker-1
 
   opencti-worker-2:
-    image: opencti/worker:${OPENCTI_VERSION}
+    <<: *opencti-worker
     container_name: geon-opencti-worker-2
-    restart: unless-stopped
-    environment:
-      - OPENCTI_URL=http://opencti:8080/opencti
-      - OPENCTI_TOKEN=${OPENCTI_ADMIN_TOKEN}
-      - WORKER_LOG_LEVEL=info
-    networks:
-      - geon_net
-    depends_on:
-      opencti:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "pgrep -f worker || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 30s
-    labels:
-      - "geon.service=opencti-worker"
-      - "geon.role=cti-worker"
 
   opencti-worker-3:
-    image: opencti/worker:${OPENCTI_VERSION}
+    <<: *opencti-worker
     container_name: geon-opencti-worker-3
-    restart: unless-stopped
-    environment:
-      - OPENCTI_URL=http://opencti:8080/opencti
-      - OPENCTI_TOKEN=${OPENCTI_ADMIN_TOKEN}
-      - WORKER_LOG_LEVEL=info
-    networks:
-      - geon_net
-    depends_on:
-      opencti:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "pgrep -f worker || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 30s
-    labels:
-      - "geon.service=opencti-worker"
-      - "geon.role=cti-worker"
 
   # ===========================================================================
   # OPENCTI CONNECTORS
