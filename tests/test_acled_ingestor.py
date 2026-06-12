@@ -38,7 +38,8 @@ class TestAcledNormalise:
 
         assert doc["event_id"] == str(raw["data_id"])
         assert doc["event_type"] == "Battles"
-        assert doc["country"] == "Libya"
+        # Country is normalized to the GEON canonical dimension at write.
+        assert doc["country"] == "LIBYA"
         assert doc["fatalities"] == 8
         assert doc["latitude"] == 31.2089
         assert doc["longitude"] == 16.5887

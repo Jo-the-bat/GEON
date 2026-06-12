@@ -141,42 +141,53 @@ class TestSanctionCyberSeverity:
 # ---------------------------------------------------------------------------
 
 
-class TestCorrelationDedup:
-    """The deduplicator drops correlations whose ID already exists in ES."""
+class TestCorrelationReconcile:
+    """Reconciliation: unknown ids become new docs, known ids update the
+    stored situation (full coverage lives in test_engine_reconcile.py)."""
 
     def _engine(self):  # type: ignore[return]
         # Import here so conftest has already patched sys.path / env vars.
         from correlation.engine import CorrelationEngine
 
-        # Bypass __init__: we only need ``es`` and the real _deduplicate method.
+        # Bypass __init__: we only need ``es`` and the real _reconcile method.
         engine = CorrelationEngine.__new__(CorrelationEngine)
         engine.es = MagicMock()
         return engine
 
-    def test_removes_existing_ids(self) -> None:
+    def test_known_id_updates_unknown_creates(self) -> None:
         engine = self._engine()
         engine.es.indices.exists.return_value = True
         # ``b`` is already indexed, ``a`` and ``c`` are new.
         engine.es.mget.return_value = {
             "docs": [
                 {"_id": "a", "found": False},
-                {"_id": "b", "found": True},
+                {"_id": "b", "found": True, "_source": {
+                    "correlation_id": "b", "rule_name": "r",
+                    "severity": "high", "times_seen": 1,
+                    "last_seen": "2026-06-12T00:00:00+00:00",
+                }},
                 {"_id": "c", "found": False},
             ]
         }
         candidates = [
-            {"correlation_id": "a", "rule_name": "r"},
-            {"correlation_id": "b", "rule_name": "r"},
-            {"correlation_id": "c", "rule_name": "r"},
+            {"correlation_id": "a", "rule_name": "r", "severity": "high"},
+            {"correlation_id": "b", "rule_name": "r", "severity": "high"},
+            {"correlation_id": "c", "rule_name": "r", "severity": "high"},
         ]
-        new = engine._deduplicate(candidates)
+        new, updated, alertable = engine._reconcile(candidates)
         assert [c["correlation_id"] for c in new] == ["a", "c"]
+        assert [c["correlation_id"] for c in updated] == ["b"]
+        assert updated[0]["times_seen"] == 2
+        # Only the new ones alert (b is a silent refresh).
+        assert {c["correlation_id"] for c in alertable} == {"a", "c"}
 
-    def test_no_existing_index_returns_all(self) -> None:
+    def test_no_existing_index_all_new(self) -> None:
         engine = self._engine()
         engine.es.indices.exists.return_value = False
-        candidates = [{"correlation_id": "x"}]
-        assert engine._deduplicate(candidates) == candidates
+        candidates = [{"correlation_id": "x", "severity": "high"}]
+        new, updated, _ = engine._reconcile(candidates)
+        assert [c["correlation_id"] for c in new] == ["x"]
+        assert not updated
 
     def test_empty_input_returns_empty(self) -> None:
-        assert self._engine()._deduplicate([]) == []
+        assert self._engine()._reconcile([]) == ([], [], [])

@@ -116,6 +116,12 @@ class TestEmailDigest:
 
 
 class TestDispatcher:
+    @pytest.fixture(autouse=True)
+    def _no_es_dedup(self, monkeypatch):
+        """Keep dispatcher tests hermetic: no real ES anti-spam lookups."""
+        monkeypatch.setattr(alerting, "_was_recently_sent", lambda c: False)
+        monkeypatch.setattr(alerting, "_record_sent", lambda c: None)
+
     def test_send_alerts_calls_both_channels_once(self, monkeypatch):
         discord_calls, email_calls = [], []
         monkeypatch.setattr(
@@ -133,6 +139,26 @@ class TestDispatcher:
         monkeypatch.setattr(alerting, "send_discord_alerts", lambda cs: called.append(1))
         alerting.send_alerts([])
         assert not called
+
+    def test_antispam_suppresses_recently_sent(self, monkeypatch):
+        sent_batches, recorded = [], []
+        monkeypatch.setattr(
+            alerting, "_was_recently_sent",
+            lambda c: c["correlation_id"] == "corr-0",
+        )
+        monkeypatch.setattr(
+            alerting, "_record_sent", lambda c: recorded.append(c["correlation_id"])
+        )
+        monkeypatch.setattr(
+            alerting, "send_discord_alerts",
+            lambda cs: sent_batches.append(cs) or True,
+        )
+        monkeypatch.setattr(alerting, "send_email_digest", lambda cs: True)
+
+        alerting.send_alerts([_correlation(0), _correlation(1)])
+        assert len(sent_batches) == 1
+        assert [c["correlation_id"] for c in sent_batches[0]] == ["corr-1"]
+        assert recorded == ["corr-1"]
 
 
 if __name__ == "__main__":
