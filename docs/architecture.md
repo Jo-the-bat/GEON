@@ -60,10 +60,11 @@ Internet
 ### Nginx (Reverse Proxy)
 
 - **Image**: `nginx:alpine`
-- **Role**: TLS termination, reverse proxy routing, static file serving
-- **Ports**: 80 (redirect), 443 (HTTPS) -- the only ports exposed to the public
-- **Configuration**: `docker/nginx/conf.d/geon.conf`
-- **TLS**: Let's Encrypt certificates managed by a Certbot sidecar container
+- **Role**: TLS termination, Authelia forward-auth, reverse proxy routing, static file serving
+- **Listeners**: 80 (ACME challenges + legacy compat), 443 (HTTPS, standalone mode), 8443 (HTTPS + proxy_protocol, target of the host-proxy SNI passthrough on a shared VPS)
+- **Configuration**: `docker/nginx/conf.d/geon.conf` (servers) + `geon-locations.inc` (shared routing/auth blocks)
+- **TLS**: Let's Encrypt certificates managed by a Certbot sidecar container; first issuance via `scripts/init_tls.sh`
+- **Exposure**: on a dedicated host, ports 80/443 are published via `docker-compose.standalone.yml`; on a shared VPS no port is published and the host proxy forwards raw TCP 443 by SNI (see [host_proxy_sni_passthrough.md](host_proxy_sni_passthrough.md))
 
 ### Elasticsearch
 

@@ -230,21 +230,29 @@ crontab scripts/crontab.example
 
 ## Step 10: TLS Certificate
 
-If using Let's Encrypt with Certbot:
+GEON's nginx terminates TLS itself. The first issuance is bootstrapped by a
+script (nginx cannot start its TLS server without a certificate, and Certbot
+needs nginx to serve the HTTP-01 challenge — the script handles this by
+generating a temporary self-signed certificate first):
 
 ```bash
-# Initial certificate request (Nginx must be running and port 80 reachable)
-docker compose -f docker/docker-compose.yml run --rm certbot certonly \
-    --webroot -w /var/www/certbot \
-    -d geon.example.com \
-    --email contact@example.com \
-    --agree-tos --no-eff-email
+# One-time bootstrap: dummy cert -> nginx up -> real Let's Encrypt cert -> reload
+./scripts/init_tls.sh            # add --staging to test against LE staging
 
-# Reload Nginx to pick up the new certificate
-docker compose -f docker/docker-compose.yml exec nginx nginx -s reload
+# Make sure the renewal sidecar is running
+docker compose -f docker/docker-compose.yml up -d certbot
 ```
 
-Certbot auto-renewal is handled by the Certbot sidecar container.
+Auto-renewal is handled by the Certbot sidecar (`certbot renew` every 12h);
+nginx reloads every 6h to pick up renewed certificates.
+
+Deployment modes:
+
+- **Dedicated host**: publish ports 80/443 with the standalone override:
+  `docker compose -f docker/docker-compose.yml -f docker/docker-compose.standalone.yml up -d`
+- **Shared VPS** (host reverse proxy already bound to 80/443): configure SNI
+  passthrough on the host proxy so GEON still terminates its own TLS — see
+  [host_proxy_sni_passthrough.md](host_proxy_sni_passthrough.md).
 
 ---
 

@@ -1,0 +1,175 @@
+# =============================================================================
+# GEON — Shared location blocks
+# Included by both the :80 and :443 server blocks in geon.conf.
+# Requires $real_scheme to be set by the including server block.
+# =============================================================================
+
+# -------------------------------------------------------------------
+# Authelia — Forward Authentication Endpoint
+# -------------------------------------------------------------------
+location /auth/api/authz/ {
+    internal;
+    proxy_pass http://authelia_backend;
+
+    proxy_pass_request_body off;
+    proxy_set_header Content-Length "";
+
+    proxy_set_header X-Original-URL $real_scheme://$http_host$request_uri;
+    proxy_set_header X-Original-Method $request_method;
+    proxy_set_header X-Forwarded-For $remote_addr;
+    proxy_set_header X-Forwarded-Proto $real_scheme;
+    proxy_set_header X-Forwarded-Host $http_host;
+    proxy_set_header X-Forwarded-Uri $request_uri;
+}
+
+# -------------------------------------------------------------------
+# Authelia — Legacy verify endpoint (compat)
+# -------------------------------------------------------------------
+location /auth/api/verify {
+    internal;
+    proxy_pass http://authelia_backend;
+
+    proxy_pass_request_body off;
+    proxy_set_header Content-Length "";
+
+    proxy_set_header X-Original-URL $real_scheme://$http_host$request_uri;
+    proxy_set_header X-Original-Method $request_method;
+    proxy_set_header X-Forwarded-For $remote_addr;
+    proxy_set_header X-Forwarded-Proto $real_scheme;
+    proxy_set_header X-Forwarded-Host $http_host;
+    proxy_set_header X-Forwarded-Uri $request_uri;
+}
+
+# -------------------------------------------------------------------
+# Authelia — Static assets (no auth, correct MIME types)
+# -------------------------------------------------------------------
+location /auth/static/ {
+    proxy_pass http://authelia_backend;
+    proxy_set_header Host $host;
+}
+
+# -------------------------------------------------------------------
+# Authelia — .well-known (OIDC discovery, no auth)
+# -------------------------------------------------------------------
+location /auth/.well-known/ {
+    proxy_pass http://authelia_backend;
+    proxy_set_header Host $host;
+}
+
+# -------------------------------------------------------------------
+# Authelia Portal — /auth (catch-all)
+# -------------------------------------------------------------------
+location /auth {
+    limit_req zone=auth_limit burst=10 nodelay;
+
+    proxy_pass http://authelia_backend;
+
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $real_scheme;
+    proxy_set_header X-Forwarded-Host $http_host;
+    proxy_set_header X-Forwarded-Uri $request_uri;
+}
+
+# -------------------------------------------------------------------
+# Landing Page — / (public, no auth)
+# -------------------------------------------------------------------
+location / {
+    root /usr/share/nginx/html/landing;
+    index index.html;
+    try_files $uri $uri/ /index.html;
+}
+
+# -------------------------------------------------------------------
+# OpenCTI — /opencti (protected by Authelia)
+# -------------------------------------------------------------------
+location /opencti {
+    auth_request /auth/api/verify;
+    auth_request_set $target_url $real_scheme://$http_host$request_uri;
+    auth_request_set $user $upstream_http_remote_user;
+    auth_request_set $groups $upstream_http_remote_groups;
+    auth_request_set $name $upstream_http_remote_name;
+    auth_request_set $email $upstream_http_remote_email;
+    error_page 401 =302 $real_scheme://$http_host/auth/?rd=$target_url;
+
+    proxy_pass http://opencti_backend;
+
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $real_scheme;
+    proxy_set_header X-Forwarded-Host $http_host;
+
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+
+    client_max_body_size 200m;
+    proxy_buffering off;
+    proxy_read_timeout 300s;
+    proxy_connect_timeout 75s;
+}
+
+# -------------------------------------------------------------------
+# n8n — /n8n (protected by Authelia)
+# -------------------------------------------------------------------
+location /n8n/ {
+    auth_request /auth/api/verify;
+    auth_request_set $target_url $real_scheme://$http_host$request_uri;
+    auth_request_set $user $upstream_http_remote_user;
+    auth_request_set $groups $upstream_http_remote_groups;
+    auth_request_set $name $upstream_http_remote_name;
+    auth_request_set $email $upstream_http_remote_email;
+    error_page 401 =302 $real_scheme://$http_host/auth/?rd=$target_url;
+
+    proxy_pass http://n8n:5678/n8n/;
+
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $real_scheme;
+    proxy_set_header X-Forwarded-Host $http_host;
+
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+
+    chunked_transfer_encoding off;
+    proxy_buffering off;
+    proxy_cache off;
+}
+
+# -------------------------------------------------------------------
+# Grafana — /grafana (protected by Authelia)
+# -------------------------------------------------------------------
+location /grafana {
+    auth_request /auth/api/verify;
+    auth_request_set $target_url $real_scheme://$http_host$request_uri;
+    auth_request_set $user $upstream_http_remote_user;
+    auth_request_set $groups $upstream_http_remote_groups;
+    auth_request_set $name $upstream_http_remote_name;
+    auth_request_set $email $upstream_http_remote_email;
+    error_page 401 =302 $real_scheme://$http_host/auth/?rd=$target_url;
+
+    proxy_pass http://grafana_backend;
+
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $real_scheme;
+    proxy_set_header X-Forwarded-Host $http_host;
+
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+}
+
+# -------------------------------------------------------------------
+# Deny access to hidden files
+# -------------------------------------------------------------------
+location ~ /\. {
+    deny all;
+    access_log off;
+    log_not_found off;
+}

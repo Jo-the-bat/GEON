@@ -1,0 +1,19 @@
+# =============================================================================
+# GEON — Standalone override (hote dedie)
+#
+# Publie les ports 80/443 du nginx GEON sur l'hote : GEON devient le point
+# d'entree public et termine son propre TLS, sans proxy hote en amont.
+#
+# Usage:
+#   docker compose -f docker/docker-compose.yml \
+#                  -f docker/docker-compose.standalone.yml up -d
+#
+# Ne PAS utiliser sur le VPS partage (les ports 80/443 y sont deja tenus par
+# le proxy hote) — voir docs/host_proxy_sni_passthrough.md pour ce cas.
+# =============================================================================
+
+services:
+  nginx:
+    ports:
+      - "80:80"
+      - "443:443"

@@ -40,6 +40,11 @@ volumes:
   geon_n8n_data:
     name: docker_geon_n8n_data
     external: true
+  # TLS — new volumes (not legacy-renamed), shared by nginx and certbot
+  geon_certbot_certs:
+    name: geon_certbot_certs
+  geon_certbot_webroot:
+    name: geon_certbot_webroot
 
 services:
   # ===========================================================================
@@ -49,10 +54,14 @@ services:
     image: nginx:alpine
     container_name: geon-nginx
     restart: unless-stopped
+    # Reload nginx every 6h so renewed Let's Encrypt certs are picked up.
+    command: "/bin/sh -c 'while :; do sleep 6h & wait $${!}; nginx -s reload; done & nginx -g \"daemon off;\"'"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
       - ../landing:/usr/share/nginx/html/landing:ro
+      - geon_certbot_certs:/etc/letsencrypt:ro
+      - geon_certbot_webroot:/var/www/certbot:ro
     networks:
       - geon_net
     depends_on:
@@ -67,6 +76,25 @@ services:
     labels:
       - "geon.service=nginx"
       - "geon.role=reverse-proxy"
+
+  # ===========================================================================
+  # CERTBOT — Let's Encrypt issuance & renewal (webroot via geon-nginx :80)
+  # First issuance: run scripts/init_tls.sh once. This service then renews
+  # every 12h; geon-nginx reloads every 6h to pick up renewed certs.
+  # ===========================================================================
+  certbot:
+    image: certbot/certbot
+    container_name: geon-certbot
+    restart: unless-stopped
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot --quiet; sleep 12h & wait $${!}; done'"
+    volumes:
+      - geon_certbot_certs:/etc/letsencrypt
+      - geon_certbot_webroot:/var/www/certbot
+    networks:
+      - geon_net
+    labels:
+      - "geon.service=certbot"
+      - "geon.role=tls"
 
   # ===========================================================================
   # ELASTICSEARCH — Storage for OpenCTI + Ingestors + Grafana
