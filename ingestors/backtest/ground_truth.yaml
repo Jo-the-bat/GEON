@@ -1,0 +1,32 @@
+# =============================================================================
+# GEON — Backtesting ground truth
+#
+# Known geopolitical events used to score the detectors: for each event
+# the harness checks whether a detection episode involving the listed
+# countries started within [date - window_before, date + window_after],
+# and reports the lead (negative = detected BEFORE the event) or lag.
+#
+# Schema per entry:
+#   name:           human label
+#   date:           the event date (YYYY-MM-DD)
+#   countries:      GEON canonical names (see common/countries.py)
+#   window_before:  days before `date` a detection still counts (default 7)
+#   window_after:   days after `date` a detection still counts (default 7)
+#
+# Add events that fall INSIDE the data range present in Elasticsearch
+# (check: curl geon-gdelt-events-* date range). Examples below are
+# placeholders — replace them with real, documented crises.
+# =============================================================================
+
+events: []
+
+# --- examples (uncomment and adapt) -----------------------------------------
+# events:
+#   - name: "Escalade frontaliere X-Y"
+#     date: 2026-05-12
+#     countries: ["INDIA", "PAKISTAN"]
+#     window_before: 7
+#     window_after: 3
+#   - name: "Crise des detroits"
+#     date: 2026-04-28
+#     countries: ["CHINA", "TAIWAN"]

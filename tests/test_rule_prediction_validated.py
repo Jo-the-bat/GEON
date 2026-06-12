@@ -31,8 +31,11 @@ def _make_rule(es):
     return rule
 
 
-def _hits(sources):
-    return {"hits": {"hits": [{"_source": s, "_id": str(i)}
+GDELT_CONCRETE_INDEX = "geon-gdelt-events-2026.06"
+
+
+def _hits(sources, index=GDELT_CONCRETE_INDEX):
+    return {"hits": {"hits": [{"_source": s, "_id": str(i), "_index": index}
                               for i, s in enumerate(sources)]}}
 
 
@@ -65,7 +68,7 @@ def _es_with(cases, events):
 
     def search(index=None, **kwargs):
         if index == POLYMARKET_INDEX:
-            return _hits(cases)
+            return _hits(cases, index=POLYMARKET_INDEX)
         if index == GDELT_INDEX_PATTERN:
             return _hits(events)
         raise AssertionError(f"unexpected index queried: {index}")
@@ -92,6 +95,14 @@ class TestHappyPath:
         ]
         assert corr["diplomatic_event"]["event_id"] == "1001"
         assert corr["diplomatic_event"]["goldstein"] == -(GOLDSTEIN_SEVERITY + 1.0)
+        # Evidence + confidence contract.
+        assert isinstance(corr["confidence"], int)
+        assert 5 <= corr["confidence"] <= 95
+        assert isinstance(corr["confidence_factors"], dict)
+        assert "base" in corr["confidence_factors"]
+        assert corr["evidence"]
+        for entry in corr["evidence"]:
+            assert {"index", "doc_id", "kind", "summary"} <= set(entry)
 
     def test_anticipation_when_market_moved_first_is_medium(self):
         es = _es_with([_case(date=DATE_BEFORE_EVENT)], [_event()])
@@ -185,6 +196,70 @@ class TestBuildDetails:
         assert len(correlations) == 1
         assert correlations[0]["severity"] == "high"
         assert "unknown" in correlations[0]["description"]
+        # No measurable gap between the dates -> no proximity bonus.
+        assert correlations[0]["confidence_factors"]["proximity"] == 0.0
+
+
+class TestEvidenceAndConfidence:
+    def test_evidence_references_case_and_event_hits(self):
+        es = _es_with([_case()], [_event()])
+
+        corr = _make_rule(es).run()[0]
+
+        market_ev = corr["evidence"][0]
+        assert market_ev["kind"] == "market"
+        assert market_ev["index"] == POLYMARKET_INDEX
+        assert market_ev["doc_id"] == "case-1"
+        assert "Will Russia escalate" in market_ev["summary"]
+
+        event_ev = corr["evidence"][1]
+        assert event_ev["kind"] == "diplomatic"
+        # The GDELT hit ids/_index are kept, not dropped.
+        assert event_ev["index"] == GDELT_CONCRETE_INDEX
+        assert event_ev["doc_id"] == "0"
+        assert event_ev["date"] == EVENT_DATE
+        assert "Military force deployment" in event_ev["summary"]
+
+    def test_event_evidence_capped_at_five(self):
+        events = [_event(event_id=str(i)) for i in range(8)]
+        es = _es_with([_case()], events)
+
+        corr = _make_rule(es).run()[0]
+
+        assert len(corr["evidence"]) == 6  # 1 market case + 5 events
+
+    def test_confidence_factors_are_auditable(self):
+        es = _es_with([_case()], [_event()])
+
+        corr = _make_rule(es).run()[0]
+
+        factors = corr["confidence_factors"]
+        assert set(factors) == {"base", "volume", "proximity", "market_move"}
+        assert factors["base"] == 30.0
+        assert corr["confidence"] == min(95, max(5, round(sum(factors.values()))))
+
+    def test_proximity_higher_when_market_and_event_coincide(self):
+        near = _make_rule(_es_with([_case(date=EVENT_DATE)], [_event()])).run()[0]
+        # ~66h gap, still inside the 72h window.
+        far = _make_rule(
+            _es_with([_case(date="2026-06-13T06:00:00+00:00")], [_event()])
+        ).run()[0]
+
+        assert (near["confidence_factors"]["proximity"]
+                > far["confidence_factors"]["proximity"])
+        assert near["confidence"] > far["confidence"]
+
+    def test_market_move_factor_scales_and_caps(self):
+        small = _make_rule(
+            _es_with([_case(change_24h=PRICE_SHIFT_THRESHOLD + 0.02)], [_event()])
+        ).run()[0]
+        big = _make_rule(
+            _es_with([_case(change_24h=PRICE_SHIFT_THRESHOLD + 0.50)], [_event()])
+        ).run()[0]
+
+        assert (small["confidence_factors"]["market_move"]
+                < big["confidence_factors"]["market_move"])
+        assert big["confidence_factors"]["market_move"] == 15.0
 
 
 if __name__ == "__main__":

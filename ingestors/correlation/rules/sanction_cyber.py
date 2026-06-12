@@ -19,6 +19,8 @@ from common.settings import setting
 from elasticsearch import Elasticsearch
 from pycti import OpenCTIApiClient
 
+from correlation.scoring import confidence, evidence_entry, volume_bonus
+
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
@@ -62,6 +64,9 @@ class SanctionCyberRule:
         self.es = es
         self.octi = octi
         self.lookback_days = lookback_days
+        # (post_count, baseline_count) of the most recent spike
+        # computation — referenced by the evidence "signal" entry.
+        self._last_window_counts: tuple[int, int] | None = None
 
     def run(self) -> list[dict[str, Any]]:
         """Execute the rule and return a list of correlation documents.
@@ -93,7 +98,8 @@ class SanctionCyberRule:
 
             if spike_ratio >= IOC_SPIKE_THRESHOLD:
                 correlation = self._build_correlation(
-                    country, sanction_docs, spike_ratio
+                    country, sanction_docs, spike_ratio,
+                    window_counts=self._last_window_counts,
                 )
                 correlations.append(correlation)
                 logger.info(
@@ -135,7 +141,15 @@ class SanctionCyberRule:
             return []
 
         hits = resp.get("hits", {}).get("hits", [])
-        return [h["_source"] for h in hits]
+        # Keep the ES identity on each source dict so the correlation can
+        # reference the sanction documents as evidence.
+        sanctions: list[dict[str, Any]] = []
+        for h in hits:
+            src = h["_source"]
+            src["_es_id"] = h.get("_id", "")
+            src["_es_index"] = h.get("_index", "")
+            sanctions.append(src)
+        return sanctions
 
     # ------------------------------------------------------------------
     # Step 2: Group by country
@@ -196,6 +210,8 @@ class SanctionCyberRule:
         baseline_count = self._count_iocs_in_window(
             country, baseline_start.isoformat(), baseline_end.isoformat()
         )
+
+        self._last_window_counts = (post_count, baseline_count)
 
         if baseline_count < MIN_BASELINE_COUNT:
             logger.info(
@@ -297,6 +313,7 @@ class SanctionCyberRule:
         country: str,
         sanction_docs: list[dict[str, Any]],
         spike_ratio: float,
+        window_counts: tuple[int, int] | None = None,
     ) -> dict[str, Any]:
         """Assemble a correlation document.
 
@@ -304,6 +321,8 @@ class SanctionCyberRule:
             country: Sanctioned country.
             sanction_docs: List of relevant sanctions documents.
             spike_ratio: IoC increase ratio.
+            window_counts: ``(post_count, baseline_count)`` of the spike
+                computation, when available, for the evidence summary.
 
         Returns:
             Correlation document dict.
@@ -350,6 +369,50 @@ class SanctionCyberRule:
             "description": f"IoC spike: {spike_ratio:.0%} increase for {country}",
         })
 
+        # Evidence: the sanction documents that triggered the rule, plus a
+        # synthetic "signal" entry describing the IoC spike itself (the
+        # spike is a computed aggregate, not a single source document).
+        evidence: list[dict[str, str]] = []
+        for s in sanction_docs[:5]:
+            evidence.append(evidence_entry(
+                index=s.get("_es_index", ""),
+                doc_id=s.get("_es_id", ""),
+                date=str(s.get("ingested_at", "")),
+                kind="sanction",
+                summary=(
+                    f"Sanction: {s.get('name', 'Unknown')} "
+                    f"({s.get('sanctions_source', 'Unknown')})"
+                ),
+            ))
+        if window_counts is not None:
+            post_count, baseline_count = window_counts
+            spike_summary = (
+                f"IoC spike for {country}: {post_count} indicators in the "
+                f"last {IOC_WINDOW_DAYS}d vs {baseline_count} in the "
+                f"previous {IOC_WINDOW_DAYS}d ({spike_ratio:.0%})"
+            )
+        else:
+            spike_summary = (
+                f"IoC spike for {country}: {spike_ratio:.0%} of baseline "
+                f"volume over the last {IOC_WINDOW_DAYS}d"
+            )
+        evidence.append(evidence_entry(
+            index=CTI_INDICATORS_PATTERN,
+            doc_id="",
+            date=now,
+            kind="signal",
+            summary=spike_summary,
+        ))
+
+        # Confidence: corroborating sanction volume + spike magnitude above
+        # the threshold. APT attribution does not apply to this rule (the
+        # spike is country-level, not actor-level).
+        conf, factors = confidence(30, {
+            "volume": volume_bonus(len(sanction_docs)),
+            "spike_strength": min(
+                20.0, max(0.0, (spike_ratio - IOC_SPIKE_THRESHOLD) * 10)),
+        })
+
         return {
             "correlation_id": correlation_id,
             "timestamp": now,
@@ -357,6 +420,9 @@ class SanctionCyberRule:
             "rule_name": self.RULE_NAME,
             "severity": severity,
             "countries_involved": [country],
+            "confidence": conf,
+            "confidence_factors": factors,
+            "evidence": evidence,
             "diplomatic_event": {
                 "event_id": "",
                 "description": (

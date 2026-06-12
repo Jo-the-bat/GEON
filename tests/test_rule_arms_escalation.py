@@ -16,6 +16,7 @@ import pytest
 from correlation.rules.arms_escalation import (
     ESCALATION_THRESHOLD_PCT,
     ESCALATION_WINDOW_DAYS,
+    TRANSFERS_INDEX,
     ArmsEscalationRule,
 )
 
@@ -33,8 +34,10 @@ def _make_rule(es):
 
 
 def _transfer(recipient=RECIPIENT, date=REF_DATE, tiv=120.0,
-              supplier="FRANCE", weapon="Rafale combat aircraft"):
+              supplier="FRANCE", weapon="Rafale combat aircraft",
+              transfer_id="t-0001"):
     return {
+        "transfer_id": transfer_id,
         "recipient_country": recipient,
         "supplier_country": supplier,
         "weapon_description": weapon,
@@ -106,6 +109,14 @@ class TestHappyPath:
         assert f"{ESCALATION_WINDOW_DAYS}d" in corr["description"]
         assert [t["type"] for t in corr["timeline"]] == ["arms_transfer", "escalation"]
         assert corr["timeline"][0]["date"] == REF_DATE
+        # Evidence + confidence contract.
+        assert isinstance(corr["confidence"], int)
+        assert 5 <= corr["confidence"] <= 95
+        assert isinstance(corr["confidence_factors"], dict)
+        assert "base" in corr["confidence_factors"]
+        assert corr["evidence"]
+        for entry in corr["evidence"]:
+            assert {"index", "doc_id", "kind", "summary"} <= set(entry)
 
     def test_all_neighbors_compared_before_and_after(self):
         es = _es_with([_transfer()], {})
@@ -205,6 +216,59 @@ class TestSeverityAndGrouping:
         assert len(correlations) == 1
         assert "Scorpene submarine" in correlations[0]["description"]
         assert "FRANCE" in correlations[0]["description"]
+
+
+class TestEvidenceAndConfidence:
+    def test_evidence_references_transfer_and_signal(self):
+        es = _es_with(
+            [_transfer()],
+            {(NEIGHBOR, "before"): 10, (NEIGHBOR, "after"): 30},
+        )
+
+        corr = _make_rule(es).run()[0]
+
+        kinds = [e["kind"] for e in corr["evidence"]]
+        assert kinds == ["transfer", "signal"]
+        transfer_ev = corr["evidence"][0]
+        assert transfer_ev["index"] == TRANSFERS_INDEX
+        assert transfer_ev["doc_id"] == "t-0001"
+        assert transfer_ev["date"] == REF_DATE
+        assert "Rafale" in transfer_ev["summary"]
+        signal_ev = corr["evidence"][1]
+        assert "10 before vs 30 after" in signal_ev["summary"]
+        assert NEIGHBOR in signal_ev["summary"]
+
+    def test_confidence_factors_are_auditable(self):
+        # 10 -> 30 = +200%: escalation_strength caps at 20, the
+        # post-delivery volume contributes, and the recorded factors sum
+        # (clamped) to the published confidence.
+        es = _es_with(
+            [_transfer()],
+            {(NEIGHBOR, "before"): 10, (NEIGHBOR, "after"): 30},
+        )
+
+        corr = _make_rule(es).run()[0]
+
+        factors = corr["confidence_factors"]
+        assert set(factors) == {"base", "volume", "escalation_strength"}
+        assert factors["base"] == 30.0
+        assert factors["escalation_strength"] == 20.0
+        assert factors["volume"] > 0
+        assert corr["confidence"] == min(95, max(5, round(sum(factors.values()))))
+
+    def test_escalation_strength_zero_at_exact_threshold(self):
+        before = 200
+        es = _es_with(
+            [_transfer()],
+            {(NEIGHBOR, "before"): before,
+             (NEIGHBOR, "after"): _after_at_threshold(before)},
+        )
+
+        corr = _make_rule(es).run()[0]
+
+        # ceil() can overshoot the exact threshold slightly — the factor
+        # must stay proportionally tiny, never negative.
+        assert 0 <= corr["confidence_factors"]["escalation_strength"] < 1
 
 
 if __name__ == "__main__":

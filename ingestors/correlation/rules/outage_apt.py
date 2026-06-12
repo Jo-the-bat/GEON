@@ -22,6 +22,13 @@ from common.settings import setting
 from elasticsearch import Elasticsearch
 from pycti import OpenCTIApiClient
 
+from correlation.scoring import (
+    attribution_bonus,
+    confidence,
+    evidence_entry,
+    volume_bonus,
+)
+
 logger = logging.getLogger(__name__)
 
 OUTAGES_INDEX = f"{INDEX_PREFIX}-outages"
@@ -98,7 +105,15 @@ class OutageAPTRule:
                 size=50,
                 sort=[{"start_time": "desc"}],
             )
-            return [h["_source"] for h in resp["hits"]["hits"]]
+            # Keep the ES identity alongside the source so the
+            # correlation can reference the outage as evidence.
+            outages = []
+            for h in resp["hits"]["hits"]:
+                src = h["_source"]
+                src["_es_id"] = h.get("_id", "")
+                src["_es_index"] = h.get("_index", "")
+                outages.append(src)
+            return outages
         except Exception:
             logger.exception("[%s] Failed to query outages.", self.RULE_NAME)
             return []
@@ -124,7 +139,8 @@ class OutageAPTRule:
                 ]
                 if validated:
                     return [{"name": c.get("name", ""), "type": "offensive",
-                             "id": c.get("id", ""), "source": "opencti"}
+                             "id": c.get("id", ""), "source": "opencti",
+                             "date": str(c.get("modified", c.get("created", "")))}
                             for c in validated]
             except Exception:
                 pass
@@ -144,7 +160,10 @@ class OutageAPTRule:
             )
             if resp["hits"]["hits"]:
                 return [{"name": h["_source"].get("name", ""), "type": "offensive",
-                         "id": h["_id"], "source": "es_cti"} for h in resp["hits"]["hits"]]
+                         "id": h["_id"], "source": "es_cti",
+                         "date": str(h["_source"].get("modified",
+                                                      h["_source"].get("created", "")))}
+                        for h in resp["hits"]["hits"]]
         except Exception:
             pass
 
@@ -171,7 +190,10 @@ class OutageAPTRule:
                 size=5,
             )
             return [{"name": h["_source"].get("name", ""), "type": "targeting",
-                     "id": h["_id"], "source": "es_cti"} for h in resp["hits"]["hits"]]
+                     "id": h["_id"], "source": "es_cti",
+                     "date": str(h["_source"].get("modified",
+                                                  h["_source"].get("created", "")))}
+                    for h in resp["hits"]["hits"]]
         except Exception:
             return []
 
@@ -213,6 +235,41 @@ class OutageAPTRule:
             names = ", ".join(a["name"] for a in targeting_apts[:3])
             desc_parts.append(f"APT groups targeting {country}: {names}")
 
+        # Evidence: the outage doc + the offensive/targeting APT entries
+        # (each carries its provenance: opencti / es_cti / static).
+        evidence: list[dict[str, str]] = [
+            evidence_entry(
+                index=outage.get("_es_index") or OUTAGES_INDEX,
+                doc_id=outage.get("_es_id") or outage.get("outage_id", ""),
+                date=str(outage.get("start_time", "")),
+                kind="outage",
+                summary=(f"Internet outage in {country}: "
+                         f"{outage.get('severity', '')} / {outage.get('type', '')}"),
+            ),
+        ]
+        for apt in all_apts[:5]:
+            source = apt.get("source", "static")
+            index = {"opencti": "opencti", "es_cti": CTI_INDEX}.get(source, source)
+            evidence.append(evidence_entry(
+                index=index,
+                doc_id=apt.get("id", "") or apt.get("name", ""),
+                date=str(apt.get("date", "")),
+                kind="cyber",
+                summary=f"{apt.get('name', 'Unknown')} ({apt.get('type', '')}, "
+                        f"{source} attribution)",
+            ))
+
+        # Confidence: best attribution provenance present across the
+        # matched APT entries + corroboration volume.
+        best_attribution = max(
+            (attribution_bonus(a.get("source", "static")) for a in all_apts),
+            default=0.0,
+        )
+        conf, factors = confidence(30, {
+            "attribution": best_attribution,
+            "volume": volume_bonus(len(all_apts)),
+        })
+
         return {
             "correlation_id": correlation_id,
             "timestamp": now,
@@ -220,6 +277,9 @@ class OutageAPTRule:
             "rule_name": self.RULE_NAME,
             "severity": severity,
             "countries_involved": [country],
+            "confidence": conf,
+            "confidence_factors": factors,
+            "evidence": evidence,
             "diplomatic_event": {
                 "event_id": outage.get("outage_id", ""),
                 "description": (

@@ -25,6 +25,9 @@ from common.config import INDEX_PREFIX
 from common.settings import setting
 from elasticsearch import Elasticsearch
 
+from correlation.baselines import negative_events_baseline
+from correlation.scoring import confidence, evidence_entry
+
 logger = logging.getLogger(__name__)
 
 RISK_SCORES_INDEX = f"{INDEX_PREFIX}-risk-scores"
@@ -47,6 +50,10 @@ PREDICTION_SHIFT_THRESHOLD: float = setting(
 SPENDING_YOY_THRESHOLD: float = setting(
     "correlation.multi_signal_convergence.spending_yoy_threshold", 10.0)
 MIN_SIGNALS: int = setting("correlation.multi_signal_convergence.min_signals", 3)
+GDELT_ZSCORE_THRESHOLD: float = setting(
+    "correlation.multi_signal_convergence.gdelt_zscore_threshold", 2.0)
+GDELT_ZSCORE_FLOOR: int = setting(
+    "correlation.multi_signal_convergence.gdelt_zscore_floor", 25)
 
 
 class MultiSignalConvergenceRule:
@@ -118,7 +125,15 @@ class MultiSignalConvergenceRule:
     # Signal 1: GDELT negative events
     # ------------------------------------------------------------------
     def _signal_gdelt(self, country: str) -> int | bool:
-        """Count GDELT negative events (Goldstein < -3) in last 7 days."""
+        """GDELT negative-event signal (Goldstein < -3, last 7 days).
+
+        Fires on EITHER condition:
+        - absolute: count >= GDELT_NEGATIVE_THRESHOLD (historic behaviour)
+        - statistical: the country's rate deviates from its OWN baseline
+          (z >= GDELT_ZSCORE_THRESHOLD) with at least GDELT_ZSCORE_FLOOR
+          events — catches unusual deterioration in countries that never
+          reach the absolute count.
+        """
         try:
             resp = self.es.count(
                 index=GDELT_INDEX_PATTERN,
@@ -138,9 +153,27 @@ class MultiSignalConvergenceRule:
                 },
             )
             count = resp["count"]
-            return count if count >= GDELT_NEGATIVE_THRESHOLD else 0
         except Exception:
             return 0
+
+        if count >= GDELT_NEGATIVE_THRESHOLD:
+            return count
+
+        if count >= GDELT_ZSCORE_FLOOR:
+            baseline = negative_events_baseline(
+                self.es, country,
+                goldstein_lt=GOLDSTEIN_THRESHOLD,
+                window_days=7,
+            )
+            if baseline is not None and baseline.zscore >= GDELT_ZSCORE_THRESHOLD:
+                logger.debug(
+                    "[%s] %s GDELT signal fired statistically "
+                    "(z=%.1f, count=%d).",
+                    self.RULE_NAME, country, baseline.zscore, count,
+                )
+                return count
+
+        return 0
 
     # ------------------------------------------------------------------
     # Signal 2: Recent sanctions
@@ -228,6 +261,11 @@ class MultiSignalConvergenceRule:
                 index=CORRELATIONS_INDEX,
                 query={
                     "bool": {
+                        # Analyst-confirmed false positives must not seed
+                        # new convergence situations.
+                        "must_not": [
+                            {"term": {"status": "false_positive"}},
+                        ],
                         "filter": [
                             {"range": {"date": {"gte": "now-30d"}}},
                             {"term": {"countries_involved": country}},
@@ -351,6 +389,47 @@ class MultiSignalConvergenceRule:
             f"{self.RULE_NAME}:{country}".encode()
         ).hexdigest()[:20]
 
+        # Evidence: one entry per active signal, pointing at the signal's
+        # SOURCE index with a stable per-signal discriminator (the
+        # engine's evidence merge refreshes signal entries in place).
+        signal_sources = {
+            "gdelt_negative_events": GDELT_INDEX_PATTERN,
+            "sanctions_recent": SANCTIONS_INDEX,
+            "internet_outage": OUTAGES_INDEX,
+            "prediction_market_movement": POLYMARKET_INDEX,
+            "apt_activity": CORRELATIONS_INDEX,
+            "acled_conflicts": ACLED_INDEX_PATTERN,
+            "military_spending_increase": SPENDING_INDEX,
+        }
+        signal_summaries = {
+            "gdelt_negative_events":
+                f"{signals['gdelt_negative_events']} GDELT negative events",
+            "sanctions_recent": "recent sanctions",
+            "internet_outage": "internet outage",
+            "prediction_market_movement":
+                f"prediction market ({signals['prediction_market_movement']})",
+            "apt_activity": f"APT activity ({signals['apt_activity']})",
+            "acled_conflicts": f"{signals['acled_conflicts']} ACLED conflicts",
+            "military_spending_increase": "military spending increase",
+        }
+        evidence = [
+            evidence_entry(
+                index=signal_sources[key],
+                doc_id=f"signal:{key}",
+                date=now.isoformat(),
+                kind="signal",
+                summary=signal_summaries[key],
+            )
+            for key in signal_sources
+            if signals.get(key)
+        ]
+        # Confidence grows with how many independent signals converge
+        # beyond the minimum, and with the country's risk score.
+        conf, factors = confidence(30, {
+            "convergence": min(30.0, (active_count - MIN_SIGNALS) * 10.0),
+            "risk_score": min(15.0, max(0.0, (risk_score - RISK_SCORE_THRESHOLD) / 4)),
+        })
+
         doc: dict[str, Any] = {
             "correlation_id": correlation_id,
             "timestamp": now.isoformat(),
@@ -358,6 +437,9 @@ class MultiSignalConvergenceRule:
             "rule_name": self.RULE_NAME,
             "severity": severity,
             "countries_involved": [country],
+            "confidence": conf,
+            "confidence_factors": factors,
+            "evidence": evidence,
             "diplomatic_event": {
                 "event_id": "",
                 "description": narrative,

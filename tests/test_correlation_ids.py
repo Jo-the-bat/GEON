@@ -24,6 +24,7 @@ def _make(rule_cls):
     rule = object.__new__(rule_cls)
     rule.es = None
     rule.octi = None
+    rule.as_of = None  # rules with an injectable clock (backtesting)
     return rule
 
 

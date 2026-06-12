@@ -45,6 +45,17 @@ def _acled_event():
             "notes": "Clashes near the border"}
 
 
+def _assert_scoring_contract(corr):
+    """Every correlation carries auditable confidence + evidence refs."""
+    assert isinstance(corr["confidence"], int)
+    assert 5 <= corr["confidence"] <= 95
+    assert isinstance(corr["confidence_factors"], dict)
+    assert "base" in corr["confidence_factors"]
+    assert corr["evidence"]
+    for ev in corr["evidence"]:
+        assert {"index", "doc_id", "kind", "summary"} <= set(ev)
+
+
 def _make_rule(outages, gdelt, acled):
     """Rule with an ES mock routing searches by target index."""
     rule = InternetOutageRule(es=MagicMock(), octi=None)
@@ -86,6 +97,31 @@ class TestRunHappyPath:
         assert [e["type"] for e in corr["timeline"]] == [
             "internet_outage", "diplomatic", "conflict",
         ]
+
+    def test_confidence_and_evidence_contract(self):
+        gdelt = _gdelt_event(GOLDSTEIN_THRESHOLD - 1.0)
+        rule, _ = _make_rule([_outage()], [gdelt], [_acled_event()])
+
+        corr = rule.run()[0]
+
+        _assert_scoring_contract(corr)
+        # The outage itself + one GDELT + one ACLED reference.
+        assert [e["kind"] for e in corr["evidence"]] == [
+            "outage", "diplomatic", "conflict",
+        ]
+        outage_ev = corr["evidence"][0]
+        assert outage_ev["index"] == OUTAGES_INDEX
+        assert outage_ev["doc_id"] == "id-0"  # ES _id propagated
+        assert outage_ev["date"] == OUTAGE_START
+        # GDELT/ACLED refs keep the ES ids from the raw hits.
+        assert corr["evidence"][1]["doc_id"] == "id-0"
+        assert "Goldstein" in corr["evidence"][1]["summary"]
+        assert corr["evidence"][2]["date"] == "2026-06-10T12:00:00+00:00"
+        # Factors: 2 corroborating events + 6h gap inside the 48h window.
+        factors = corr["confidence_factors"]
+        assert factors["base"] == 30.0
+        assert factors["volume"] > 0
+        assert factors["proximity"] > 0
 
 
 class TestQueryShape:

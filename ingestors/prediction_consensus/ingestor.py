@@ -249,6 +249,25 @@ class PredictionConsensusIngestor:
                 )
 
         if divergence_alerts:
+            # Full-replace writes: carry over analyst triage verdicts from
+            # the previous version of each situation-stable document.
+            try:
+                ids = [d["correlation_id"] for d in divergence_alerts]
+                resp = self.es.mget(index=CORRELATIONS_INDEX, body={"ids": ids})
+                existing = {
+                    doc["_id"]: doc.get("_source", {})
+                    for doc in resp.get("docs", [])
+                    if doc.get("found", False)
+                }
+                for alert in divergence_alerts:
+                    prev = existing.get(alert["correlation_id"], {})
+                    for key in ("status", "triaged_at", "triage_note"):
+                        if key in prev:
+                            alert[key] = prev[key]
+                    alert.setdefault("status", "open")
+            except Exception:
+                logger.warning("Could not preserve triage fields.", exc_info=True)
+
             bulk_index(
                 self.es, CORRELATIONS_INDEX, divergence_alerts, id_field="correlation_id"
             )

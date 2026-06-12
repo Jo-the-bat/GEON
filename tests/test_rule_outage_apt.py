@@ -36,6 +36,17 @@ def _outage(country="RUSSIA", type_="country-level", scope="national",
             "outage_id": outage_id, "duration_hours": duration_hours}
 
 
+def _assert_scoring_contract(corr):
+    """Every correlation carries auditable confidence + evidence refs."""
+    assert isinstance(corr["confidence"], int)
+    assert 5 <= corr["confidence"] <= 95
+    assert isinstance(corr["confidence_factors"], dict)
+    assert "base" in corr["confidence_factors"]
+    assert corr["evidence"]
+    for ev in corr["evidence"]:
+        assert {"index", "doc_id", "kind", "summary"} <= set(ev)
+
+
 def _make_rule(outages, cti_offensive=(), cti_targeting=(), octi=None):
     rule = OutageAPTRule(es=MagicMock(), octi=octi)
     calls = []
@@ -88,6 +99,17 @@ class TestOffensiveOpenCTIPath:
         )
         # The configured APT activity window is forwarded to OpenCTI.
         assert seen == {"country": "RUSSIA", "days_back": APT_WINDOW_DAYS}
+        # Confidence/evidence contract: outage ref + STIX-validated APT.
+        _assert_scoring_contract(corr)
+        assert corr["evidence"][0]["kind"] == "outage"
+        assert corr["evidence"][0]["index"] == OUTAGES_INDEX
+        assert corr["evidence"][0]["doc_id"] == "id-0"  # ES _id propagated
+        cyber_evs = [e for e in corr["evidence"] if e["kind"] == "cyber"]
+        assert [e["index"] for e in cyber_evs] == ["opencti"]
+        assert cyber_evs[0]["doc_id"] == "campaign--1"
+        # OpenCTI is the strongest provenance present.
+        assert corr["confidence_factors"]["attribution"] == 30.0
+        assert corr["confidence_factors"]["volume"] > 0
 
 
 class TestOffensiveEsCtiPath:
@@ -103,6 +125,11 @@ class TestOffensiveEsCtiPath:
         assert corr["cyber_event"]["apt_group"] == "Sandworm Team"
         assert corr["cyber_event"]["campaign_id"] == "id-0"  # ES _id propagated
         assert corr["severity"] == "critical"
+        # Indexed-CTI provenance scores between opencti and static.
+        _assert_scoring_contract(corr)
+        assert corr["confidence_factors"]["attribution"] == 20.0
+        cyber_evs = [e for e in corr["evidence"] if e["kind"] == "cyber"]
+        assert all(e["index"] == CTI_INDEX for e in cyber_evs)
 
 
 class TestStaticFallbackPath:
@@ -123,6 +150,13 @@ class TestStaticFallbackPath:
         apt_entries = [e for e in corr["timeline"] if e["type"] == "apt_activity"]
         assert len(apt_entries) == 3
         assert all("(offensive)" in e["description"] for e in apt_entries)
+        # Static attribution is the weakest provenance.
+        _assert_scoring_contract(corr)
+        assert corr["confidence_factors"]["attribution"] == 15.0
+        cyber_evs = [e for e in corr["evidence"] if e["kind"] == "cyber"]
+        assert cyber_evs and all(e["index"] == "static" for e in cyber_evs)
+        # Without an ES doc, the APT name itself is the reference.
+        assert cyber_evs[0]["doc_id"] == _COUNTRY_APT_MAP["RUSSIA"][0]
 
 
 class TestTargetingPath:

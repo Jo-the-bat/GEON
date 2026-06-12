@@ -35,6 +35,17 @@ def _spending(country="RUSSIA", yoy=None, year=None, usd=86000.0):
     }
 
 
+def _assert_scoring_contract(corr):
+    """Every correlation carries auditable confidence + evidence refs."""
+    assert isinstance(corr["confidence"], int)
+    assert 5 <= corr["confidence"] <= 95
+    assert isinstance(corr["confidence_factors"], dict)
+    assert "base" in corr["confidence_factors"]
+    assert corr["evidence"]
+    for ev in corr["evidence"]:
+        assert {"index", "doc_id", "kind", "summary"} <= set(ev)
+
+
 def _make_rule(spending_docs, octi=None):
     es = MagicMock()
     es.search.return_value = _hits(spending_docs)
@@ -60,6 +71,28 @@ class TestRunHappyPath:
         assert corr["cyber_event"]["campaign_id"] == ""
         assert corr["timeline"][0]["type"] == "military_spending"
         assert corr["timeline"][0]["date"].startswith(str(CURRENT_YEAR))
+
+    def test_confidence_and_evidence_contract_static_path(self):
+        """Static-map attribution: spending doc ref + cyber refs, with the
+        weaker static attribution bonus and the YoY-strength factor."""
+        rule = _make_rule([_spending()])  # yoy = threshold + 5
+
+        corr = rule.run()[0]
+
+        _assert_scoring_contract(corr)
+        spending_ev = corr["evidence"][0]
+        assert spending_ev["kind"] == "spending"
+        assert spending_ev["index"] == SPENDING_INDEX
+        # Deterministic {country}:{year} identity of the SIPRI doc.
+        assert spending_ev["doc_id"] == f"RUSSIA:{CURRENT_YEAR}"
+        cyber_evs = [e for e in corr["evidence"] if e["kind"] == "cyber"]
+        assert cyber_evs
+        assert len(cyber_evs) <= 5
+        assert all(e["index"] == "static" for e in cyber_evs)
+        factors = corr["confidence_factors"]
+        assert factors["base"] == 30.0
+        assert factors["attribution"] == 15.0  # static map only
+        assert factors["yoy_strength"] == 5.0  # yoy 5 points above threshold
 
 
 class TestQueryShape:
@@ -118,6 +151,11 @@ class TestOpenCTIValidation:
         # Lazarus Group is filtered out; the validated APT28 wins.
         assert corr["cyber_event"]["apt_group"] == "APT28"
         assert corr["cyber_event"]["campaign_id"] == "intrusion-set--abc"
+        # STIX-validated attribution scores higher than the static map.
+        assert corr["confidence_factors"]["attribution"] == 30.0
+        cyber_evs = [e for e in corr["evidence"] if e["kind"] == "cyber"]
+        assert [e["index"] for e in cyber_evs] == ["opencti"]
+        assert cyber_evs[0]["doc_id"] == "intrusion-set--abc"
 
     def test_unvalidated_campaigns_fall_back_to_static(self, monkeypatch):
         monkeypatch.setattr(

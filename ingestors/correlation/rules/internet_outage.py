@@ -17,6 +17,14 @@ from common.countries import normalize_country
 from common.settings import setting
 from elasticsearch import Elasticsearch
 
+from correlation.scoring import (
+    confidence,
+    evidence_entry,
+    evidence_from_hit,
+    proximity_bonus,
+    volume_bonus,
+)
+
 logger = logging.getLogger(__name__)
 
 WINDOW_HOURS: int = setting("correlation.internet_outage.window_hours", 48)
@@ -92,7 +100,15 @@ class InternetOutageRule:
                 size=100,
                 sort=[{"start_time": "desc"}],
             )
-            return [h["_source"] for h in resp["hits"]["hits"]]
+            # Keep the ES identity alongside the source so the
+            # correlation can reference the outage as evidence.
+            outages = []
+            for h in resp["hits"]["hits"]:
+                src = h["_source"]
+                src["_es_id"] = h.get("_id", "")
+                src["_es_index"] = h.get("_index", "")
+                outages.append(src)
+            return outages
         except Exception:
             logger.exception("[%s] Failed to query outages.", self.RULE_NAME)
             return []
@@ -100,7 +116,12 @@ class InternetOutageRule:
     def _find_gdelt_escalation(
         self, country: str, ref_time: str
     ) -> list[dict[str, Any]]:
-        """Find GDELT events with Goldstein < threshold near the outage."""
+        """Find GDELT events with Goldstein < threshold near the outage.
+
+        Returns:
+            Raw ES hits (``_index``/``_id``/``_source``) so the
+            correlation can reference its evidence.
+        """
         window_start, window_end = self._time_window(ref_time)
         try:
             resp = self.es.search(
@@ -120,14 +141,14 @@ class InternetOutageRule:
                 size=10,
                 sort=[{"goldstein_scale": "asc"}],
             )
-            return [h["_source"] for h in resp["hits"]["hits"]]
+            return resp["hits"]["hits"]
         except Exception:
             return []
 
     def _find_acled_conflict(
         self, country: str, ref_time: str
     ) -> list[dict[str, Any]]:
-        """Find ACLED conflict events near the outage."""
+        """Find ACLED conflict events near the outage (raw ES hits)."""
         window_start, window_end = self._time_window(ref_time)
         try:
             resp = self.es.search(
@@ -142,7 +163,7 @@ class InternetOutageRule:
                 },
                 size=10,
             )
-            return [h["_source"] for h in resp["hits"]["hits"]]
+            return resp["hits"]["hits"]
         except Exception:
             return []
 
@@ -155,9 +176,14 @@ class InternetOutageRule:
         now = datetime.now(timezone.utc).isoformat()
         country = outage["country"]
 
+        # Accept both raw ES hits (with _source) and bare source dicts so
+        # the signature stays backward compatible.
+        gdelt_events = [h.get("_source", h) for h in gdelt_hits]
+        acled_events = [h.get("_source", h) for h in acled_hits]
+
         is_total = outage.get("severity") == "total"
-        has_conflict = bool(acled_hits)
-        has_diplomatic = bool(gdelt_hits)
+        has_conflict = bool(acled_events)
+        has_diplomatic = bool(gdelt_events)
 
         if is_total and has_conflict:
             severity = "critical"
@@ -170,10 +196,12 @@ class InternetOutageRule:
 
         worst_goldstein = None
         worst_event_desc = ""
-        if gdelt_hits:
-            worst = min(gdelt_hits, key=lambda e: e.get("goldstein_scale", 0))
+        worst_event_date = ""
+        if gdelt_events:
+            worst = min(gdelt_events, key=lambda e: e.get("goldstein_scale", 0))
             worst_goldstein = worst.get("goldstein_scale")
             worst_event_desc = worst.get("cameo_description", "")
+            worst_event_date = worst.get("date", "")
 
         timeline: list[dict[str, str]] = [
             {
@@ -185,14 +213,14 @@ class InternetOutageRule:
                 ),
             }
         ]
-        for evt in gdelt_hits[:3]:
+        for evt in gdelt_events[:3]:
             timeline.append({
                 "date": evt.get("date", now),
                 "type": "diplomatic",
                 "description": (f"Goldstein {evt.get('goldstein_scale')}: "
                                 f"{evt.get('cameo_description', '')}"),
             })
-        for evt in acled_hits[:3]:
+        for evt in acled_events[:3]:
             timeline.append({
                 "date": evt.get("event_date", now),
                 "type": "conflict",
@@ -211,7 +239,44 @@ class InternetOutageRule:
                 f"coinciding with diplomatic escalation (Goldstein {worst_goldstein})"
             )
         if has_conflict:
-            desc_parts.append(f"and {len(acled_hits)} ACLED conflict event(s)")
+            desc_parts.append(f"and {len(acled_events)} ACLED conflict event(s)")
+
+        # Evidence: the outage doc + the corroborating GDELT/ACLED hits,
+        # so an analyst can verify the claim against the sources.
+        evidence: list[dict[str, str]] = [
+            evidence_entry(
+                index=outage.get("_es_index") or OUTAGES_INDEX,
+                doc_id=outage.get("_es_id") or outage.get("outage_id", ""),
+                date=str(outage.get("start_time", "")),
+                kind="outage",
+                summary=(f"{outage.get('severity', 'unknown')} internet outage "
+                         f"in {country} ({outage.get('type', '')})"),
+            ),
+        ]
+        for hit in gdelt_hits[:5]:
+            src = hit.get("_source", hit)
+            evidence.append(evidence_from_hit(
+                hit, "diplomatic",
+                f"Goldstein {src.get('goldstein_scale')}: "
+                f"{src.get('cameo_description', '')}",
+            ))
+        for hit in acled_hits[:5]:
+            src = hit.get("_source", hit)
+            evidence.append(evidence_from_hit(
+                hit, "conflict",
+                f"ACLED: {src.get('event_type', '')} — {src.get('notes', '')[:100]}",
+                date_field="event_date",
+            ))
+
+        # Confidence: corroboration volume + temporal proximity between
+        # the outage start and the worst GDELT escalation.
+        conf, factors = confidence(30, {
+            "volume": volume_bonus(len(gdelt_events) + len(acled_events)),
+            "proximity": proximity_bonus(
+                self._days_apart(outage.get("start_time", ""), worst_event_date),
+                WINDOW_HOURS / 24,
+            ),
+        })
 
         return {
             "correlation_id": correlation_id,
@@ -220,8 +285,11 @@ class InternetOutageRule:
             "rule_name": self.RULE_NAME,
             "severity": severity,
             "countries_involved": [country],
+            "confidence": conf,
+            "confidence_factors": factors,
+            "evidence": evidence,
             "diplomatic_event": {
-                "event_id": gdelt_hits[0].get("event_id", "") if gdelt_hits else "",
+                "event_id": gdelt_events[0].get("event_id", "") if gdelt_events else "",
                 "description": worst_event_desc,
                 "goldstein": worst_goldstein or 0.0,
             },
@@ -233,6 +301,20 @@ class InternetOutageRule:
             "description": " ".join(desc_parts) + ".",
             "timeline": timeline,
         }
+
+    @staticmethod
+    def _days_apart(time_a: str, time_b: str) -> float | None:
+        """Absolute gap in days between two ISO timestamps (None if unparseable)."""
+        try:
+            dt_a = datetime.fromisoformat(str(time_a).replace("Z", "+00:00"))
+            dt_b = datetime.fromisoformat(str(time_b).replace("Z", "+00:00"))
+        except (ValueError, TypeError):
+            return None
+        if dt_a.tzinfo is None:
+            dt_a = dt_a.replace(tzinfo=timezone.utc)
+        if dt_b.tzinfo is None:
+            dt_b = dt_b.replace(tzinfo=timezone.utc)
+        return abs((dt_a - dt_b).total_seconds()) / 86400.0
 
     @staticmethod
     def _time_window(ref_time: str) -> tuple[str, str]:

@@ -148,6 +148,8 @@ def _format_plain_alert(correlation: dict[str, Any]) -> str:
         f"Rule: {rule}",
         f"Countries: {countries}",
     ]
+    if correlation.get("confidence") is not None:
+        lines.append(f"Confidence: {correlation['confidence']}/100")
     if diplo_line:
         lines.append(diplo_line)
     if cyber_line:
@@ -186,6 +188,12 @@ def _build_discord_embed(correlation: dict[str, Any]) -> dict[str, Any]:
         {"name": "Severity", "value": severity.upper(), "inline": True},
         {"name": "Countries", "value": countries, "inline": True},
     ]
+    if correlation.get("confidence") is not None:
+        fields.append({
+            "name": "Confidence",
+            "value": f"{correlation['confidence']}/100",
+            "inline": True,
+        })
 
     diplo = correlation.get("diplomatic_event", {})
     if diplo:

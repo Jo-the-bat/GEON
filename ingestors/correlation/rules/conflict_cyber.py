@@ -21,6 +21,14 @@ from common.settings import setting
 from elasticsearch import Elasticsearch
 from pycti import OpenCTIApiClient
 
+from correlation.scoring import (
+    attribution_bonus,
+    confidence,
+    evidence_entry,
+    proximity_bonus,
+    volume_bonus,
+)
+
 logger = logging.getLogger(__name__)
 
 # Country → APT attribution mapping, used to validate OpenCTI matches
@@ -161,6 +169,10 @@ class ConflictCyberRule:
             # Defensive: pre-migration ACLED docs store Title Case names.
             country = normalize_country(src.get("country", "").strip())
             if country:
+                # Keep the ES identity on the source dict so the
+                # correlation can reference the event as evidence.
+                src["_es_id"] = hit.get("_id", "")
+                src["_es_index"] = hit.get("_index", "")
                 by_country.setdefault(country, []).append(src)
 
         return by_country
@@ -271,6 +283,41 @@ class ConflictCyberRule:
             f"{self.RULE_NAME}:{country}".encode()
         ).hexdigest()[:20]
 
+        # Evidence: the ACLED conflict events + the validated OpenCTI
+        # campaigns, so the analyst can verify the claim.
+        evidence: list[dict[str, str]] = []
+        for evt in conflict_events[:5]:
+            evidence.append(evidence_entry(
+                index=evt.get("_es_index", ""),
+                doc_id=evt.get("_es_id", ""),
+                date=str(evt.get("event_date", "")),
+                kind="conflict",
+                summary=(
+                    f"{evt.get('event_type', 'Conflict')}: "
+                    f"{evt.get('location', 'Unknown location')} "
+                    f"({evt.get('fatalities', 0)} fatalities)"
+                ),
+            ))
+        for apt in cyber_matches[:3]:
+            evidence.append(evidence_entry(
+                index="opencti",
+                doc_id=apt.get("id", ""),
+                date=str(apt.get("modified", apt.get("created", ""))),
+                kind="cyber",
+                summary=f"{apt.get('name', 'Unknown')} "
+                        f"({apt.get('_geon_type', 'campaign')})",
+            ))
+
+        # Confidence: STIX-validated attribution + conflict corroboration
+        # volume + temporal proximity between the latest conflict event
+        # and the primary campaign's activity.
+        days_apart = self._days_apart(conflict_events, primary_apt)
+        conf, factors = confidence(30, {
+            "attribution": attribution_bonus("opencti"),
+            "volume": volume_bonus(num_events),
+            "proximity": proximity_bonus(days_apart, CYBER_WINDOW_DAYS),
+        })
+
         return {
             "correlation_id": correlation_id,
             "timestamp": now,
@@ -278,6 +325,9 @@ class ConflictCyberRule:
             "rule_name": self.RULE_NAME,
             "severity": severity,
             "countries_involved": [country],
+            "confidence": conf,
+            "confidence_factors": factors,
+            "evidence": evidence,
             "diplomatic_event": {
                 "event_id": "",
                 "description": (
@@ -299,6 +349,43 @@ class ConflictCyberRule:
             ),
             "timeline": timeline,
         }
+
+    # ------------------------------------------------------------------
+    # Helpers
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _days_apart(
+        conflict_events: list[dict[str, Any]],
+        campaign: dict[str, Any],
+    ) -> float | None:
+        """Gap in days between the latest conflict event and a campaign.
+
+        Args:
+            conflict_events: ACLED event dicts (with ``event_date``).
+            campaign: OpenCTI campaign/intrusion-set dict (``modified``
+                or ``created`` date).
+
+        Returns:
+            Absolute gap in days, or ``None`` when either date is missing
+            or unparseable — absence of dates is neither evidence for nor
+            against, so the proximity bonus then stays at 0.
+        """
+        latest = max(
+            (str(e.get("event_date", "")) for e in conflict_events),
+            default="",
+        )
+        campaign_date = str(campaign.get("modified", campaign.get("created", "")) or "")
+        try:
+            conflict_dt = datetime.fromisoformat(latest.replace("Z", "+00:00"))
+            cyber_dt = datetime.fromisoformat(campaign_date.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+        if conflict_dt.tzinfo is None:
+            conflict_dt = conflict_dt.replace(tzinfo=timezone.utc)
+        if cyber_dt.tzinfo is None:
+            cyber_dt = cyber_dt.replace(tzinfo=timezone.utc)
+        return abs((cyber_dt - conflict_dt).total_seconds()) / 86400.0
 
     # ------------------------------------------------------------------
     # Severity computation

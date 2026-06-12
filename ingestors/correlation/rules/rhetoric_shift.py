@@ -17,6 +17,13 @@ from common.config import INDEX_PREFIX
 from common.settings import setting
 from elasticsearch import Elasticsearch
 
+from correlation.scoring import (
+    confidence,
+    evidence_entry,
+    volume_bonus,
+    zscore_bonus,
+)
+
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
@@ -47,15 +54,25 @@ class RhetoricShiftRule:
 
     RULE_NAME = "rhetoric_shift"
 
-    def __init__(self, es: Elasticsearch, **_kwargs: Any) -> None:
+    def __init__(
+        self,
+        es: Elasticsearch,
+        as_of: "datetime | None" = None,
+        **_kwargs: Any,
+    ) -> None:
         """Initialise the rule.
 
         Args:
             es: Elasticsearch client.
+            as_of: Clock override for the backtesting harness.
             **_kwargs: Accepts and ignores extra keyword arguments so the
                 engine can pass ``octi`` without error.
         """
         self.es = es
+        self.as_of = as_of
+
+    def _now(self) -> datetime:
+        return self.as_of or datetime.now(timezone.utc)
 
     def run(self) -> list[dict[str, Any]]:
         """Execute the rule and return a list of correlation documents.
@@ -71,8 +88,12 @@ class RhetoricShiftRule:
             logger.info("[%s] No GDELT tone data in the short window.", self.RULE_NAME)
             return correlations
 
-        # Step 2: Get baseline statistics for the long window.
-        long_stats = self._aggregate_tone(days=LONG_WINDOW_DAYS)
+        # Step 2: Get baseline statistics — the long window EXCLUDES the
+        # short window so the shift under test does not contaminate its
+        # own baseline (it would otherwise drag the mean toward itself
+        # and understate the deviation by ~SHORT/LONG).
+        long_stats = self._aggregate_tone(
+            days=LONG_WINDOW_DAYS, exclude_recent_days=SHORT_WINDOW_DAYS)
 
         # Step 3: Compare and detect deviations.
         for pair_key, short in short_stats.items():
@@ -105,7 +126,7 @@ class RhetoricShiftRule:
     # ------------------------------------------------------------------
 
     def _aggregate_tone(
-        self, days: int
+        self, days: int, exclude_recent_days: int = 0
     ) -> dict[str, dict[str, Any]]:
         """Aggregate GDELT tone by country pair over the given window.
 
@@ -113,21 +134,29 @@ class RhetoricShiftRule:
         target_country)`` with stats sub-aggregation on the ``tone`` field.
 
         Args:
-            days: Number of days to look back.
+            days: Window length in days.
+            exclude_recent_days: Shift the window back by this many days
+                (used so the baseline window ends BEFORE the detection
+                window instead of containing it).
 
         Returns:
             Dict mapping ``"countryA||countryB"`` to a dict with keys
             ``avg_tone``, ``std_tone``, ``count``, ``min_tone``,
             ``max_tone``.
         """
-        since = (
-            datetime.now(timezone.utc) - timedelta(days=days)
-        ).isoformat()
+        until = self._now() - timedelta(days=exclude_recent_days)
+        since = (until - timedelta(days=days)).isoformat()
 
         query: dict[str, Any] = {
             "bool": {
                 "must": [
-                    {"range": {"date": {"gte": since}}},
+                    # The upper bound matters for the backtesting harness
+                    # (a replay must not see future events) AND for the
+                    # baseline call (which ends before the short window).
+                    {"range": {"date": {
+                        "gte": since,
+                        "lte": until.isoformat(),
+                    }}},
                     {"exists": {"field": "tone"}},
                 ],
                 "must_not": [
@@ -291,7 +320,7 @@ class RhetoricShiftRule:
         Returns:
             Correlation document dict.
         """
-        now = datetime.now(timezone.utc).isoformat()
+        now = self._now().isoformat()
         countries = pair_key.split("||")
 
         # Negative deviation = rhetoric deteriorating; positive = improving.
@@ -313,6 +342,25 @@ class RhetoricShiftRule:
             f"{self.RULE_NAME}:{pair_key}".encode()
         ).hexdigest()[:20]
 
+        # Pure-aggregation rule: the evidence is the statistical signal
+        # itself (there are no individual trigger documents to point at).
+        evidence = [evidence_entry(
+            index=GDELT_INDEX_PATTERN,
+            doc_id="",
+            date=now,
+            kind="signal",
+            summary=(
+                f"Tone {direction}: {SHORT_WINDOW_DAYS}d avg "
+                f"{short['avg_tone']:.2f} vs {LONG_WINDOW_DAYS}d baseline "
+                f"{baseline['avg_tone']:.2f} ({deviation:+.1f} sigma, "
+                f"n={short['count']}/{baseline['count']})"
+            ),
+        )]
+        conf, factors = confidence(25, {
+            "zscore": zscore_bonus(abs_dev, STDDEV_THRESHOLD),
+            "volume": volume_bonus(int(short.get("count", 0)), saturation=100),
+        })
+
         return {
             "correlation_id": correlation_id,
             "timestamp": now,
@@ -320,6 +368,10 @@ class RhetoricShiftRule:
             "rule_name": self.RULE_NAME,
             "severity": severity,
             "countries_involved": countries,
+            "deviation": round(deviation, 2),
+            "confidence": conf,
+            "confidence_factors": factors,
+            "evidence": evidence,
             "diplomatic_event": {
                 "event_id": "",
                 "description": (
@@ -347,7 +399,7 @@ class RhetoricShiftRule:
             "timeline": [
                 {
                     "date": (
-                        datetime.now(timezone.utc) - timedelta(days=LONG_WINDOW_DAYS)
+                        self._now() - timedelta(days=LONG_WINDOW_DAYS)
                     ).isoformat(),
                     "type": "baseline",
                     "description": (
@@ -359,7 +411,7 @@ class RhetoricShiftRule:
                 },
                 {
                     "date": (
-                        datetime.now(timezone.utc) - timedelta(days=SHORT_WINDOW_DAYS)
+                        self._now() - timedelta(days=SHORT_WINDOW_DAYS)
                     ).isoformat(),
                     "type": "shift",
                     "description": (

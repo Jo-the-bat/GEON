@@ -50,7 +50,9 @@ def _hits(sources: list[dict[str, Any]]) -> dict[str, Any]:
     return {
         "hits": {
             "hits": [
-                {"_id": f"doc-{i}", "_source": s} for i, s in enumerate(sources)
+                {"_id": f"doc-{i}", "_index": "geon-acled-events-2026.06",
+                 "_source": s}
+                for i, s in enumerate(sources)
             ]
         }
     }
@@ -114,6 +116,15 @@ class TestHappyPath:
         assert types.count("cyber") == 1
         # OpenCTI queried with the configured window for the canonical name.
         assert calls == [("SYRIA", CYBER_WINDOW_DAYS)]
+        # Confidence contract: auditable int in [5, 95] with its factors.
+        assert isinstance(corr["confidence"], int)
+        assert 5 <= corr["confidence"] <= 95
+        assert isinstance(corr["confidence_factors"], dict)
+        assert "base" in corr["confidence_factors"]
+        # Evidence contract: non-empty refs with index/doc_id/kind/summary.
+        assert corr["evidence"]
+        for ref in corr["evidence"]:
+            assert {"index", "doc_id", "kind", "summary"} <= set(ref)
 
     def test_title_case_country_normalized(self, monkeypatch):
         rule = _rule([_acled(country="Syria")])
@@ -190,6 +201,76 @@ class TestAttributionValidation:
         correlations = rule.run()
         assert len(correlations) == 1
         assert correlations[0]["cyber_event"]["apt_group"] == "Syrian Electronic Army"
+
+
+class TestConfidenceEvidence:
+    """Confidence scoring and evidence references on the correlation."""
+
+    def test_evidence_references_conflicts_and_campaigns(self, monkeypatch):
+        rule = _rule([
+            _acled(fatalities=12),
+            _acled(fatalities=3, location="Homs"),
+        ])
+        _patch_campaigns(monkeypatch, {"SYRIA": [_campaign()]})
+
+        corr = rule.run()[0]
+
+        conflict_refs = [e for e in corr["evidence"] if e["kind"] == "conflict"]
+        assert len(conflict_refs) == 2
+        assert {r["doc_id"] for r in conflict_refs} == {"doc-0", "doc-1"}
+        assert all(
+            r["index"] == "geon-acled-events-2026.06" for r in conflict_refs
+        )
+        assert "fatalities" in conflict_refs[0]["summary"]
+
+        cyber_refs = [e for e in corr["evidence"] if e["kind"] == "cyber"]
+        assert len(cyber_refs) == 1
+        assert cyber_refs[0]["index"] == "opencti"
+        assert cyber_refs[0]["doc_id"].startswith("intrusion-set--")
+        assert "Syrian Electronic Army" in cyber_refs[0]["summary"]
+
+    def test_evidence_capped_per_source_type(self, monkeypatch):
+        events = [dict(_acled(), country="Russia") for _ in range(7)]
+        campaigns = [
+            _campaign(name=n)
+            for n in ("APT28", "APT29", "Sandworm Team", "Turla")
+        ]
+        rule = _rule(events)
+        _patch_campaigns(monkeypatch, {"RUSSIA": campaigns})
+
+        kinds = [e["kind"] for e in rule.run()[0]["evidence"]]
+        assert kinds.count("conflict") == 5  # capped at 5
+        assert kinds.count("cyber") == 3     # capped at 3
+
+    def test_proximity_factor_uses_real_gap(self, monkeypatch):
+        """Latest conflict 2026-06-08, campaign modified 2026-06-09: the
+        1-day gap is scored against the rule's CYBER_WINDOW_DAYS."""
+        rule = _rule([
+            _acled(event_date="2026-06-01T00:00:00+00:00"),
+            _acled(event_date="2026-06-08T00:00:00+00:00"),
+        ])
+        _patch_campaigns(monkeypatch, {
+            "SYRIA": [_campaign(modified="2026-06-09T00:00:00+00:00")],
+        })
+
+        factors = rule.run()[0]["confidence_factors"]
+
+        expected = 15.0 * (1 - 1 / CYBER_WINDOW_DAYS)
+        assert factors["proximity"] == pytest.approx(expected)
+
+    def test_unparseable_dates_drop_proximity_bonus(self, monkeypatch):
+        rule = _rule([_acled(event_date="not-a-date")])
+        _patch_campaigns(monkeypatch, {"SYRIA": [_campaign(modified="")]})
+        factors = rule.run()[0]["confidence_factors"]
+        assert factors["proximity"] == 0.0
+
+    def test_attribution_factor_is_opencti_grade(self, monkeypatch):
+        """Matches are STIX-validated against the attribution map, so the
+        attribution factor uses the strongest ("opencti") bonus."""
+        rule = _rule([_acled()])
+        _patch_campaigns(monkeypatch, {"SYRIA": [_campaign()]})
+        factors = rule.run()[0]["confidence_factors"]
+        assert factors["attribution"] == 30.0
 
 
 class TestSeverity:

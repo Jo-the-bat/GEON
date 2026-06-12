@@ -18,6 +18,8 @@ from common.config import INDEX_PREFIX
 from common.settings import setting
 from elasticsearch import Elasticsearch
 
+from correlation.scoring import confidence, evidence_entry, volume_bonus
+
 logger = logging.getLogger(__name__)
 
 TRANSFERS_INDEX = f"{INDEX_PREFIX}-arms-transfers"
@@ -185,6 +187,39 @@ class ArmsEscalationRule:
             f"{self.RULE_NAME}:{recipient}:{neighbor}:{transfer.get('date', '')}".encode()
         ).hexdigest()[:20]
 
+        # Evidence: the highest-TIV delivery + the before/after counts as
+        # a computed signal, so an analyst can verify the escalation claim.
+        evidence: list[dict[str, str]] = [
+            evidence_entry(
+                index=TRANSFERS_INDEX,
+                doc_id=transfer.get("transfer_id", ""),
+                date=str(transfer.get("date", "")),
+                kind="transfer",
+                summary=(
+                    f"{supplier} -> {recipient}: {weapon} "
+                    f"(TIV {transfer.get('tiv_value', 0)})"
+                ),
+            ),
+            evidence_entry(
+                index=GDELT_INDEX_PATTERN,
+                date=str(transfer.get("date", "")),
+                kind="signal",
+                summary=(
+                    f"Negative GDELT events {recipient}<->{neighbor}: "
+                    f"{before} before vs {after} after delivery "
+                    f"(+{pct_increase:.0f}% over {ESCALATION_WINDOW_DAYS}d)"
+                ),
+            ),
+        ]
+
+        # Confidence: post-delivery corroboration volume + how far the
+        # increase exceeds the firing threshold.
+        conf, factors = confidence(30, {
+            "volume": volume_bonus(after),
+            "escalation_strength": max(
+                0.0, min(20.0, (pct_increase - ESCALATION_THRESHOLD_PCT) / 5)),
+        })
+
         return {
             "correlation_id": correlation_id,
             "timestamp": now,
@@ -192,6 +227,9 @@ class ArmsEscalationRule:
             "rule_name": self.RULE_NAME,
             "severity": severity,
             "countries_involved": sorted([recipient, neighbor]),
+            "confidence": conf,
+            "confidence_factors": factors,
+            "evidence": evidence,
             "diplomatic_event": {
                 "event_id": "",
                 "description": (

@@ -326,6 +326,21 @@ class PolymarketIngestor:
         }
 
         try:
+            # Full-replace write: preserve any analyst triage verdict from
+            # a previous version of the document (the engine's protected
+            # merge does this for rule correlations; direct writers must
+            # honour the same contract).
+            try:
+                existing = self.es.get(
+                    index=f"{INDEX_PREFIX}-correlations", id=corr_id
+                )["_source"]
+                for key in ("status", "triaged_at", "triage_note"):
+                    if key in existing:
+                        correlation[key] = existing[key]
+            except Exception:
+                pass  # New document.
+            correlation.setdefault("status", "open")
+
             self.es.index(
                 index=f"{INDEX_PREFIX}-correlations",
                 id=corr_id,
@@ -366,10 +381,15 @@ class PolymarketIngestor:
             result = self.es.count(
                 index=f"{INDEX_PREFIX}-correlations",
                 body={
-                    "query": {"bool": {"filter": [
-                        {"range": {"date": {"gte": "now-30d"}}},
-                        {"terms": {"countries_involved": countries}},
-                    ]}}
+                    "query": {"bool": {
+                        "must_not": [
+                            {"term": {"status": "false_positive"}},
+                        ],
+                        "filter": [
+                            {"range": {"date": {"gte": "now-30d"}}},
+                            {"terms": {"countries_involved": countries}},
+                        ],
+                    }}
                 },
             )
             return result["count"]

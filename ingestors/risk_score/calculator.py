@@ -196,13 +196,20 @@ class RiskScoreCalculator:
             return 0
 
     def _count_correlations(self, country: str) -> int:
-        """Count correlations involving a country in last 30 days."""
+        """Count correlations involving a country in last 30 days.
+
+        Analyst-confirmed false positives are excluded — a known-false
+        detection must not keep inflating the country's risk score.
+        """
         try:
             result = self.es.count(
                 index=f"{INDEX_PREFIX}-correlations",
                 body={
                     "query": {
                         "bool": {
+                            "must_not": [
+                                {"term": {"status": "false_positive"}},
+                            ],
                             "filter": [
                                 {"range": {"date": {"gte": "now-30d"}}},
                                 {"term": {"countries_involved": country}},

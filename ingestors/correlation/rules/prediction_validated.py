@@ -17,6 +17,14 @@ from common.config import INDEX_PREFIX
 from common.settings import setting
 from elasticsearch import Elasticsearch
 
+from correlation.scoring import (
+    confidence,
+    evidence_entry,
+    evidence_from_hit,
+    proximity_bonus,
+    volume_bonus,
+)
+
 logger = logging.getLogger(__name__)
 
 POLYMARKET_INDEX = f"{INDEX_PREFIX}-polymarket-cases"
@@ -52,11 +60,12 @@ class PredictionValidatedRule:
             if not countries:
                 continue
 
-            events = self._find_high_severity_events(countries)
-            if not events:
+            event_hits = self._find_high_severity_events(countries)
+            if not event_hits:
                 continue
 
-            correlation = self._build_correlation(case, events)
+            events = [h["_source"] for h in event_hits]
+            correlation = self._build_correlation(case, events, event_hits=event_hits)
             correlations.append(correlation)
 
         logger.info("[%s] Generated %d correlation(s).", self.RULE_NAME, len(correlations))
@@ -112,7 +121,12 @@ class PredictionValidatedRule:
             return []
 
     def _find_high_severity_events(self, countries: list[str]) -> list[dict[str, Any]]:
-        """Find GDELT events with |Goldstein| > threshold for given countries in 72h."""
+        """Find GDELT events with |Goldstein| > threshold for given countries in 72h.
+
+        Returns:
+            RAW ES hits (``_index``/``_id`` kept) so the correlation can
+            reference its evidence documents.
+        """
         since = (datetime.now(timezone.utc) - timedelta(hours=WINDOW_HOURS)).isoformat()
 
         country_clauses = []
@@ -141,7 +155,7 @@ class PredictionValidatedRule:
                 size=10,
                 sort=[{"goldstein_scale": "asc"}],
             )
-            return [h["_source"] for h in resp["hits"]["hits"]]
+            return resp["hits"]["hits"]
         except Exception:
             return []
 
@@ -149,7 +163,16 @@ class PredictionValidatedRule:
         self,
         case: dict[str, Any],
         events: list[dict[str, Any]],
+        event_hits: list[dict[str, Any]] | None = None,
     ) -> dict[str, Any]:
+        """Assemble a correlation document.
+
+        Args:
+            case: Polymarket case source document.
+            events: GDELT event source dicts (``_source`` contents).
+            event_hits: Raw ES hits (with ``_index``/``_id``) matching
+                *events*, used for evidence references when available.
+        """
         now = datetime.now(timezone.utc).isoformat()
         question = case.get("question", "")
         countries = case.get("countries_involved", [])
@@ -164,12 +187,15 @@ class PredictionValidatedRule:
         case_date = case.get("date", "")
 
         # Determine direction: anticipation (market moved first) or reaction
+        days_apart: float | None
         try:
             ev_dt = datetime.fromisoformat(str(event_date).replace("Z", "+00:00"))
             ca_dt = datetime.fromisoformat(str(case_date).replace("Z", "+00:00"))
             direction = "anticipation" if ca_dt < ev_dt else "reaction"
+            days_apart = abs((ev_dt - ca_dt).total_seconds()) / 86400.0
         except (ValueError, TypeError):
             direction = "unknown"
+            days_apart = None
 
         severity = "medium" if direction == "anticipation" else "high"
 
@@ -180,6 +206,46 @@ class PredictionValidatedRule:
             f"{self.RULE_NAME}:{case.get('case_id', '')}:{event_anchor}".encode()
         ).hexdigest()[:20]
 
+        # Evidence: the market case + the validating GDELT events, so the
+        # analyst can verify the claim instead of trusting the alert.
+        evidence: list[dict[str, str]] = [
+            evidence_entry(
+                index=POLYMARKET_INDEX,
+                doc_id=str(case.get("case_id", "")),
+                date=str(case_date),
+                kind="market",
+                summary=f"{change:+.1%} on \"{question[:120]}\"",
+            ),
+        ]
+        if event_hits:
+            for hit in event_hits[:5]:
+                src = hit.get("_source", {})
+                evidence.append(evidence_from_hit(
+                    hit, "diplomatic",
+                    f"Goldstein {src.get('goldstein_scale')}: "
+                    f"{src.get('cameo_description', '')}",
+                ))
+        else:
+            # Direct callers (tests, backtesting) may only have sources.
+            for ev in events[:5]:
+                evidence.append(evidence_entry(
+                    index=GDELT_INDEX_PATTERN,
+                    doc_id=str(ev.get("event_id", "")),
+                    date=str(ev.get("date", "")),
+                    kind="diplomatic",
+                    summary=f"Goldstein {ev.get('goldstein_scale')}: "
+                            f"{ev.get('cameo_description', '')}",
+                ))
+
+        # Confidence: corroborating event volume + temporal proximity of
+        # the market move and the event + magnitude of the price shift.
+        conf, factors = confidence(30, {
+            "volume": volume_bonus(len(events)),
+            "proximity": proximity_bonus(days_apart, WINDOW_HOURS / 24.0),
+            "market_move": max(
+                0.0, min(15.0, (abs(change) - PRICE_SHIFT_THRESHOLD) * 100)),
+        })
+
         return {
             "correlation_id": correlation_id,
             "timestamp": now,
@@ -187,6 +253,9 @@ class PredictionValidatedRule:
             "rule_name": self.RULE_NAME,
             "severity": severity,
             "countries_involved": countries,
+            "confidence": conf,
+            "confidence_factors": factors,
+            "evidence": evidence,
             "diplomatic_event": {
                 "event_id": worst_event.get("event_id", ""),
                 "description": worst_event.get("cameo_description", ""),

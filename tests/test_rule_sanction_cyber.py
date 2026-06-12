@@ -44,7 +44,8 @@ def _hits(sources: list[dict[str, Any]]) -> dict[str, Any]:
     return {
         "hits": {
             "hits": [
-                {"_id": f"doc-{i}", "_source": s} for i, s in enumerate(sources)
+                {"_id": f"doc-{i}", "_index": "geon-sanctions", "_source": s}
+                for i, s in enumerate(sources)
             ]
         }
     }
@@ -98,6 +99,15 @@ class TestHappyPath:
         assert types.count("sanction") == 1
         assert types[-1] == "cyber"
         assert "Entity X" in corr["timeline"][0]["description"]
+        # Confidence contract: auditable int in [5, 95] with its factors.
+        assert isinstance(corr["confidence"], int)
+        assert 5 <= corr["confidence"] <= 95
+        assert isinstance(corr["confidence_factors"], dict)
+        assert "base" in corr["confidence_factors"]
+        # Evidence contract: non-empty refs with index/doc_id/kind/summary.
+        assert corr["evidence"]
+        for ref in corr["evidence"]:
+            assert {"index", "doc_id", "kind", "summary"} <= set(ref)
 
     def test_ratio_exactly_at_threshold_correlates(self):
         """The spike comparison is inclusive (>= IOC_SPIKE_THRESHOLD)."""
@@ -141,6 +151,69 @@ class TestEmptyData:
         rule = _rule([_sanction(country="")])
         assert rule.run() == []
         rule.es.count.assert_not_called()
+
+
+class TestConfidenceEvidence:
+    """Confidence scoring and evidence references on the correlation."""
+
+    def _correlation(
+        self,
+        sanctions: list[dict[str, Any]] | None = None,
+        ratio: float = IOC_SPIKE_THRESHOLD,
+    ) -> dict[str, Any]:
+        post = int(BASELINE * ratio)
+        rule = _rule(sanctions or [_sanction()], counts=[post, BASELINE])
+        correlations = rule.run()
+        assert len(correlations) == 1
+        return correlations[0]
+
+    def test_sanction_evidence_references_source_docs(self):
+        corr = self._correlation()
+        sanction_refs = [e for e in corr["evidence"] if e["kind"] == "sanction"]
+        assert len(sanction_refs) == 1
+        ref = sanction_refs[0]
+        assert ref["index"] == "geon-sanctions"
+        assert ref["doc_id"] == "doc-0"
+        assert ref["date"] == "2026-06-10T00:00:00+00:00"
+        assert "Entity X" in ref["summary"]
+
+    def test_signal_entry_describes_spike_counts_and_windows(self):
+        post = int(BASELINE * IOC_SPIKE_THRESHOLD) + 1
+        rule = _rule([_sanction()], counts=[post, BASELINE])
+        corr = rule.run()[0]
+        signals = [e for e in corr["evidence"] if e["kind"] == "signal"]
+        assert len(signals) == 1
+        summary = signals[0]["summary"]
+        assert str(post) in summary
+        assert str(BASELINE) in summary
+        assert f"{IOC_WINDOW_DAYS}d" in summary
+
+    def test_spike_strength_scales_with_ratio_and_caps_at_20(self):
+        at_threshold = self._correlation(ratio=IOC_SPIKE_THRESHOLD)
+        big = self._correlation(ratio=IOC_SPIKE_THRESHOLD + 5)
+        assert at_threshold["confidence_factors"]["spike_strength"] == 0.0
+        assert big["confidence_factors"]["spike_strength"] == 20.0
+        assert big["confidence"] > at_threshold["confidence"]
+
+    def test_volume_factor_counts_sanction_docs_and_evidence_capped(self):
+        many = [_sanction(name=f"Entity {i}") for i in range(8)]
+        corr = self._correlation(sanctions=many)
+        single = self._correlation()
+        assert (corr["confidence_factors"]["volume"]
+                > single["confidence_factors"]["volume"])
+        # Evidence capped: at most 5 sanction refs + the signal entry.
+        kinds = [e["kind"] for e in corr["evidence"]]
+        assert kinds.count("sanction") == 5
+        assert kinds.count("signal") == 1
+
+    def test_build_without_window_counts_still_describes_spike(self):
+        """Backward-compatible direct call: no window_counts kwarg."""
+        rule = _rule([_sanction()])
+        corr = rule._build_correlation("RUSSIA", [_sanction()], 3.5)
+        signals = [e for e in corr["evidence"] if e["kind"] == "signal"]
+        assert len(signals) == 1
+        assert "350%" in signals[0]["summary"]
+        assert 5 <= corr["confidence"] <= 95
 
 
 class TestCountryGrouping:

@@ -91,12 +91,47 @@ CORRELATIONS_MAPPING: dict[str, Any] = {
             "first_seen": {"type": "date"},
             "last_seen": {"type": "date"},
             "times_seen": {"type": "integer"},
+            # Detection trust + verifiability (see correlation/scoring.py).
+            "confidence": {"type": "integer"},
+            "confidence_factors": {"type": "object", "enabled": False},
+            # Statistical baseline snapshot (rules using z-score gating).
+            "baseline": {"type": "object", "enabled": False},
+            "evidence": {
+                "type": "nested",
+                "properties": {
+                    "index": {"type": "keyword"},
+                    "doc_id": {"type": "keyword"},
+                    "date": {"type": "keyword"},
+                    "kind": {"type": "keyword"},
+                    "summary": {"type": "text"},
+                },
+            },
+            # Analyst lifecycle: open | acknowledged | resolved |
+            # false_positive (managed via `python -m correlation.triage`).
+            "status": {"type": "keyword"},
+            "triaged_at": {"type": "date"},
+            "triage_note": {"type": "text"},
         },
     },
     "settings": {
         "number_of_shards": 1,
         "number_of_replicas": 0,
     },
+}
+
+# Mapping fields added after the index already exists in deployments —
+# applied idempotently by _ensure_correlations_index.
+_LATE_MAPPING_FIELDS: dict[str, Any] = {
+    "first_seen": {"type": "date"},
+    "last_seen": {"type": "date"},
+    "times_seen": {"type": "integer"},
+    "confidence": {"type": "integer"},
+    "confidence_factors": {"type": "object", "enabled": False},
+    "baseline": {"type": "object", "enabled": False},
+    "evidence": CORRELATIONS_MAPPING["mappings"]["properties"]["evidence"],
+    "status": {"type": "keyword"},
+    "triaged_at": {"type": "date"},
+    "triage_note": {"type": "text"},
 }
 
 # Temporary mapping file path (written at runtime).
@@ -132,6 +167,9 @@ REACTIVATION_DAYS: int = setting("correlation.engine.reactivation_days", 14)
 
 # Cap merged timelines so long-running situations don't grow unbounded.
 TIMELINE_MAX_ENTRIES: int = setting("correlation.engine.timeline_max_entries", 50)
+
+# Cap merged evidence references per situation document.
+EVIDENCE_MAX_ENTRIES: int = setting("correlation.engine.evidence_max_entries", 20)
 
 
 class CorrelationEngine:
@@ -345,21 +383,17 @@ class CorrelationEngine:
     def _ensure_correlations_index(self) -> None:
         """Ensure the correlations index exists with up-to-date mapping."""
         if self.es.indices.exists(index=CORRELATIONS_INDEX):
-            # Idempotent: add the situation-tracking fields to indices
-            # created before they existed.
+            # Idempotent: add the fields introduced after the index was
+            # first created in existing deployments.
             try:
                 self.es.indices.put_mapping(
                     index=CORRELATIONS_INDEX,
-                    properties={
-                        "first_seen": {"type": "date"},
-                        "last_seen": {"type": "date"},
-                        "times_seen": {"type": "integer"},
-                    },
+                    properties=_LATE_MAPPING_FIELDS,
                 )
             except Exception:
                 logger.warning(
-                    "Could not add situation-tracking fields to the "
-                    "correlations mapping."
+                    "Could not extend the correlations mapping with the "
+                    "situation/evidence/triage fields."
                 )
             return
 
@@ -467,11 +501,16 @@ class CorrelationEngine:
                 cand.setdefault("first_seen", cand.get("timestamp", now_iso))
                 cand["last_seen"] = now_iso
                 cand["times_seen"] = 1
+                cand.setdefault("status", "open")
                 new_docs.append(cand)
                 alertable.append({**cand, "alert_context": "new"})
             else:
                 merged, alert_reason = self._merge_existing(stored, cand, now)
                 updated_docs.append(merged)
+                # Analyst verdicts override the engine: a situation marked
+                # false_positive keeps being tracked but never re-alerts.
+                if merged.get("status") == "false_positive":
+                    alert_reason = None
                 if alert_reason:
                     alertable.append({**merged, "alert_context": alert_reason})
 
@@ -503,6 +542,9 @@ class CorrelationEngine:
         """
         merged = dict(stored)
         merged.setdefault("first_seen", stored.get("timestamp", now.isoformat()))
+        # Legacy documents predate the lifecycle — they are de-facto open
+        # (setdefault never clobbers an analyst verdict).
+        merged.setdefault("status", "open")
         prev_last_seen = stored.get("last_seen") or stored.get("timestamp") or ""
         merged["last_seen"] = now.isoformat()
         merged["times_seen"] = int(stored.get("times_seen", 1) or 1) + 1
@@ -510,7 +552,10 @@ class CorrelationEngine:
         # (risk score, rule 10, Grafana timeField) — it MUST track the
         # latest firing or long-running active situations silently vanish
         # from those windows. ``timestamp``/``first_seen`` keep the origin.
-        merged["date"] = now.isoformat()
+        # Exception: analyst-confirmed false positives stop being
+        # refreshed so they age OUT of those windows naturally.
+        if merged.get("status") != "false_positive":
+            merged["date"] = now.isoformat()
 
         alert_reason: str | None = None
 
@@ -537,17 +582,39 @@ class CorrelationEngine:
         if cand_rank >= stored_rank or alert_reason == "reactivation":
             protected = {
                 "correlation_id", "timestamp", "first_seen", "last_seen",
-                "times_seen", "timeline", "date",
+                "times_seen", "timeline", "date", "evidence",
+                # Analyst triage is never clobbered by the engine.
+                "status", "triaged_at", "triage_note",
             }
             for key, value in cand.items():
                 if key not in protected:
                     merged[key] = value
+            # Optional rule-payload keys must not survive a refresh that
+            # no longer carries them (e.g. rule 10's fusion flag when the
+            # convergence drops below 5 signals, a baseline snapshot when
+            # the pair lost statistical history).
+            for key in ("flag", "baseline", "deviation"):
+                if key not in cand:
+                    merged.pop(key, None)
             if cand_rank < stored_rank:
                 # Severity never de-escalates.
                 merged["severity"] = stored.get("severity", "low")
 
+        # A resolved situation that escalates or reactivates reopens.
+        if alert_reason and merged.get("status") == "resolved":
+            merged["status"] = "open"
+
+        # An analyst already engaged on the situation doesn't need a
+        # dormancy reminder (escalations still alert).
+        if (alert_reason == "reactivation"
+                and merged.get("status") == "acknowledged"):
+            alert_reason = None
+
         merged["timeline"] = self._merge_timeline(
             stored.get("timeline"), cand.get("timeline")
+        )
+        merged["evidence"] = self._merge_evidence(
+            stored.get("evidence"), cand.get("evidence")
         )
 
         return merged, alert_reason
@@ -580,6 +647,44 @@ class CorrelationEngine:
         if len(merged) > TIMELINE_MAX_ENTRIES:
             head = TIMELINE_MAX_ENTRIES // 2
             tail = TIMELINE_MAX_ENTRIES - head
+            merged = merged[:head] + merged[-tail:]
+        return merged
+
+    @staticmethod
+    def _merge_evidence(
+        stored_evidence: list[dict[str, Any]] | None,
+        cand_evidence: list[dict[str, Any]] | None,
+    ) -> list[dict[str, Any]]:
+        """Union evidence references, capped.
+
+        Real document references dedup by (index, doc_id). Synthetic
+        entries (doc_id empty or "signal:*") dedup by (index, kind,
+        doc_id) and the CANDIDATE version wins, so rolling-stat
+        summaries (spike ratios, sigmas) refresh with the situation
+        instead of freezing at first detection.
+
+        Oldest and newest halves are both kept when capping, mirroring
+        the timeline merge: the original trigger documents stay
+        verifiable for the situation's whole lifetime.
+        """
+        seen: set[tuple[str, ...]] = set()
+        merged: list[dict[str, Any]] = []
+        # Candidate first: on key collision the fresh entry wins.
+        for entry in (cand_evidence or []) + (stored_evidence or []):
+            doc_id = str(entry.get("doc_id", ""))
+            if doc_id and not doc_id.startswith("signal:"):
+                key: tuple[str, ...] = (str(entry.get("index", "")), doc_id)
+            else:
+                key = (str(entry.get("index", "")),
+                       str(entry.get("kind", "")), doc_id)
+            if key in seen:
+                continue
+            seen.add(key)
+            merged.append(entry)
+        merged.sort(key=lambda e: str(e.get("date", "")))
+        if len(merged) > EVIDENCE_MAX_ENTRIES:
+            head = EVIDENCE_MAX_ENTRIES // 2
+            tail = EVIDENCE_MAX_ENTRIES - head
             merged = merged[:head] + merged[-tail:]
         return merged
 

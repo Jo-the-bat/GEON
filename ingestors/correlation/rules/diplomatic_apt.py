@@ -20,6 +20,16 @@ from common.settings import setting
 from elasticsearch import Elasticsearch
 from pycti import OpenCTIApiClient
 
+from correlation.baselines import Baseline, negative_events_baseline
+from correlation.scoring import (
+    attribution_bonus,
+    confidence,
+    evidence_entry,
+    evidence_from_hit,
+    volume_bonus,
+    zscore_bonus,
+)
+
 # Load country → APT attribution mapping for validation.
 _MAPPING_PATH = (
     Path(__file__).resolve().parent.parent.parent / "common" / "country_apt_mapping.json"
@@ -41,6 +51,13 @@ GOLDSTEIN_THRESHOLD: float = setting(
     "correlation.diplomatic_apt.goldstein_threshold", -5.0)
 LOOKBACK_DAYS: int = setting("correlation.diplomatic_apt.lookback_days", 7)
 APT_WINDOW_DAYS: int = setting("correlation.diplomatic_apt.apt_window_days", 30)
+# Statistical gating: a pair only fires when its negative-event rate
+# deviates from ITS OWN baseline (z-score) — chronically tense pairs no
+# longer alert on their normal background level. Pairs without enough
+# history fall back to the absolute-threshold behaviour.
+USE_BASELINE: bool = setting("correlation.diplomatic_apt.use_baseline", True)
+ZSCORE_THRESHOLD: float = setting(
+    "correlation.diplomatic_apt.zscore_threshold", 2.0)
 GDELT_INDEX_PATTERN = f"{INDEX_PREFIX}-gdelt-events-*"
 
 
@@ -64,10 +81,16 @@ class DiplomaticAPTRule:
         es: Elasticsearch,
         octi: OpenCTIApiClient,
         lookback_days: int = LOOKBACK_DAYS,
+        as_of: datetime | None = None,
     ) -> None:
         self.es = es
         self.octi = octi
         self.lookback_days = lookback_days
+        # Clock override for the backtesting harness.
+        self.as_of = as_of
+
+    def _now(self) -> datetime:
+        return self.as_of or datetime.now(timezone.utc)
 
     def run(self) -> list[dict[str, Any]]:
         """Execute the rule and return a list of correlation documents.
@@ -91,8 +114,23 @@ class DiplomaticAPTRule:
         )
 
         # Step 2: For each country pair, look for APT activity.
-        for pair_key, events in country_pairs.items():
+        for pair_key, event_hits in country_pairs.items():
             src_country, tgt_country = pair_key.split("||")
+
+            # Statistical gating against the pair's own history.
+            baseline = self._pair_baseline(src_country, tgt_country)
+            if (
+                USE_BASELINE
+                and baseline is not None
+                and baseline.zscore < ZSCORE_THRESHOLD
+            ):
+                logger.debug(
+                    "[%s] %s below baseline deviation (z=%.1f < %.1f) — skipped.",
+                    self.RULE_NAME, pair_key, baseline.zscore, ZSCORE_THRESHOLD,
+                )
+                continue
+
+            events = [h["_source"] for h in event_hits]
             worst_event = min(events, key=lambda e: e["goldstein_scale"])
 
             apt_matches = self._find_apt_activity(src_country, tgt_country, worst_event)
@@ -101,7 +139,8 @@ class DiplomaticAPTRule:
 
             # Step 3: Build the correlation document.
             correlation = self._build_correlation(
-                src_country, tgt_country, worst_event, apt_matches
+                src_country, tgt_country, worst_event, apt_matches,
+                event_hits=event_hits, baseline=baseline,
             )
             correlations.append(correlation)
 
@@ -109,6 +148,19 @@ class DiplomaticAPTRule:
             "[%s] Generated %d correlation(s).", self.RULE_NAME, len(correlations)
         )
         return correlations
+
+    def _pair_baseline(self, country_a: str, country_b: str) -> Baseline | None:
+        """Compute the pair's negative-event baseline (None = no history)."""
+        if not USE_BASELINE:
+            return None
+        return negative_events_baseline(
+            self.es,
+            country_a,
+            country_b,
+            goldstein_lt=GOLDSTEIN_THRESHOLD,
+            window_days=self.lookback_days,
+            as_of=self.as_of,
+        )
 
     # ------------------------------------------------------------------
     # Step 1: Query GDELT for diplomatic escalations
@@ -121,15 +173,16 @@ class DiplomaticAPTRule:
             Dict mapping ``"source_country||target_country"`` keys to lists
             of matching event dicts.
         """
-        since = (
-            datetime.now(timezone.utc) - timedelta(days=self.lookback_days)
-        ).isoformat()
+        since = (self._now() - timedelta(days=self.lookback_days)).isoformat()
 
         query: dict[str, Any] = {
             "bool": {
                 "must": [
                     {"range": {"goldstein_scale": {"lt": GOLDSTEIN_THRESHOLD}}},
-                    {"range": {"date": {"gte": since}}},
+                    {"range": {"date": {
+                        "gte": since,
+                        "lte": self._now().isoformat(),
+                    }}},
                 ],
                 "must_not": [
                     # Ignore events without country data.
@@ -149,12 +202,13 @@ class DiplomaticAPTRule:
         hits = resp.get("hits", {}).get("hits", [])
         logger.debug("[%s] GDELT query returned %d hits.", self.RULE_NAME, len(hits))
 
-        # Group by country pair (order-independent).
+        # Group RAW hits by country pair (order-independent) — _index/_id
+        # are kept so the correlation can reference its evidence.
         pairs: dict[str, list[dict[str, Any]]] = {}
         for hit in hits:
             src = hit["_source"]
             pair = self._pair_key(src["source_country"], src["target_country"])
-            pairs.setdefault(pair, []).append(src)
+            pairs.setdefault(pair, []).append(hit)
 
         return pairs
 
@@ -189,11 +243,12 @@ class DiplomaticAPTRule:
             if campaigns:
                 matches.extend(campaigns)
 
-        # Strict validation against known country-APT attributions.
-        # OpenCTI returns unfiltered results (country field is empty),
-        # so we MUST validate every match against our mapping.
-        # If neither country has entries in the mapping, we cannot
-        # validate — return empty to avoid false positives.
+        # Defence-in-depth validation: get_campaigns_by_country is already
+        # STIX-relationship filtered (originates-from / attributed-to a
+        # Location), but the static attribution map remains a second
+        # gate against mis-modelled relationships. If neither country has
+        # entries in the mapping, we cannot validate — return empty to
+        # avoid false positives.
         if _COUNTRY_APT_MAP:
             known_apts: set[str] = set()
             for c in [country_a, country_b]:
@@ -220,6 +275,8 @@ class DiplomaticAPTRule:
         country_b: str,
         worst_event: dict[str, Any],
         apt_matches: list[dict[str, Any]],
+        event_hits: list[dict[str, Any]] | None = None,
+        baseline: Baseline | None = None,
     ) -> dict[str, Any]:
         """Assemble a correlation document.
 
@@ -228,12 +285,14 @@ class DiplomaticAPTRule:
             country_b: Target country.
             worst_event: The GDELT event with the lowest Goldstein score.
             apt_matches: List of matching APT campaigns/intrusion sets.
+            event_hits: Raw ES hits (with _index/_id) for evidence refs.
+            baseline: Statistical baseline of the pair, when available.
 
         Returns:
             Correlation document dict following the ``geon-correlations``
             schema.
         """
-        now = datetime.now(timezone.utc).isoformat()
+        now = self._now().isoformat()
 
         # Determine severity based on Goldstein score and APT confidence.
         goldstein = worst_event.get("goldstein_scale", 0)
@@ -271,13 +330,45 @@ class DiplomaticAPTRule:
             f"{self.RULE_NAME}:{pair}".encode()
         ).hexdigest()[:20]
 
-        return {
+        # Evidence: the worst GDELT events + the APT entities, so the
+        # analyst can verify the claim instead of trusting the alert.
+        evidence: list[dict[str, str]] = []
+        for hit in (event_hits or [])[:5]:
+            src = hit.get("_source", {})
+            evidence.append(evidence_from_hit(
+                hit, "diplomatic",
+                f"Goldstein {src.get('goldstein_scale')}: "
+                f"{src.get('cameo_description', '')}",
+            ))
+        for apt in apt_matches[:3]:
+            evidence.append(evidence_entry(
+                index="opencti",
+                doc_id=apt.get("id", ""),
+                date=str(apt.get("modified", apt.get("created", ""))),
+                kind="cyber",
+                summary=f"{apt.get('name', 'Unknown')} "
+                        f"({apt.get('_geon_type', 'campaign')})",
+            ))
+
+        # Confidence: STIX-validated attribution + corroboration volume
+        # + statistical strength of the escalation.
+        conf, factors = confidence(30, {
+            "attribution": attribution_bonus("opencti"),
+            "volume": volume_bonus(len(event_hits or [])),
+            "zscore": zscore_bonus(
+                baseline.zscore if baseline else None, ZSCORE_THRESHOLD),
+        })
+
+        doc: dict[str, Any] = {
             "correlation_id": correlation_id,
             "timestamp": now,
             "date": now,
             "rule_name": self.RULE_NAME,
             "severity": severity,
             "countries_involved": sorted([country_a, country_b]),
+            "confidence": conf,
+            "confidence_factors": factors,
+            "evidence": evidence,
             "diplomatic_event": {
                 "event_id": worst_event.get("event_id", ""),
                 "description": worst_event.get("cameo_description", ""),
@@ -295,6 +386,19 @@ class DiplomaticAPTRule:
             ),
             "timeline": timeline,
         }
+        if baseline is not None:
+            doc["baseline"] = {
+                "zscore": round(baseline.zscore, 2),
+                "current_rate": baseline.current_rate,
+                "baseline_mean": baseline.baseline_mean,
+                "baseline_std": baseline.baseline_std,
+                "baseline_days": baseline.baseline_days,
+            }
+            doc["description"] += (
+                f" Pair activity at {baseline.zscore:.1f} standard deviations "
+                f"above its {baseline.baseline_days}-day baseline."
+            )
+        return doc
 
     # ------------------------------------------------------------------
     # Helpers

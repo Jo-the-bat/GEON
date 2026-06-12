@@ -207,6 +207,7 @@ class TestSeverityTiers:
     )
     def test_tiers(self, deviation, expected):
         rule = object.__new__(RhetoricShiftRule)
+        rule.as_of = None  # injectable clock (backtesting)
         short = {"avg_tone": -6.0, "std_tone": 1.0, "count": 50,
                  "min_tone": -9.0, "max_tone": -2.0,
                  "source_country": "CHINA", "target_country": "TAIWAN"}

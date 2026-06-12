@@ -391,6 +391,14 @@ C'est le coeur de la valeur ajoutee de GEON. Le moteur (`correlation/engine.py`)
 
 Identites par regle : 1 = paire triee, 2/3/10 = pays, 4 = paire, 5/9 = pays + start_time de la coupure, 6 = pays + annee SIPRI, 7 = destinataire + voisin + date du transfert, 8 = case_id + event_id GDELT. Les ecrivains directs (shift Polymarket : case + jour + direction ; divergence consensus : market_id) suivent la meme logique.
 
+**Confiance + preuves** : chaque correlation porte `confidence` (0-100, facteurs auditables dans `confidence_factors` — voir `correlation/scoring.py` : qualite d'attribution, volume de corroboration, force statistique, proximite temporelle) et `evidence` (references index+doc_id+date+resume des documents declencheurs, fusionnees et plafonnees a 20 par situation).
+
+**Baselines statistiques** (`correlation/baselines.py`) : les regles 1 et 10 (signal GDELT) mesurent l'ecart au comportement PROPRE du pays/de la paire (z-score sur histogramme journalier 90j) au lieu d'un seuil absolu identique pour tous — les paires chroniquement tendues ne declenchent plus sur leur niveau de fond ; fallback sur le seuil absolu quand l'historique est insuffisant. Reglages : `correlation.baselines.*`, `diplomatic_apt.zscore_threshold`, `multi_signal_convergence.gdelt_zscore_*`.
+
+**Cycle de vie analyste** : statut `open | acknowledged | resolved | false_positive` sur chaque situation, gere via `python -m correlation.triage` (list/show/ack/resolve/fp/reopen). Le moteur n'ecrase jamais le triage ; `false_positive` supprime definitivement les re-alertes (le suivi continue silencieusement) ; `resolved` se rouvre (et re-alerte) sur escalade ou reactivation.
+
+**Backtesting** (`backtest/runner.py`, doc `docs/backtesting.md`) : rejoue les detecteurs a horloge injectable (`as_of` sur les regles 1 et 4) sur l'historique ES, regroupe en episodes, et mesure rappel + avance (jours) contre la verite terrain `backtest/ground_truth.yaml` — l'outil de reglage des seuils du config.yaml.
+
 CLI : `python -m correlation.engine [--rules 1 2 ...] [--dry-run]`
 
 Regles ES uniquement : 4, 5, 7, 8, 10. Regles necessitant OpenCTI : 1, 2, 3, 6, 9 (degradent proprement si OpenCTI est indisponible). Les regles APT (1, 6, 9) s'appuient sur `common/country_apt_mapping.json` (attribution pays -> groupes APT, validation stricte pour eviter la cross-contamination).

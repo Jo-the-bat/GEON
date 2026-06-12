@@ -20,6 +20,8 @@ from common.settings import setting
 from elasticsearch import Elasticsearch
 from pycti import OpenCTIApiClient
 
+from correlation.scoring import attribution_bonus, confidence, evidence_entry
+
 logger = logging.getLogger(__name__)
 
 SPENDING_INDEX = f"{INDEX_PREFIX}-military-spending"
@@ -107,19 +109,26 @@ class MilitaryBuildupRule:
         if not known_apts:
             return []
 
-        # Then check OpenCTI for active campaigns, validated against mapping
+        # Then check OpenCTI for active campaigns, validated against mapping.
+        # Each match is tagged with its provenance ("source") so the
+        # confidence scoring can weigh the attribution quality.
         known_lower = {a.lower() for a in known_apts}
         if self.octi:
             try:
                 campaigns = get_campaigns_by_country(self.octi, country, days_back=365)
-                validated = [c for c in campaigns if c.get("name", "").lower() in known_lower]
+                validated = [
+                    {**c, "source": "opencti"}
+                    for c in campaigns
+                    if c.get("name", "").lower() in known_lower
+                ]
                 if validated:
                     return validated
             except Exception:
                 pass
 
         # Return static APT info as fallback
-        return [{"name": apt, "_geon_type": "intrusion-set"} for apt in known_apts]
+        return [{"name": apt, "_geon_type": "intrusion-set", "source": "static"}
+                for apt in known_apts]
 
     def _build_correlation(
         self,
@@ -138,6 +147,38 @@ class MilitaryBuildupRule:
             f"{self.RULE_NAME}:{country}:{spending.get('year', '')}".encode()
         ).hexdigest()[:20]
 
+        # Evidence: the spending document (deterministic {country}:{year}
+        # identity in the SIPRI index) + the matched APT entries.
+        year = spending.get("year", "")
+        evidence: list[dict[str, str]] = [
+            evidence_entry(
+                index=SPENDING_INDEX,
+                doc_id=f"{country}:{year}",
+                date=f"{year}-01-01" if year else "",
+                kind="spending",
+                summary=(f"Military spending +{yoy:.1f}% YoY "
+                         f"(${spending.get('spending_usd_millions', 0):.0f}M USD)"),
+            ),
+        ]
+        for apt in apt_matches[:5]:
+            source = apt.get("source", "static")
+            evidence.append(evidence_entry(
+                index="opencti" if source == "opencti" else source,
+                doc_id=apt.get("id", "") or apt.get("name", ""),
+                date=str(apt.get("modified", apt.get("created", ""))),
+                kind="cyber",
+                summary=(f"{apt.get('name', 'Unknown')} attributed to {country} "
+                         f"({source} attribution)"),
+            ))
+
+        # Confidence: attribution quality per the match's provenance +
+        # strength of the YoY increase above the threshold. Volume does
+        # not apply — there is a single yearly datapoint.
+        conf, factors = confidence(30, {
+            "attribution": attribution_bonus(primary_apt.get("source", "static")),
+            "yoy_strength": max(0.0, min(15.0, yoy - YOY_THRESHOLD)),
+        })
+
         return {
             "correlation_id": correlation_id,
             "timestamp": now,
@@ -145,6 +186,9 @@ class MilitaryBuildupRule:
             "rule_name": self.RULE_NAME,
             "severity": severity,
             "countries_involved": [country],
+            "confidence": conf,
+            "confidence_factors": factors,
+            "evidence": evidence,
             "diplomatic_event": {
                 "event_id": "",
                 "description": (

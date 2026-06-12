@@ -19,12 +19,27 @@ correlation:
     timeline_max_entries: 50
     # Minimum severity that triggers notifications: low|medium|high|critical
     min_alert_severity: high
+    # Cap on merged evidence references per situation document.
+    evidence_max_entries: 20
+
+  # Per-subject statistical baselines (deviation from each country/pair's
+  # own history instead of one absolute threshold for everyone).
+  baselines:
+    baseline_days: 90
+    min_baseline_days: 21
+    std_floor: 1.0
 
   # Rule 1 — diplomatic escalation + APT activity
   diplomatic_apt:
     goldstein_threshold: -5.0
     lookback_days: 7
     apt_window_days: 30
+    # Statistical gating: the pair's negative-event rate must deviate
+    # from ITS OWN baseline (z-score) — chronically tense pairs no longer
+    # fire on their normal background level. Falls back to the absolute
+    # behaviour when the pair has insufficient history.
+    use_baseline: true
+    zscore_threshold: 2.0
 
   # Rule 2 — sanction + IoC spike
   sanction_cyber:
@@ -82,6 +97,11 @@ correlation:
     prediction_shift_threshold: 0.05
     spending_yoy_threshold: 10.0
     min_signals: 3
+    # The GDELT signal also fires statistically: z-score above this
+    # threshold with at least gdelt_zscore_floor events (catches unusual
+    # deterioration in countries that never reach the absolute count).
+    gdelt_zscore_threshold: 2.0
+    gdelt_zscore_floor: 25
 
 alerting:
   # Suppress a re-notification for the same (rule, countries, severity)
