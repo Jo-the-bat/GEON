@@ -2,12 +2,17 @@
 
 Dispatches correlation alerts to Discord (webhook) and/or email (SMTP).
 Alert format follows the GEON notification template specification.
+
+Alerts are sent in batch: one engine run produces a handful of Discord
+messages (up to 10 embeds each, the webhook limit) and a single digest
+email, regardless of how many correlations fired.
 """
 
 from __future__ import annotations
 
 import logging
 import smtplib
+import time
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from typing import Any
@@ -51,7 +56,20 @@ SEVERITY_EMOJI: dict[str, str] = {
     "low": "\U0001f7e2",       # Green circle
 }
 
+ALERT_CONTEXT_LABEL: dict[str, str] = {
+    "new": "New",
+    "escalation": "Escalation",
+    "reactivation": "Reactivation",
+}
+
 DASHBOARD_BASE_URL = "https://geon.example.com/grafana/d/correlations"
+
+# Discord allows at most 10 embeds per webhook message AND at most 6000
+# characters across all embeds of one message.
+DISCORD_EMBEDS_PER_MESSAGE = 10
+DISCORD_CHARS_PER_MESSAGE = 5500  # headroom under the 6000 hard limit
+# Small pause between chunked webhook posts to stay clear of rate limits.
+DISCORD_CHUNK_PAUSE_SECONDS = 1.0
 
 
 # ---------------------------------------------------------------------------
@@ -131,29 +149,23 @@ def _format_plain_alert(correlation: dict[str, Any]) -> str:
 # Discord
 # ---------------------------------------------------------------------------
 
-@retry(
-    retry=retry_if_exception_type((requests.ConnectionError, requests.Timeout)),
-    stop=stop_after_attempt(RETRY_MAX_ATTEMPTS),
-    wait=wait_exponential(min=RETRY_WAIT_MIN, max=RETRY_WAIT_MAX),
-    reraise=True,
-)
-def send_discord_alert(correlation: dict[str, Any]) -> bool:
-    """Send a formatted alert embed to the configured Discord webhook.
+def _build_discord_embed(correlation: dict[str, Any]) -> dict[str, Any]:
+    """Build one Discord embed for a correlation.
 
     Args:
-        correlation: Correlation document dict.
+        correlation: Correlation document dict (may carry
+            ``alert_context``).
 
     Returns:
-        ``True`` if the message was sent successfully, ``False`` otherwise.
+        Discord embed dict.
     """
-    if not DISCORD_WEBHOOK_URL:
-        logger.warning("DISCORD_WEBHOOK_URL is not configured — skipping Discord alert.")
-        return False
-
     severity = correlation.get("severity", "medium")
     rule = correlation.get("rule_name", "Unknown rule")
     countries = _format_countries(correlation)
-    description = correlation.get("description", "No description.")
+    description = correlation.get("description", "No description.")[:1500]
+    context = ALERT_CONTEXT_LABEL.get(
+        correlation.get("alert_context", "new"), "New"
+    )
 
     # Build the embed fields.
     fields: list[dict[str, Any]] = [
@@ -168,7 +180,7 @@ def send_discord_alert(correlation: dict[str, Any]) -> bool:
         diplo_desc = diplo.get("description", "N/A")
         fields.append({
             "name": "Diplomatic Event",
-            "value": f"Goldstein **{goldstein}** -- {diplo_desc}",
+            "value": f"Goldstein **{goldstein}** -- {diplo_desc}"[:1024],
             "inline": False,
         })
 
@@ -181,43 +193,120 @@ def send_discord_alert(correlation: dict[str, Any]) -> bool:
             value += f"\nTechniques: {techniques}"
         fields.append({
             "name": "Cyber Event",
-            "value": value,
+            "value": value[:1024],
             "inline": False,
         })
 
-    fields.append({
-        "name": "Dashboard",
-        "value": f"[Open in Kibana]({DASHBOARD_BASE_URL})",
-        "inline": False,
-    })
-
     emoji = SEVERITY_EMOJI.get(severity, "\u26a0\ufe0f")
-    embed = {
-        "title": f"{emoji} GEON Correlation Detected",
+    return {
+        "title": f"{emoji} GEON Correlation \u2014 {context}",
         "description": description,
         "color": SEVERITY_COLORS.get(severity, 0xFFCC00),
         "fields": fields,
         "timestamp": correlation.get("timestamp", ""),
     }
 
-    payload = {"embeds": [embed]}
 
+@retry(
+    retry=retry_if_exception_type((requests.ConnectionError, requests.Timeout)),
+    stop=stop_after_attempt(RETRY_MAX_ATTEMPTS),
+    wait=wait_exponential(min=RETRY_WAIT_MIN, max=RETRY_WAIT_MAX),
+    reraise=True,
+)
+def _post_discord(payload: dict[str, Any]) -> bool:
+    """POST one payload to the Discord webhook (with retry)."""
     response = requests.post(
         DISCORD_WEBHOOK_URL,
         json=payload,
         timeout=15,
     )
-
     if response.ok:
-        logger.info("Discord alert sent for correlation %s.", correlation.get("correlation_id"))
         return True
-    else:
-        logger.error(
-            "Discord webhook returned HTTP %d: %s",
-            response.status_code,
-            response.text[:200],
-        )
+    logger.error(
+        "Discord webhook returned HTTP %d: %s",
+        response.status_code,
+        response.text[:200],
+    )
+    return False
+
+
+def _embed_size(embed: dict[str, Any]) -> int:
+    """Character count Discord attributes to an embed (title, description,
+    field names/values)."""
+    size = len(embed.get("title", "")) + len(embed.get("description", ""))
+    for field in embed.get("fields", []):
+        size += len(str(field.get("name", ""))) + len(str(field.get("value", "")))
+    return size
+
+
+def _chunk_embeds(embeds: list[dict[str, Any]]) -> list[list[dict[str, Any]]]:
+    """Split embeds into webhook messages respecting BOTH Discord limits:
+    max 10 embeds per message and max ~6000 characters per message."""
+    chunks: list[list[dict[str, Any]]] = []
+    current: list[dict[str, Any]] = []
+    current_size = 0
+    for embed in embeds:
+        size = _embed_size(embed)
+        if current and (
+            len(current) >= DISCORD_EMBEDS_PER_MESSAGE
+            or current_size + size > DISCORD_CHARS_PER_MESSAGE
+        ):
+            chunks.append(current)
+            current, current_size = [], 0
+        current.append(embed)
+        current_size += size
+    if current:
+        chunks.append(current)
+    return chunks
+
+
+def send_discord_alerts(correlations: list[dict[str, Any]]) -> bool:
+    """Send all correlation alerts to Discord in batched messages.
+
+    One engine run produces ceil(n/10) webhook posts (Discord caps a
+    message at 10 embeds) instead of one post per correlation.
+
+    Args:
+        correlations: Correlation document dicts.
+
+    Returns:
+        ``True`` if every chunk was sent successfully.
+    """
+    if not DISCORD_WEBHOOK_URL:
+        logger.warning("DISCORD_WEBHOOK_URL is not configured \u2014 skipping Discord alerts.")
         return False
+    if not correlations:
+        return True
+
+    embeds = [_build_discord_embed(c) for c in correlations]
+    chunks = _chunk_embeds(embeds)
+
+    all_ok = True
+    for i, chunk in enumerate(chunks):
+        payload: dict[str, Any] = {"embeds": chunk}
+        if i == 0:
+            payload["content"] = (
+                f"**[GEON]** {len(correlations)} correlation alert(s) \u2014 "
+                f"dashboard: {DASHBOARD_BASE_URL}"
+            )
+        if i > 0:
+            time.sleep(DISCORD_CHUNK_PAUSE_SECONDS)
+        try:
+            ok = _post_discord(payload)
+        except Exception:
+            logger.exception(
+                "Failed to post Discord chunk %d/%d.", i + 1, len(chunks)
+            )
+            ok = False
+        all_ok = all_ok and ok
+
+    if all_ok:
+        logger.info(
+            "Discord alerts sent: %d correlation(s) in %d message(s).",
+            len(correlations),
+            len(chunks),
+        )
+    return all_ok
 
 
 # ---------------------------------------------------------------------------
@@ -230,11 +319,11 @@ def send_discord_alert(correlation: dict[str, Any]) -> bool:
     wait=wait_exponential(min=RETRY_WAIT_MIN, max=RETRY_WAIT_MAX),
     reraise=True,
 )
-def send_email_alert(correlation: dict[str, Any]) -> bool:
-    """Send a correlation alert via email using SMTP.
+def send_email_digest(correlations: list[dict[str, Any]]) -> bool:
+    """Send ONE digest email covering all correlations of the run.
 
     Args:
-        correlation: Correlation document dict.
+        correlations: Correlation document dicts.
 
     Returns:
         ``True`` if the email was sent successfully, ``False`` otherwise.
@@ -242,16 +331,30 @@ def send_email_alert(correlation: dict[str, Any]) -> bool:
     if not all([ALERT_EMAIL_SMTP_HOST, ALERT_EMAIL_FROM, ALERT_EMAIL_TO]):
         logger.warning("Email SMTP settings are incomplete — skipping email alert.")
         return False
+    if not correlations:
+        return True
 
-    severity = correlation.get("severity", "medium").upper()
-    rule = correlation.get("rule_name", "Unknown rule")
-    countries = _format_countries(correlation)
+    severities = [c.get("severity", "medium") for c in correlations]
+    rank = {"low": 0, "medium": 1, "high": 2, "critical": 3}
+    worst = max(severities, key=lambda s: rank.get(s, 1))
 
-    subject = f"[GEON {severity}] {rule} -- {countries}"
-    body_text = _format_plain_alert(correlation)
+    if len(correlations) == 1:
+        c = correlations[0]
+        subject = (
+            f"[GEON {worst.upper()}] {c.get('rule_name', 'Unknown rule')} "
+            f"-- {_format_countries(c)}"
+        )
+    else:
+        n_critical = sum(1 for s in severities if s == "critical")
+        n_high = sum(1 for s in severities if s == "high")
+        subject = (
+            f"[GEON {worst.upper()}] {len(correlations)} correlations "
+            f"({n_critical} critical, {n_high} high)"
+        )
 
-    # Build HTML body.
-    body_html = _build_email_html(correlation)
+    separator = "\n\n" + "-" * 60 + "\n\n"
+    body_text = separator.join(_format_plain_alert(c) for c in correlations)
+    body_html = _build_email_digest_html(correlations)
 
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
@@ -270,23 +373,26 @@ def send_email_alert(correlation: dict[str, Any]) -> bool:
                 server.login(ALERT_EMAIL_FROM, ALERT_EMAIL_PASSWORD)
             server.sendmail(ALERT_EMAIL_FROM, [ALERT_EMAIL_TO], msg.as_string())
 
-        logger.info("Email alert sent to %s for correlation %s.",
-                     ALERT_EMAIL_TO, correlation.get("correlation_id"))
+        logger.info(
+            "Email digest sent to %s (%d correlation(s)).",
+            ALERT_EMAIL_TO,
+            len(correlations),
+        )
         return True
 
     except smtplib.SMTPException:
-        logger.exception("Failed to send email alert.")
+        logger.exception("Failed to send email digest.")
         raise
 
 
 def _build_email_html(correlation: dict[str, Any]) -> str:
-    """Build an HTML email body for a correlation alert.
+    """Build one HTML card for a correlation (embedded in the digest).
 
     Args:
         correlation: Correlation document dict.
 
     Returns:
-        HTML string.
+        HTML fragment string.
     """
     severity = correlation.get("severity", "medium")
     color = {
@@ -323,13 +429,14 @@ def _build_email_html(correlation: dict[str, Any]) -> str:
             cyber_html += f"<br/>Techniques: {techniques}"
         cyber_html += "</td></tr>"
 
-    return f"""<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"/></head>
-<body style="font-family:Arial,sans-serif;margin:0;padding:20px;background:#f4f4f4;">
-  <div style="max-width:600px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;">
+    context = ALERT_CONTEXT_LABEL.get(
+        correlation.get("alert_context", "new"), "New"
+    )
+
+    return f"""
+  <div style="max-width:600px;margin:0 auto 20px;background:#fff;border-radius:8px;overflow:hidden;">
     <div style="background:{color};padding:16px 20px;color:#fff;">
-      <h2 style="margin:0;">GEON Correlation Alert</h2>
+      <h2 style="margin:0;">GEON Correlation — {context}</h2>
       <p style="margin:4px 0 0;">Severity: {severity.upper()}</p>
     </div>
     <div style="padding:20px;">
@@ -343,14 +450,32 @@ def _build_email_html(correlation: dict[str, Any]) -> str:
         <tr><td style="padding:6px;font-weight:bold;">Description</td>
             <td style="padding:6px;">{description}</td></tr>
       </table>
-      <p style="margin-top:16px;">
-        <a href="{DASHBOARD_BASE_URL}"
-           style="background:#0066cc;color:#fff;padding:10px 20px;text-decoration:none;border-radius:4px;">
-          View in Kibana
-        </a>
-      </p>
     </div>
-  </div>
+  </div>"""
+
+
+def _build_email_digest_html(correlations: list[dict[str, Any]]) -> str:
+    """Build the full HTML body for the digest email (one card per
+    correlation, single dashboard link at the bottom).
+
+    Args:
+        correlations: Correlation document dicts.
+
+    Returns:
+        HTML string.
+    """
+    cards = "\n".join(_build_email_html(c) for c in correlations)
+    return f"""<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"/></head>
+<body style="font-family:Arial,sans-serif;margin:0;padding:20px;background:#f4f4f4;">
+  {cards}
+  <p style="max-width:600px;margin:0 auto;text-align:center;">
+    <a href="{DASHBOARD_BASE_URL}"
+       style="background:#0066cc;color:#fff;padding:10px 20px;text-decoration:none;border-radius:4px;">
+      View in Grafana
+    </a>
+  </p>
 </body>
 </html>"""
 
@@ -359,27 +484,31 @@ def _build_email_html(correlation: dict[str, Any]) -> str:
 # Dispatcher
 # ---------------------------------------------------------------------------
 
-def send_alerts(correlation: dict[str, Any]) -> None:
-    """Dispatch a correlation alert to all configured channels.
+def send_alerts(correlations: list[dict[str, Any]]) -> None:
+    """Dispatch the run's correlation alerts to all configured channels.
 
-    Sends to Discord and email.  Failures in one channel do not prevent
-    the other channel from being attempted.
+    Sends ONE batch to Discord (chunked at 10 embeds/message) and ONE
+    digest email.  Failures in one channel do not prevent the other
+    channel from being attempted.
 
     Args:
-        correlation: Correlation document dict.
+        correlations: Alert-worthy correlation dicts for this run.
     """
-    cid = correlation.get("correlation_id", "unknown")
-    logger.info("Dispatching alerts for correlation %s (severity=%s).",
-                cid, correlation.get("severity", "?"))
+    if not correlations:
+        return
+
+    logger.info(
+        "Dispatching alerts for %d correlation(s).", len(correlations)
+    )
 
     # --- Discord ---
     try:
-        send_discord_alert(correlation)
+        send_discord_alerts(correlations)
     except Exception:
-        logger.exception("Failed to send Discord alert for %s.", cid)
+        logger.exception("Failed to send Discord alerts.")
 
     # --- Email ---
     try:
-        send_email_alert(correlation)
+        send_email_digest(correlations)
     except Exception:
-        logger.exception("Failed to send email alert for %s.", cid)
+        logger.exception("Failed to send email digest.")

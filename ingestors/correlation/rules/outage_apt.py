@@ -19,6 +19,7 @@ from elasticsearch import Elasticsearch
 from pycti import OpenCTIApiClient
 
 from common.config import INDEX_PREFIX
+from common.countries import normalize_country
 from common.opencti_client import get_campaigns_by_country
 
 logger = logging.getLogger(__name__)
@@ -57,9 +58,12 @@ class OutageAPTRule:
         logger.info("[%s] Checking %d outage(s) against APT data.", self.RULE_NAME, len(outages))
 
         for outage in outages:
-            country = outage.get("country", "")
+            # Defensive: pre-migration outage docs may carry the old
+            # Cloudflare spellings (e.g. "IVORY COAST").
+            country = normalize_country(outage.get("country", ""))
             if not country:
                 continue
+            outage["country"] = country
 
             # a) APT groups attributed TO the country (offensive — state shutdown?)
             offensive_apts = self._find_offensive_apts(country)

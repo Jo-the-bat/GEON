@@ -57,6 +57,10 @@ def get_opencti_client() -> OpenCTIApiClient:
         url=OPENCTI_URL,
         token=OPENCTI_TOKEN,
         log_level="warning",
+        # pycti defaults to 300s per request; with per-country query loops
+        # in the correlation rules a hung OpenCTI would stall the whole
+        # single-threaded scheduler for hours.
+        requests_timeout=60,
     )
     logger.info("Connected to OpenCTI.")
     return client

@@ -85,6 +85,11 @@ CORRELATIONS_MAPPING: dict[str, Any] = {
                     "description": {"type": "text"},
                 },
             },
+            # Situation tracking: one document per ongoing situation,
+            # refreshed on every run where the rule still fires.
+            "first_seen": {"type": "date"},
+            "last_seen": {"type": "date"},
+            "times_seen": {"type": "integer"},
         },
     },
     "settings": {
@@ -119,6 +124,13 @@ ALERT_SEVERITY_THRESHOLD: dict[str, int] = {
 }
 MIN_ALERT_SEVERITY: int = 2  # "high" and above
 
+# A situation dormant for this many days that fires again is treated as a
+# reactivation and re-alerted (instead of being silently refreshed).
+REACTIVATION_DAYS: int = 14
+
+# Cap merged timelines so long-running situations don't grow unbounded.
+TIMELINE_MAX_ENTRIES: int = 50
+
 
 class CorrelationEngine:
     """Main correlation engine that orchestrates all rules.
@@ -126,9 +138,11 @@ class CorrelationEngine:
     The engine:
     1. Initialises Elasticsearch and OpenCTI clients.
     2. Loads and runs each correlation rule.
-    3. Deduplicates results against previously indexed correlations.
-    4. Indexes new correlations into ``geon-correlations``.
-    5. Dispatches alerts for high/critical findings.
+    3. Reconciles candidates against previously indexed situations
+       (new document vs. refresh of an ongoing one).
+    4. Indexes new and updated correlations into ``geon-correlations``.
+    5. Dispatches one batched alert for new/escalated/reactivated
+       high+ findings.
 
     Attributes:
         es: Elasticsearch client.
@@ -146,7 +160,7 @@ class CorrelationEngine:
         """Initialise the correlation engine.
 
         Args:
-            rule_numbers: Optional list of rule numbers (1-4) to run.
+            rule_numbers: Optional list of rule numbers (1-10) to run.
                 If ``None``, all rules are run.
             dry_run: If ``True``, skip indexing and alerting.
         """
@@ -218,8 +232,14 @@ class CorrelationEngine:
     def run(self) -> list[dict[str, Any]]:
         """Execute all loaded rules and process the results.
 
+        Candidates are reconciled against previously indexed situations:
+        unknown correlation_ids become new documents (and alerts), known
+        ones update the existing document (``last_seen``/``times_seen``),
+        re-alerting only on severity escalation or reactivation after
+        dormancy.
+
         Returns:
-            List of all correlation documents generated in this run.
+            List of all correlation documents indexed/updated in this run.
         """
         start_time = datetime.now(timezone.utc)
         logger.info(
@@ -232,45 +252,63 @@ class CorrelationEngine:
             correlations = self.execute_rule(rule)
             all_correlations.extend(correlations)
 
-        # --- Deduplication ---
-        new_correlations = self._deduplicate(all_correlations)
+        # --- Reconcile against existing situations ---
+        new_docs, updated_docs, alertable = self._reconcile(all_correlations)
 
         logger.info(
-            "Total correlations: %d generated, %d new after deduplication.",
+            "Reconciliation: %d candidate(s) -> %d new, %d updated, "
+            "%d alertable.",
             len(all_correlations),
-            len(new_correlations),
+            len(new_docs),
+            len(updated_docs),
+            len(alertable),
         )
+
+        to_index = new_docs + updated_docs
 
         if self.dry_run:
             logger.info("DRY RUN — skipping indexing and alerting.")
-            for c in new_correlations:
+            for c in alertable:
                 logger.info(
-                    "  [DRY] %s | %s | %s | %s",
+                    "  [DRY ALERT %s] %s | %s | %s | %s",
+                    c.get("alert_context", "new"),
                     c.get("rule_name"),
                     c.get("severity"),
                     c.get("countries_involved"),
                     c.get("description", "")[:120],
                 )
-            return new_correlations
+            for c in updated_docs:
+                logger.info(
+                    "  [DRY UPDATE] %s | %s | times_seen=%s",
+                    c.get("rule_name"),
+                    c.get("countries_involved"),
+                    c.get("times_seen"),
+                )
+            return to_index
 
         # --- Index ---
-        if new_correlations:
+        if to_index:
             self._ensure_correlations_index()
-            indexed = self.index_correlations(new_correlations)
-            logger.info("Indexed %d new correlation(s).", indexed)
+            indexed = self.index_correlations(to_index)
+            logger.info(
+                "Indexed %d correlation(s) (%d new, %d updated).",
+                indexed,
+                len(new_docs),
+                len(updated_docs),
+            )
 
-            # --- Alert ---
-            self._dispatch_alerts(new_correlations)
+            # --- Alert (single batch) ---
+            self._dispatch_alerts(alertable)
 
         elapsed = (datetime.now(timezone.utc) - start_time).total_seconds()
         logger.info(
             "Correlation engine run completed in %.1f seconds. "
             "%d correlation(s) produced.",
             elapsed,
-            len(new_correlations),
+            len(to_index),
         )
 
-        return new_correlations
+        return to_index
 
     def execute_rule(self, rule: Any) -> list[dict[str, Any]]:
         """Execute a single correlation rule safely.
@@ -303,8 +341,24 @@ class CorrelationEngine:
     # ------------------------------------------------------------------
 
     def _ensure_correlations_index(self) -> None:
-        """Ensure the correlations index exists in Elasticsearch."""
+        """Ensure the correlations index exists with up-to-date mapping."""
         if self.es.indices.exists(index=CORRELATIONS_INDEX):
+            # Idempotent: add the situation-tracking fields to indices
+            # created before they existed.
+            try:
+                self.es.indices.put_mapping(
+                    index=CORRELATIONS_INDEX,
+                    properties={
+                        "first_seen": {"type": "date"},
+                        "last_seen": {"type": "date"},
+                        "times_seen": {"type": "integer"},
+                    },
+                )
+            except Exception:
+                logger.warning(
+                    "Could not add situation-tracking fields to the "
+                    "correlations mapping."
+                )
             return
 
         # Write mapping to temp file for ensure_index().
@@ -342,99 +396,226 @@ class CorrelationEngine:
         self.index_correlations([correlation])
 
     # ------------------------------------------------------------------
-    # Deduplication
+    # Reconciliation (situation tracking)
     # ------------------------------------------------------------------
 
-    def _deduplicate(
+    def _reconcile(
         self, correlations: list[dict[str, Any]]
-    ) -> list[dict[str, Any]]:
-        """Remove correlations that have already been indexed.
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
+        """Reconcile candidates against previously indexed situations.
 
-        Checks Elasticsearch for existing ``correlation_id`` values.
+        Rules emit situation-stable ``correlation_id`` values (no date
+        component), so an ongoing situation maps to ONE document that is
+        refreshed on every run instead of producing a duplicate per day.
 
         Args:
             correlations: List of candidate correlation dicts.
 
         Returns:
-            Filtered list containing only new correlations.
+            Tuple ``(new_docs, updated_docs, alertable)``. ``alertable``
+            entries are copies carrying an ``alert_context`` key
+            (``"new"``, ``"escalation"`` or ``"reactivation"``).
         """
         if not correlations:
-            return []
+            return [], [], []
 
-        if not self.es.indices.exists(index=CORRELATIONS_INDEX):
-            return correlations  # Index doesn't exist yet; all are new.
+        now = datetime.now(timezone.utc)
+        now_iso = now.isoformat()
 
-        ids = [c["correlation_id"] for c in correlations if "correlation_id" in c]
-        if not ids:
-            return correlations
+        # Fetch existing documents for the candidate ids.
+        existing_docs: dict[str, dict[str, Any]] = {}
+        ids = [c["correlation_id"] for c in correlations if c.get("correlation_id")]
+        if ids and self.es.indices.exists(index=CORRELATIONS_INDEX):
+            try:
+                resp = self.es.mget(
+                    index=CORRELATIONS_INDEX,
+                    body={"ids": ids},
+                )
+                existing_docs = {
+                    doc["_id"]: doc.get("_source", {}) or {}
+                    for doc in resp.get("docs", [])
+                    if doc.get("found", False)
+                }
+            except Exception:
+                # Fail CLOSED: treating everything as new would overwrite
+                # stored situations (first_seen/times_seen/timeline) and
+                # re-alert all of them. Skip this run instead — the next
+                # run (30 min later) retries.
+                logger.exception(
+                    "Could not fetch existing correlations — skipping "
+                    "indexing and alerting for this run (%d candidates).",
+                    len(correlations),
+                )
+                return [], [], []
 
-        # Multi-get to check which IDs already exist.
+        new_docs: list[dict[str, Any]] = []
+        updated_docs: list[dict[str, Any]] = []
+        alertable: list[dict[str, Any]] = []
+        seen_ids: set[str] = set()
+
+        for cand in correlations:
+            cid = cand.get("correlation_id", "")
+            if cid:
+                if cid in seen_ids:
+                    continue  # In-run duplicate (same situation, two hits).
+                seen_ids.add(cid)
+
+            stored = existing_docs.get(cid)
+            if stored is None:
+                cand.setdefault("first_seen", cand.get("timestamp", now_iso))
+                cand["last_seen"] = now_iso
+                cand["times_seen"] = 1
+                new_docs.append(cand)
+                alertable.append({**cand, "alert_context": "new"})
+            else:
+                merged, alert_reason = self._merge_existing(stored, cand, now)
+                updated_docs.append(merged)
+                if alert_reason:
+                    alertable.append({**merged, "alert_context": alert_reason})
+
+        return new_docs, updated_docs, alertable
+
+    def _merge_existing(
+        self,
+        stored: dict[str, Any],
+        cand: dict[str, Any],
+        now: datetime,
+    ) -> tuple[dict[str, Any], str | None]:
+        """Merge a re-detected candidate into its stored situation document.
+
+        The stored document keeps its original ``timestamp``/``first_seen``;
+        ``last_seen``/``times_seen`` are refreshed. When the candidate's
+        severity is at least the stored one, the descriptive payload
+        (severity, description, events) is refreshed to the latest
+        assessment; severity never de-escalates.
+
+        Args:
+            stored: The previously indexed correlation document.
+            cand: The freshly generated candidate for the same situation.
+            now: Current UTC time.
+
+        Returns:
+            Tuple ``(merged_doc, alert_reason)`` where ``alert_reason`` is
+            ``"escalation"``, ``"reactivation"`` or ``None`` (silent
+            refresh).
+        """
+        merged = dict(stored)
+        merged.setdefault("first_seen", stored.get("timestamp", now.isoformat()))
+        prev_last_seen = stored.get("last_seen") or stored.get("timestamp") or ""
+        merged["last_seen"] = now.isoformat()
+        merged["times_seen"] = int(stored.get("times_seen", 1) or 1) + 1
+        # ``date`` is the activity date used by every 30-day window reader
+        # (risk score, rule 10, Grafana timeField) — it MUST track the
+        # latest firing or long-running active situations silently vanish
+        # from those windows. ``timestamp``/``first_seen`` keep the origin.
+        merged["date"] = now.isoformat()
+
+        alert_reason: str | None = None
+
+        # Reactivation: the situation was dormant and fires again.
         try:
-            resp = self.es.mget(
-                index=CORRELATIONS_INDEX,
-                body={"ids": ids},
+            prev_dt = datetime.fromisoformat(
+                str(prev_last_seen).replace("Z", "+00:00")
             )
-            existing_ids = {
-                doc["_id"]
-                for doc in resp.get("docs", [])
-                if doc.get("found", False)
+            if (now - prev_dt).days >= REACTIVATION_DAYS:
+                alert_reason = "reactivation"
+        except (ValueError, TypeError):
+            pass
+
+        cand_rank = ALERT_SEVERITY_THRESHOLD.get(cand.get("severity", "low"), 0)
+        stored_rank = ALERT_SEVERITY_THRESHOLD.get(stored.get("severity", "low"), 0)
+
+        if cand_rank > stored_rank:
+            alert_reason = "escalation"
+
+        # Refresh the rule payload (description, events, rule-specific
+        # fields like rule 10's signals_detail) with the latest assessment
+        # when the fresh firing is at least as severe — or on reactivation,
+        # so a reactivation alert never describes a weeks-old event.
+        if cand_rank >= stored_rank or alert_reason == "reactivation":
+            protected = {
+                "correlation_id", "timestamp", "first_seen", "last_seen",
+                "times_seen", "timeline", "date",
             }
-        except Exception:
-            logger.warning(
-                "Could not check for duplicate correlations — "
-                "proceeding with all %d candidates.",
-                len(correlations),
-            )
-            return correlations
+            for key, value in cand.items():
+                if key not in protected:
+                    merged[key] = value
+            if cand_rank < stored_rank:
+                # Severity never de-escalates.
+                merged["severity"] = stored.get("severity", "low")
 
-        if existing_ids:
-            logger.info(
-                "Deduplication: %d of %d correlations already exist.",
-                len(existing_ids),
-                len(correlations),
-            )
+        merged["timeline"] = self._merge_timeline(
+            stored.get("timeline"), cand.get("timeline")
+        )
 
-        return [
-            c
-            for c in correlations
-            if c.get("correlation_id") not in existing_ids
-        ]
+        return merged, alert_reason
+
+    @staticmethod
+    def _merge_timeline(
+        stored_timeline: list[dict[str, Any]] | None,
+        cand_timeline: list[dict[str, Any]] | None,
+    ) -> list[dict[str, Any]]:
+        """Union two timelines, dedup by (type, description), capped.
+
+        The date is deliberately excluded from the dedup key: several
+        rules emit run-relative entry dates (computed from ``now``), so a
+        date-inclusive key would re-add the same logical entry on every
+        run.  When capping, the oldest and newest halves are both kept so
+        the situation's origin events are never evicted by churn.
+        """
+        seen: set[tuple[str, str]] = set()
+        merged: list[dict[str, Any]] = []
+        for entry in (stored_timeline or []) + (cand_timeline or []):
+            key = (
+                str(entry.get("type", "")),
+                str(entry.get("description", "")),
+            )
+            if key in seen:
+                continue
+            seen.add(key)
+            merged.append(entry)
+        merged.sort(key=lambda e: str(e.get("date", "")))
+        if len(merged) > TIMELINE_MAX_ENTRIES:
+            head = TIMELINE_MAX_ENTRIES // 2
+            tail = TIMELINE_MAX_ENTRIES - head
+            merged = merged[:head] + merged[-tail:]
+        return merged
 
     # ------------------------------------------------------------------
     # Alerting
     # ------------------------------------------------------------------
 
     def _dispatch_alerts(self, correlations: list[dict[str, Any]]) -> None:
-        """Send alerts for correlations that meet the severity threshold.
+        """Send one batched notification for alert-worthy correlations.
 
-        Only correlations with severity >= "high" trigger notifications.
+        Only correlations with severity >= "high" are included; the whole
+        run produces a single Discord message batch and a single digest
+        email instead of one notification per correlation.
 
         Args:
-            correlations: List of new correlation dicts.
+            correlations: Alertable correlation dicts (with
+                ``alert_context``).
         """
-        for correlation in correlations:
-            severity = correlation.get("severity", "low")
-            severity_level = ALERT_SEVERITY_THRESHOLD.get(severity, 0)
+        to_alert = [
+            c
+            for c in correlations
+            if ALERT_SEVERITY_THRESHOLD.get(c.get("severity", "low"), 0)
+            >= MIN_ALERT_SEVERITY
+        ]
+        below = len(correlations) - len(to_alert)
+        if below:
+            logger.debug(
+                "%d correlation(s) below alert threshold — not notified.",
+                below,
+            )
+        if not to_alert:
+            return
 
-            if severity_level >= MIN_ALERT_SEVERITY:
-                logger.info(
-                    "Dispatching alert for correlation %s (severity=%s).",
-                    correlation.get("correlation_id"),
-                    severity,
-                )
-                try:
-                    send_alerts(correlation)
-                except Exception:
-                    logger.exception(
-                        "Failed to send alerts for correlation %s.",
-                        correlation.get("correlation_id"),
-                    )
-            else:
-                logger.debug(
-                    "Correlation %s (severity=%s) below alert threshold.",
-                    correlation.get("correlation_id"),
-                    severity,
-                )
+        logger.info("Dispatching %d alert(s) in one batch.", len(to_alert))
+        try:
+            send_alerts(to_alert)
+        except Exception:
+            logger.exception("Failed to send batched alerts.")
 
 
 # ---------------------------------------------------------------------------

@@ -16,6 +16,7 @@ from elasticsearch import Elasticsearch
 from pycti import OpenCTIApiClient
 
 from common.config import INDEX_PREFIX
+from common.countries import normalize_country
 from common.opencti_client import get_campaigns_by_country
 
 logger = logging.getLogger(__name__)
@@ -138,7 +139,8 @@ class ConflictCyberRule:
         by_country: dict[str, list[dict[str, Any]]] = {}
         for hit in hits:
             src = hit["_source"]
-            country = src.get("country", "").strip()
+            # Defensive: pre-migration ACLED docs store Title Case names.
+            country = normalize_country(src.get("country", "").strip())
             if country:
                 by_country.setdefault(country, []).append(src)
 
@@ -228,8 +230,10 @@ class ConflictCyberRule:
         # Sort timeline by date.
         timeline.sort(key=lambda t: t.get("date", ""))
 
+        # Situation-stable identity: one correlation per conflict country;
+        # the engine updates the existing document on subsequent runs.
         correlation_id = hashlib.sha256(
-            f"{self.RULE_NAME}:{country}:{now[:10]}".encode()
+            f"{self.RULE_NAME}:{country}".encode()
         ).hexdigest()[:20]
 
         return {

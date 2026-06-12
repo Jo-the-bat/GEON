@@ -272,8 +272,13 @@ class PredictionConsensusIngestor:
 
         severity = "high" if divergence > 0.20 else "medium"
 
+        # Situation-stable identity: one document per diverging market —
+        # re-running while the divergence persists overwrites it in place
+        # instead of accumulating one document per day. Anchor on case_id:
+        # polymarket case documents have NO market_id field, so the old
+        # anchor was always "" and every divergence collided on one id.
         correlation_id = hashlib.sha256(
-            f"prediction_divergence:{pm_case.get('market_id', '')}:{now[:10]}".encode()
+            f"prediction_divergence:{pm_case.get('case_id', '')}".encode()
         ).hexdigest()[:20]
 
         return {

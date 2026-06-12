@@ -218,12 +218,16 @@ class PolymarketIngestor:
         """Create a correlation entry for a significant price shift."""
         import hashlib
         now = datetime.now(tz=timezone.utc).isoformat()
-        corr_id = hashlib.sha256(
-            f"shift-{doc['case_id']}-{now}".encode()
-        ).hexdigest()[:20]
-
         direction = "up" if new_price > old_price else "down"
         change_pct = round(abs(new_price - old_price) * 100, 1)
+
+        # A shift is an event, not a situation — but bucket by day and
+        # direction so the 2-hourly enrich cron can't spam one document
+        # per run for the same move (the id previously embedded the full
+        # timestamp).
+        corr_id = hashlib.sha256(
+            f"shift-{doc['case_id']}-{now[:10]}-{direction}".encode()
+        ).hexdigest()[:20]
 
         correlation = {
             "correlation_id": corr_id,

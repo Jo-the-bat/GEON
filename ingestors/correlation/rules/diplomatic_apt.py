@@ -259,8 +259,13 @@ class DiplomaticAPTRule:
                 "description": f"{apt.get('name', 'Unknown')} ({apt_type})",
             })
 
+        # Situation-stable identity: one correlation per (sorted) country
+        # pair. The previous hash used the unsorted pair AND the current
+        # date, so (A,B)/(B,A) diverged and the same escalation re-alerted
+        # daily; the engine now updates the existing document instead.
+        pair = "||".join(sorted([country_a, country_b]))
         correlation_id = hashlib.sha256(
-            f"{self.RULE_NAME}:{country_a}:{country_b}:{now[:10]}".encode()
+            f"{self.RULE_NAME}:{pair}".encode()
         ).hexdigest()[:20]
 
         return {

@@ -2,13 +2,18 @@
 
 ## Overview
 
-The GEON correlation engine runs hourly and evaluates four rules that detect patterns spanning geopolitical events and cyber threat activity. When a rule matches, an alert is created in the `geon-correlations` Elasticsearch index and notifications are sent via Discord and email.
+The GEON correlation engine runs every 30 minutes and evaluates ten rules that detect patterns spanning geopolitical events and cyber threat activity.
+
+Correlations are **situation documents**: each rule emits a stable `correlation_id` (sha256 of the rule name plus its situation anchor — country pair, country, outage start time, SIPRI year, market case + GDELT event — never the current date). An unknown id creates a new document; a known id refreshes the existing one (`last_seen`, `times_seen`, merged timeline, severity never de-escalates).
+
+Notifications (Discord + email) are sent as ONE batch per engine run, only for correlations with severity >= high, and only when the situation is **new**, **escalates** in severity, or **reactivates** after 14+ days of dormancy. Silent refreshes of ongoing situations do not notify.
 
 Each correlation includes:
 - A severity level (low, medium, high, critical)
 - The triggering events from both domains
-- A cross-referenced timeline
-- Links to the relevant Grafana dashboard
+- A cross-referenced timeline (capped, deduplicated)
+- Situation tracking fields: `first_seen`, `last_seen`, `times_seen`
+- `date` always reflects the latest firing (used by dashboards and 30-day windows); `timestamp` keeps the first detection
 
 ---
 
@@ -152,11 +157,15 @@ All detected correlations are stored in `geon-correlations`:
 
 ```json
 {
-    "correlation_id": "corr-20250615-001",
+    "correlation_id": "3f2a9c81d4e5b6a7c8d9",
     "timestamp": "2025-06-15T14:30:00Z",
+    "date": "2025-06-18T09:00:00Z",
+    "first_seen": "2025-06-15T14:30:00Z",
+    "last_seen": "2025-06-18T09:00:00Z",
+    "times_seen": 12,
     "rule_name": "diplomatic_escalation_apt",
     "severity": "critical",
-    "countries_involved": ["RUS", "UKR"],
+    "countries_involved": ["RUSSIA", "UKRAINE"],
     "diplomatic_event": {
         "event_id": "gdelt-12345678",
         "description": "Military force deployment",

@@ -150,8 +150,11 @@ class PredictionValidatedRule:
 
         severity = "medium" if direction == "anticipation" else "high"
 
+        # Stable identity anchored on the market case and the validating
+        # GDELT event (previously the current date rotated the id daily).
+        event_anchor = worst_event.get("event_id", "") or str(event_date)
         correlation_id = hashlib.sha256(
-            f"{self.RULE_NAME}:{case.get('case_id', '')}:{now[:10]}".encode()
+            f"{self.RULE_NAME}:{case.get('case_id', '')}:{event_anchor}".encode()
         ).hexdigest()[:20]
 
         return {

@@ -258,7 +258,7 @@ class MultiSignalConvergenceRule:
                     "query": {
                         "bool": {
                             "filter": [
-                                {"range": {"date": {"gte": "now-7d"}}},
+                                {"range": {"event_date": {"gte": "now-7d"}}},
                                 {"term": {"country": country}},
                             ]
                         }
@@ -338,8 +338,11 @@ class MultiSignalConvergenceRule:
             f"Risk score: {risk_score}."
         )
 
+        # Situation-stable identity: one fusion document per country while
+        # the convergence persists; the engine refreshes last_seen and
+        # re-alerts only on severity escalation or reactivation.
         correlation_id = hashlib.sha256(
-            f"{self.RULE_NAME}:{country}:{window_end}".encode()
+            f"{self.RULE_NAME}:{country}".encode()
         ).hexdigest()[:20]
 
         doc: dict[str, Any] = {

@@ -305,8 +305,11 @@ class RhetoricShiftRule:
         else:
             severity = "low"
 
+        # Situation-stable identity: one correlation per country pair; the
+        # engine tracks persistence via last_seen/times_seen instead of
+        # producing a new document every day.
         correlation_id = hashlib.sha256(
-            f"{self.RULE_NAME}:{pair_key}:{now[:10]}".encode()
+            f"{self.RULE_NAME}:{pair_key}".encode()
         ).hexdigest()[:20]
 
         return {

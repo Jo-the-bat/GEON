@@ -16,6 +16,7 @@ from elasticsearch import Elasticsearch
 from pycti import OpenCTIApiClient
 
 from common.config import INDEX_PREFIX
+from common.countries import normalize_country
 from common.opencti_client import get_indicators_by_country
 
 logger = logging.getLogger(__name__)
@@ -147,7 +148,9 @@ class SanctionCyberRule:
         """
         by_country: dict[str, list[dict[str, Any]]] = {}
         for doc in sanctions:
-            country = doc.get("country", "").strip()
+            # Normalize defensively: pre-migration sanction docs may still
+            # carry raw vendor spellings ("RUSSIAN FEDERATION", "Iraqi").
+            country = normalize_country(doc.get("country", "").strip())
             if country:
                 by_country.setdefault(country, []).append(doc)
         return by_country
@@ -315,8 +318,12 @@ class SanctionCyberRule:
             programs.extend(s.get("programs", []))
         programs = list(set(programs))
 
+        # Situation-stable identity: one correlation per sanctioned country.
+        # The engine updates last_seen/severity on the existing document
+        # instead of re-alerting daily (the id previously rotated with the
+        # current date).
         correlation_id = hashlib.sha256(
-            f"{self.RULE_NAME}:{country}:{now[:10]}".encode()
+            f"{self.RULE_NAME}:{country}".encode()
         ).hexdigest()[:20]
 
         # Timeline.

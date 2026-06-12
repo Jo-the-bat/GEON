@@ -15,6 +15,7 @@ from typing import Any
 from elasticsearch import Elasticsearch
 
 from common.config import INDEX_PREFIX
+from common.countries import normalize_country
 
 logger = logging.getLogger(__name__)
 
@@ -49,9 +50,12 @@ class InternetOutageRule:
         logger.info("[%s] Found %d outage(s) to check.", self.RULE_NAME, len(outages))
 
         for outage in outages:
-            country = outage.get("country", "")
+            # Defensive: pre-migration outage docs may carry the old
+            # Cloudflare spellings (e.g. "IVORY COAST").
+            country = normalize_country(outage.get("country", ""))
             if not country:
                 continue
+            outage["country"] = country
 
             start_time = outage.get("start_time", "")
             gdelt_hits = self._find_gdelt_escalation(country, start_time)
@@ -130,7 +134,7 @@ class InternetOutageRule:
                 query={
                     "bool": {
                         "filter": [
-                            {"range": {"date": {"gte": window_start, "lte": window_end}}},
+                            {"range": {"event_date": {"gte": window_start, "lte": window_end}}},
                             {"term": {"country": country}},
                         ]
                     }
@@ -188,7 +192,7 @@ class InternetOutageRule:
             })
         for evt in acled_hits[:3]:
             timeline.append({
-                "date": evt.get("date", now),
+                "date": evt.get("event_date", now),
                 "type": "conflict",
                 "description": f"ACLED: {evt.get('event_type', '')} — {evt.get('notes', '')[:100]}",
             })
