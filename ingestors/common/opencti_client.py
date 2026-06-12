@@ -26,9 +26,25 @@ from common.config import (
     RETRY_WAIT_MAX,
     RETRY_WAIT_MIN,
 )
-from common.countries import CANONICAL_COUNTRIES, normalize_country
+from common.countries import ALIASES, CANONICAL_COUNTRIES, normalize_country
 
 logger = logging.getLogger(__name__)
+
+
+def _location_search_terms(canonical: str) -> list[str]:
+    """Search terms likely to hit the OpenCTI geography name for a country.
+
+    OpenCTI's dataset uses UN long forms ("Viet Nam", "Russian
+    Federation", "Democratic People's Republic of Korea") — our alias
+    table maps exactly those forms to the canonical name, so reversing it
+    gives the right search phrases.
+    """
+    terms = [canonical.title()]
+    terms += [
+        alias for alias, target in ALIASES.items()
+        if target == canonical and len(alias) > 3
+    ][:4]
+    return terms
 
 
 # ---------------------------------------------------------------------------
@@ -176,9 +192,9 @@ def _resolve_country_location(
         logger.debug("'%s' is not a country — skipping Location lookup.", country_name)
         return None
 
-    # OpenCTI's geography dataset stores names like "Iran" or "United
-    # States of America", not the GEON canonical uppercase form — try a
-    # few cheap exact reads first.
+    # OpenCTI's geography dataset stores UN long forms ("Viet Nam",
+    # "Russian Federation"), not the GEON canonical uppercase form — try
+    # cheap exact reads first.
     candidates = list(dict.fromkeys(
         [country_name, canonical.title(), canonical]
     ))
@@ -197,26 +213,27 @@ def _resolve_country_location(
             if location:
                 return location
 
-        # Fuzzy fallback: search, then compare name/aliases through the
-        # canonical dimension (handles "United States of America",
-        # "Russian Federation", accented forms, ...).
-        results = client.location.list(
-            search=canonical.title(),
-            first=10,
-            filters={
-                "mode": "and",
-                "filters": [
-                    {"key": "entity_type", "values": ["Country"], "operator": "eq"},
-                ],
-                "filterGroups": [],
-            },
-        )
-        for location in results or []:
-            names = [location.get("name", "")]
-            names += location.get("x_opencti_aliases") or []
-            names += location.get("aliases") or []
-            if any(normalize_country(n) == canonical for n in names if n):
-                return location
+        # Fuzzy fallback: search with the canonical name AND its known
+        # alias phrases (UN long forms), then accept a result only when
+        # its name/aliases map back to the same canonical country.
+        for term in _location_search_terms(canonical):
+            results = client.location.list(
+                search=term,
+                first=10,
+                filters={
+                    "mode": "and",
+                    "filters": [
+                        {"key": "entity_type", "values": ["Country"], "operator": "eq"},
+                    ],
+                    "filterGroups": [],
+                },
+            )
+            for location in results or []:
+                names = [location.get("name", "")]
+                names += location.get("x_opencti_aliases") or []
+                names += location.get("aliases") or []
+                if any(normalize_country(n) == canonical for n in names if n):
+                    return location
     except Exception:
         logger.exception(
             "Failed to resolve Location for country '%s'.", country_name
@@ -265,10 +282,11 @@ def get_campaigns_by_country(
 
     location = _resolve_country_location(client, country_name)
     if not location:
-        logger.warning(
-            "Location '%s' not found in OpenCTI — rule cannot attribute APTs by relationship",
-            country_name,
-        )
+        if normalize_country(country_name) in CANONICAL_COUNTRIES:
+            logger.warning(
+                "Location '%s' not found in OpenCTI — rule cannot attribute APTs by relationship",
+                country_name,
+            )
         return []
 
     location_id = location.get("id") or location.get("standard_id")
@@ -374,10 +392,11 @@ def get_indicators_by_country(
 
     location = _resolve_country_location(client, country_name)
     if not location:
-        logger.warning(
-            "Location '%s' not found in OpenCTI — rule cannot attribute IoCs by relationship",
-            country_name,
-        )
+        if normalize_country(country_name) in CANONICAL_COUNTRIES:
+            logger.warning(
+                "Location '%s' not found in OpenCTI — rule cannot attribute IoCs by relationship",
+                country_name,
+            )
         return []
 
     location_id = location.get("id") or location.get("standard_id")
