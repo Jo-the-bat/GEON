@@ -14,11 +14,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from elasticsearch import Elasticsearch
-from pycti import OpenCTIApiClient
-
 from common.config import INDEX_PREFIX
 from common.opencti_client import get_campaigns_by_country
+from elasticsearch import Elasticsearch
+from pycti import OpenCTIApiClient
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +66,15 @@ class MilitaryBuildupRule:
         return correlations
 
     def _find_high_increase_countries(self) -> list[dict[str, Any]]:
-        """Find countries with YoY spending increase > threshold."""
+        """Find countries with YoY spending increase > threshold.
+
+        Only considers YoY changes from the current or previous calendar year
+        (covers the January transition where SIPRI data for the current year
+        isn't published yet). Without this filter, the rule fires every time
+        the calculator runs on any old SIPRI record still in ES, which
+        produces stale correlations long after the buildup ended.
+        """
+        current_year = datetime.now(tz=timezone.utc).year
         try:
             resp = self.es.search(
                 index=SPENDING_INDEX,
@@ -75,6 +82,7 @@ class MilitaryBuildupRule:
                     "bool": {
                         "filter": [
                             {"range": {"spending_change_yoy_pct": {"gt": YOY_THRESHOLD}}},
+                            {"range": {"year": {"gte": current_year - 1}}},
                         ]
                     }
                 },

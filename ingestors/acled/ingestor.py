@@ -1,7 +1,7 @@
 """GEON ACLED ingestor.
 
 Fetches armed-conflict events from the ACLED API and indexes them into
-Elasticsearch for use in correlation analysis and Kibana dashboards.
+Elasticsearch for use in correlation analysis and Grafana dashboards.
 
 Usage::
 
@@ -19,13 +19,6 @@ from pathlib import Path
 from typing import Any
 
 import requests
-from tenacity import (
-    retry,
-    retry_if_exception_type,
-    stop_after_attempt,
-    wait_exponential,
-)
-
 from common.config import (
     ACLED_API_KEY,
     ACLED_EMAIL,
@@ -37,6 +30,12 @@ from common.config import (
 )
 from common.countries import normalize_country
 from common.es_client import bulk_index, ensure_index, get_es_client, get_latest_timestamp
+from tenacity import (
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential,
+)
 
 logger = logging.getLogger(__name__)
 

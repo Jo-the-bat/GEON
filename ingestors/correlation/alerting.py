@@ -6,6 +6,14 @@ Alert format follows the GEON notification template specification.
 Alerts are sent in batch: one engine run produces a handful of Discord
 messages (up to 10 embeds each, the webhook limit) and a single digest
 email, regardless of how many correlations fired.
+
+Anti-spam safety net: before sending, each correlation is checked against
+``geon-alerts-sent`` in Elasticsearch for a recent alert with the same
+(rule_name, countries_involved, severity). If one was sent in the last
+7 days the alert is silently skipped. Escalations pass (the severity
+changes the key) and reactivations pass (dormancy >= 14 days exceeds the
+7-day window). On successful send, a record is indexed so future runs
+see it.
 """
 
 from __future__ import annotations
@@ -13,6 +21,7 @@ from __future__ import annotations
 import logging
 import smtplib
 import time
+from datetime import datetime, timezone
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from typing import Any
@@ -36,6 +45,7 @@ from common.config import (
     RETRY_WAIT_MAX,
     RETRY_WAIT_MIN,
 )
+from common.es_client import get_es_client
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +73,9 @@ ALERT_CONTEXT_LABEL: dict[str, str] = {
 }
 
 DASHBOARD_BASE_URL = "https://geon.example.com/grafana/d/correlations"
+
+ALERTS_SENT_INDEX = "geon-alerts-sent"
+DEDUP_WINDOW_DAYS = 7
 
 # Discord allows at most 10 embeds per webhook message AND at most 6000
 # characters across all embeds of one message.
@@ -481,15 +494,88 @@ def _build_email_digest_html(correlations: list[dict[str, Any]]) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Anti-spam deduplication via Elasticsearch
+# ---------------------------------------------------------------------------
+
+def _dedup_key(correlation: dict[str, Any]) -> str:
+    """Build a deterministic key from (rule_name, sorted countries, severity)."""
+    rule = correlation.get("rule_name", "")
+    countries = sorted(correlation.get("countries_involved", []))
+    severity = correlation.get("severity", "")
+    return f"{rule}:{','.join(countries)}:{severity}"
+
+
+def _was_recently_sent(correlation: dict[str, Any]) -> bool:
+    """Check if an equivalent alert was sent in the last DEDUP_WINDOW_DAYS."""
+    try:
+        es = get_es_client()
+        if not es.indices.exists(index=ALERTS_SENT_INDEX):
+            return False
+        key = _dedup_key(correlation)
+        resp = es.count(
+            index=ALERTS_SENT_INDEX,
+            body={
+                "query": {
+                    "bool": {
+                        "filter": [
+                            {"term": {"dedup_key": key}},
+                            {"range": {"sent_at": {"gte": f"now-{DEDUP_WINDOW_DAYS}d"}}},
+                        ]
+                    }
+                }
+            },
+        )
+        return resp.get("count", 0) > 0
+    except Exception:
+        logger.debug("Dedup check failed — will send alert anyway.", exc_info=True)
+        return False
+
+
+def _record_sent(correlation: dict[str, Any]) -> None:
+    """Index a record in geon-alerts-sent after successful dispatch."""
+    try:
+        es = get_es_client()
+        if not es.indices.exists(index=ALERTS_SENT_INDEX):
+            es.indices.create(
+                index=ALERTS_SENT_INDEX,
+                body={
+                    "mappings": {
+                        "properties": {
+                            "dedup_key": {"type": "keyword"},
+                            "rule_name": {"type": "keyword"},
+                            "countries": {"type": "keyword"},
+                            "severity": {"type": "keyword"},
+                            "sent_at": {"type": "date"},
+                        }
+                    }
+                },
+            )
+        es.index(
+            index=ALERTS_SENT_INDEX,
+            body={
+                "dedup_key": _dedup_key(correlation),
+                "rule_name": correlation.get("rule_name", ""),
+                "countries": sorted(correlation.get("countries_involved", [])),
+                "severity": correlation.get("severity", ""),
+                "sent_at": datetime.now(timezone.utc).isoformat(),
+            },
+        )
+    except Exception:
+        logger.debug("Could not record sent alert.", exc_info=True)
+
+
+# ---------------------------------------------------------------------------
 # Dispatcher
 # ---------------------------------------------------------------------------
 
 def send_alerts(correlations: list[dict[str, Any]]) -> None:
     """Dispatch the run's correlation alerts to all configured channels.
 
-    Sends ONE batch to Discord (chunked at 10 embeds/message) and ONE
-    digest email.  Failures in one channel do not prevent the other
-    channel from being attempted.
+    Correlations already alerted in the last DEDUP_WINDOW_DAYS (same
+    rule/countries/severity) are dropped, then ONE batch goes to Discord
+    (chunked at 10 embeds/message) and ONE digest email is sent.
+    Failures in one channel do not prevent the other channel from being
+    attempted.
 
     Args:
         correlations: Alert-worthy correlation dicts for this run.
@@ -497,18 +583,33 @@ def send_alerts(correlations: list[dict[str, Any]]) -> None:
     if not correlations:
         return
 
-    logger.info(
-        "Dispatching alerts for %d correlation(s).", len(correlations)
-    )
+    fresh = [c for c in correlations if not _was_recently_sent(c)]
+    suppressed = len(correlations) - len(fresh)
+    if suppressed:
+        logger.info(
+            "%d alert(s) suppressed by the %d-day anti-spam window.",
+            suppressed,
+            DEDUP_WINDOW_DAYS,
+        )
+    if not fresh:
+        return
+
+    logger.info("Dispatching alerts for %d correlation(s).", len(fresh))
 
     # --- Discord ---
+    discord_ok = False
     try:
-        send_discord_alerts(correlations)
+        discord_ok = send_discord_alerts(fresh)
     except Exception:
         logger.exception("Failed to send Discord alerts.")
 
     # --- Email ---
+    email_ok = False
     try:
-        send_email_digest(correlations)
+        email_ok = send_email_digest(fresh)
     except Exception:
         logger.exception("Failed to send email digest.")
+
+    if discord_ok or email_ok:
+        for correlation in fresh:
+            _record_sent(correlation)

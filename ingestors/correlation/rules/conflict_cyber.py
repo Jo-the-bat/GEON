@@ -12,12 +12,11 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from elasticsearch import Elasticsearch
-from pycti import OpenCTIApiClient
-
 from common.config import INDEX_PREFIX
 from common.countries import normalize_country
 from common.opencti_client import get_campaigns_by_country
+from elasticsearch import Elasticsearch
+from pycti import OpenCTIApiClient
 
 logger = logging.getLogger(__name__)
 
@@ -29,11 +28,13 @@ CYBER_WINDOW_DAYS: int = 30
 ACLED_INDEX_PATTERN = f"{INDEX_PREFIX}-acled-events-*"
 
 # ACLED event types that indicate active armed conflict.
+# "Strategic developments" was removed because it covers non-violent events
+# (treaty signings, hostage releases, disarmament announcements) that drown
+# the rule in false positives.
 CONFLICT_EVENT_TYPES = frozenset({
     "Battles",
     "Violence against civilians",
     "Explosions/Remote violence",
-    "Strategic developments",
 })
 
 

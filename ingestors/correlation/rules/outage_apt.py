@@ -15,12 +15,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from elasticsearch import Elasticsearch
-from pycti import OpenCTIApiClient
-
 from common.config import INDEX_PREFIX
 from common.countries import normalize_country
 from common.opencti_client import get_campaigns_by_country
+from elasticsearch import Elasticsearch
+from pycti import OpenCTIApiClient
 
 logger = logging.getLogger(__name__)
 
@@ -181,7 +180,6 @@ class OutageAPTRule:
             severity = "medium"
 
         all_apts = offensive_apts + targeting_apts
-        apt_names = [a["name"] for a in all_apts if a.get("name")]
         primary_apt = all_apts[0] if all_apts else {}
 
         correlation_id = hashlib.sha256(

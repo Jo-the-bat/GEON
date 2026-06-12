@@ -12,12 +12,11 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from elasticsearch import Elasticsearch
-from pycti import OpenCTIApiClient
-
 from common.config import INDEX_PREFIX
 from common.countries import normalize_country
 from common.opencti_client import get_indicators_by_country
+from elasticsearch import Elasticsearch
+from pycti import OpenCTIApiClient
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +26,11 @@ logger = logging.getLogger(__name__)
 LOOKBACK_DAYS: int = 14
 IOC_WINDOW_DAYS: int = 60
 IOC_SPIKE_THRESHOLD: float = 2.0  # 200% increase
+# Minimum indicator count in the baseline window for the spike ratio to be
+# statistically meaningful. Below this we skip the comparison instead of
+# treating a near-zero baseline as a massive "spike" (the former behaviour
+# produced constant false positives for quiet countries).
+MIN_BASELINE_COUNT: int = 10
 SANCTIONS_INDEX = f"{INDEX_PREFIX}-sanctions"
 CTI_INDICATORS_PATTERN = f"{INDEX_PREFIX}-cti-indicators"
 
@@ -170,8 +174,10 @@ class SanctionCyberRule:
             country: Country name to check.
 
         Returns:
-            Ratio of post/baseline IoC counts, or ``None`` if the
-            baseline is empty (no comparison possible).
+            Ratio of post/baseline IoC counts, or ``None`` when the baseline
+            is too small (< :data:`MIN_BASELINE_COUNT`) for the ratio to be
+            meaningful — in that case we skip the correlation rather than
+            reporting a spurious spike.
         """
         now = datetime.now(timezone.utc)
         post_start = now - timedelta(days=IOC_WINDOW_DAYS)
@@ -188,17 +194,11 @@ class SanctionCyberRule:
             country, baseline_start.isoformat(), baseline_end.isoformat()
         )
 
-        if baseline_count == 0:
-            if post_count > 0:
-                logger.info(
-                    "[%s] Country %s: %d IoCs in post-window, 0 in baseline "
-                    "(treating as spike).",
-                    self.RULE_NAME,
-                    country,
-                    post_count,
-                )
-                # Treat any activity against a zero baseline as a maximum spike.
-                return IOC_SPIKE_THRESHOLD + 1.0
+        if baseline_count < MIN_BASELINE_COUNT:
+            logger.info(
+                "[%s] insufficient baseline for %s (%d IoCs, threshold %d)",
+                self.RULE_NAME, country, baseline_count, MIN_BASELINE_COUNT,
+            )
             return None
 
         ratio = post_count / baseline_count
@@ -268,7 +268,11 @@ class SanctionCyberRule:
                     "bool": {
                         "must": [
                             {"term": {"country": country}},
-                            {"range": {"ingested_at": {"gte": since, "lte": until}}},
+                            # Use the STIX ``valid_from`` rather than
+                            # ``ingested_at``: we care when the indicator
+                            # became active, not when our exporter happened
+                            # to run.
+                            {"range": {"valid_from": {"gte": since, "lte": until}}},
                         ],
                     }
                 },

@@ -1,13 +1,16 @@
 # GEON
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![CI](https://github.com/Jo-the-bat/GEON/actions/workflows/ci.yml/badge.svg)](https://github.com/Jo-the-bat/GEON/actions/workflows/ci.yml)
+[![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)](https://python.org)
 [![Docker](https://img.shields.io/badge/Docker-rootless-2496ED?logo=docker&logoColor=white)](https://docs.docker.com/engine/security/rootless/)
+[![Lint: ruff](https://img.shields.io/badge/lint-ruff-D7FF64?logo=ruff&logoColor=black)](https://docs.astral.sh/ruff/)
 
 **Geopolitical & Cyber Threat Intelligence Platform**
 
 GEON automatically correlates diplomatic events, armed conflicts, and sanctions with cyber threat activity from APT groups and malware campaigns. It bridges the gap between structured CTI (OpenCTI/STIX2) and geopolitical event data (GDELT/ACLED) that no existing open-source tool connects.
 
-The name is an acronym of the core stack -- **n**8n, **E**lasticsearch, **G**DELT, **O**penCTI -- and evokes *geontiation*, a central concept in international relations.
+The name is primarily an acronym of the core stack -- **n**8n, **E**lasticsearch, **G**DELT, **O**penCTI. As a second layer, *geontiation* is a neologism I coined for the project — a portmanteau of "geo" (geography, territory) and the French "énonciation" (the act of naming / making something speakable), to capture what the platform does: it names and surfaces latent patterns in geopolitics + cyber. It is not an established term in international relations; I flag it as a coinage here so the framing stays honest.
 
 ---
 
@@ -123,7 +126,7 @@ All dashboards are built in Grafana using Elasticsearch as the datasource:
 | Dashboard | Description |
 |-----------|-------------|
 | **Global Overview** | World map (Geomap panel) with GDELT events, ACLED conflicts, and APT campaigns. 30-day timeline. |
-| **Country Profile** | Per-country timeline, attributed APT groups, active sanctions, composite risk score (7 factors: GDELT events, ACLED conflicts, sanctions, APT groups, correlations, internet outages, military spending). Uses template variables for country selection. |
+| **Country Profile** | Per-country timeline, attributed APT groups, active sanctions, composite risk score (7 weighted factors: GDELT negative events 25%, ACLED conflicts 15%, sanctions 10%, APT groups 15%, correlations 20%, military spending YoY 10%, arms imports TIV 5%). Uses template variables for country selection. |
 | **Correlations** | Detected cross-domain patterns with severity filters and dual timelines. |
 | **Article Feed** | Ingested articles from RSS sources (via n8n) with keyword trends. |
 | **Monitoring** | Service health (Prometheus datasource), ingestion timestamps, index volumes. |
@@ -134,12 +137,12 @@ All dashboards are built in Grafana using Elasticsearch as the datasource:
 
 - [x] Phase 1 -- Infrastructure: Nginx, Elasticsearch, Grafana, Authelia, TLS
 - [x] Phase 2 -- OpenCTI: platform, connectors, STIX2 graph
-- [ ] Phase 3 -- GDELT ingestion and first Grafana dashboards
-- [ ] Phase 4 -- ACLED and sanctions ingestion
-- [ ] Phase 5 -- n8n RSS workflows
-- [ ] Phase 6 -- Correlation engine and alerting
-- [ ] Phase 7 -- Monitoring, backups, crontab
-- [ ] Phase 8 -- Documentation and use cases
+- [x] Phase 3 -- GDELT ingestion and first Grafana dashboards
+- [x] Phase 4 -- ACLED and sanctions ingestion
+- [x] Phase 5 -- n8n RSS workflows
+- [x] Phase 6 -- Correlation engine and alerting
+- [x] Phase 7 -- Monitoring, backups, crontab
+- [x] Phase 8 -- Documentation and use cases
 
 ---
 

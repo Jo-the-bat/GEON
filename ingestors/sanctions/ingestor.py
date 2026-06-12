@@ -15,19 +15,11 @@ import argparse
 import hashlib
 import logging
 import sys
-import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 import requests
-from tenacity import (
-    retry,
-    retry_if_exception_type,
-    stop_after_attempt,
-    wait_exponential,
-)
-
 from common.config import (
     INDEX_PREFIX,
     RETRY_MAX_ATTEMPTS,
@@ -40,6 +32,13 @@ from common.es_client import bulk_index, ensure_index, get_es_client
 from common.opencti_client import (
     create_organization,
     get_opencti_client,
+)
+from defusedxml import ElementTree as ET
+from tenacity import (
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential,
 )
 
 logger = logging.getLogger(__name__)
@@ -60,8 +59,9 @@ NS = {"sdn": "https://sanctionslistservice.ofac.treas.gov/api/PublicationPreview
 class SanctionsIngestor:
     """Fetches sanctions data and indexes it in Elasticsearch / OpenCTI.
 
-    Currently implements the OFAC SDN list.  EU and UN sources are marked
-    with TODOs for future implementation.
+    Implements OFAC SDN, EU Consolidated Sanctions, and UN Security Council
+    sanctions lists. Individual Person entities in OpenCTI remain a future
+    enhancement.
 
     Attributes:
         es: Elasticsearch client instance.
@@ -114,7 +114,7 @@ class SanctionsIngestor:
         Returns:
             List of normalised sanctions entity dicts.
         """
-        root = ET.fromstring(xml_data)  # noqa: S314 — trusted source
+        root = ET.fromstring(xml_data)
         entries = root.findall(".//sdn:sdnEntry", NS)
         logger.info("Found %d SDN entries in XML.", len(entries))
 
@@ -301,7 +301,7 @@ class SanctionsIngestor:
         logger.info("Created/updated %d entities in OpenCTI.", created)
 
     # ------------------------------------------------------------------
-    # EU / UN sources (stubs)
+    # EU / UN sources
     # ------------------------------------------------------------------
 
     def _fetch_eu_sanctions(self) -> list[dict[str, Any]]:
@@ -318,7 +318,11 @@ class SanctionsIngestor:
             logger.warning("Failed to download EU sanctions, skipping.", exc_info=True)
             return []
 
-        root = ET.fromstring(resp.content)
+        try:
+            root = ET.fromstring(resp.content)
+        except ET.ParseError:
+            logger.warning("EU sanctions XML is malformed, skipping.", exc_info=True)
+            return []
         # EU XML uses default namespace
         ns_match = root.tag.split("}")[0] + "}" if "}" in root.tag else ""
 
@@ -382,7 +386,11 @@ class SanctionsIngestor:
             logger.warning("Failed to download UN sanctions, skipping.", exc_info=True)
             return []
 
-        root = ET.fromstring(resp.content)
+        try:
+            root = ET.fromstring(resp.content)
+        except ET.ParseError:
+            logger.warning("UN sanctions XML is malformed, skipping.", exc_info=True)
+            return []
 
         documents: list[dict[str, Any]] = []
         for individual in root.iter("INDIVIDUAL"):
@@ -479,10 +487,10 @@ class SanctionsIngestor:
         xml_data = self._fetch_ofac_xml()
         documents = self._parse_ofac_xml(xml_data)
 
-        # --- EU (stub) ---
+        # --- EU ---
         documents.extend(self._fetch_eu_sanctions())
 
-        # --- UN (stub) ---
+        # --- UN ---
         documents.extend(self._fetch_un_sanctions())
 
         if not documents:

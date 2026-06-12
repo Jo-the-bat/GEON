@@ -166,6 +166,119 @@ body {
     color: var(--color-accent);
 }
 
+/* --- Sample Correlation --- */
+
+.sample-correlation {
+    padding: 80px 0;
+}
+
+.correlation-card {
+    background-color: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    padding: 32px;
+    max-width: 720px;
+    margin: 0 auto;
+}
+
+.correlation-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.severity-badge {
+    display: inline-block;
+    padding: 4px 12px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    border-radius: 100px;
+    color: #fff;
+}
+
+.severity-high {
+    background-color: #FF6600;
+}
+
+.correlation-rule {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--color-text-muted);
+}
+
+.correlation-countries {
+    font-size: 20px;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 24px;
+}
+
+.correlation-timeline {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.timeline-event {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.timeline-date {
+    flex-shrink: 0;
+    width: 52px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--color-text-muted);
+}
+
+.timeline-tag {
+    flex-shrink: 0;
+    display: inline-block;
+    padding: 2px 8px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-radius: 4px;
+    color: #fff;
+    min-width: 48px;
+    text-align: center;
+}
+
+.tag-acled  { background-color: #e74c3c; }
+.tag-gdelt  { background-color: #3498db; }
+.tag-cti    { background-color: #9b59b6; }
+.tag-sanc   { background-color: #e67e22; }
+
+.timeline-text {
+    color: var(--color-text);
+}
+
+.correlation-disclaimer {
+    font-size: 12px;
+    color: var(--color-text-muted);
+    font-style: italic;
+    border-top: 1px solid var(--color-border);
+    padding-top: 12px;
+}
+
+.correlation-disclaimer a {
+    color: var(--color-accent);
+    text-decoration: none;
+}
+
+.correlation-disclaimer a:hover {
+    text-decoration: underline;
+}
+
 /* --- Section titles --- */
 
 .section-title {

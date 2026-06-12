@@ -24,16 +24,16 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from elasticsearch import Elasticsearch
-from pycti import OpenCTIApiClient
-
 from common.config import INDEX_PREFIX, setup_logging
 from common.es_client import bulk_index, ensure_index, get_es_client
 from common.opencti_client import get_opencti_client
+from elasticsearch import Elasticsearch
+from pycti import OpenCTIApiClient
+
 from correlation.alerting import send_alerts
+from correlation.rules.arms_escalation import ArmsEscalationRule
 from correlation.rules.conflict_cyber import ConflictCyberRule
 from correlation.rules.diplomatic_apt import DiplomaticAPTRule
-from correlation.rules.arms_escalation import ArmsEscalationRule
 from correlation.rules.internet_outage import InternetOutageRule
 from correlation.rules.military_buildup import MilitaryBuildupRule
 from correlation.rules.multi_signal_convergence import MultiSignalConvergenceRule

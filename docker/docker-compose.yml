@@ -45,6 +45,10 @@ volumes:
     name: geon_certbot_certs
   geon_certbot_webroot:
     name: geon_certbot_webroot
+  # Dedicated volume for Elasticsearch snapshot repository. Must match
+  # path.repo in elasticsearch.yml. scripts/backup.sh writes snapshots here.
+  geon_es_backups:
+    name: geon_es_backups
 
 services:
   # ===========================================================================
@@ -121,6 +125,7 @@ services:
         hard: 65536
     volumes:
       - geon_elasticsearch_data:/usr/share/elasticsearch/data
+      - geon_es_backups:/usr/share/elasticsearch/backups
       - ./elasticsearch/elasticsearch.yml:/usr/share/elasticsearch/config/elasticsearch.yml:ro
     networks:
       - geon_net
@@ -272,11 +277,10 @@ services:
       - "geon.role=cti-platform"
 
   # ===========================================================================
-  # OPENCTI WORKERS — Background Processing
+  # OPENCTI WORKERS — Background Processing (3 identical workers)
   # ===========================================================================
-  opencti-worker-1:
+  x-opencti-worker: &opencti-worker
     image: opencti/worker:${OPENCTI_VERSION}
-    container_name: geon-opencti-worker-1
     restart: unless-stopped
     environment:
       - OPENCTI_URL=http://opencti:8080/opencti
@@ -296,52 +300,18 @@ services:
     labels:
       - "geon.service=opencti-worker"
       - "geon.role=cti-worker"
+
+  opencti-worker-1:
+    <<: *opencti-worker
+    container_name: geon-opencti-worker-1
 
   opencti-worker-2:
-    image: opencti/worker:${OPENCTI_VERSION}
+    <<: *opencti-worker
     container_name: geon-opencti-worker-2
-    restart: unless-stopped
-    environment:
-      - OPENCTI_URL=http://opencti:8080/opencti
-      - OPENCTI_TOKEN=${OPENCTI_ADMIN_TOKEN}
-      - WORKER_LOG_LEVEL=info
-    networks:
-      - geon_net
-    depends_on:
-      opencti:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "pgrep -f worker || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 30s
-    labels:
-      - "geon.service=opencti-worker"
-      - "geon.role=cti-worker"
 
   opencti-worker-3:
-    image: opencti/worker:${OPENCTI_VERSION}
+    <<: *opencti-worker
     container_name: geon-opencti-worker-3
-    restart: unless-stopped
-    environment:
-      - OPENCTI_URL=http://opencti:8080/opencti
-      - OPENCTI_TOKEN=${OPENCTI_ADMIN_TOKEN}
-      - WORKER_LOG_LEVEL=info
-    networks:
-      - geon_net
-    depends_on:
-      opencti:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "pgrep -f worker || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 30s
-    labels:
-      - "geon.service=opencti-worker"
-      - "geon.role=cti-worker"
 
   # ===========================================================================
   # OPENCTI CONNECTORS
@@ -519,7 +489,6 @@ services:
       - GENERIC_TIMEZONE=Europe/Paris
       - DB_TYPE=sqlite
       - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
-      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
     volumes:
       - geon_n8n_data:/home/node/.n8n
     networks:
@@ -599,12 +568,18 @@ services:
       - GF_SERVER_ROOT_URL=https://${GEON_DOMAIN}/grafana
       - GF_SERVER_SERVE_FROM_SUB_PATH=true
       - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=${ELASTIC_PASSWORD}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
       - GF_USERS_ALLOW_SIGN_UP=false
-      - GF_AUTH_DISABLE_LOGIN_FORM=true
-      - GF_AUTH_ANONYMOUS_ENABLED=true
-      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
-      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
+      # --- Authelia auth proxy (nginx forwards Remote-User after MFA) ---
+      - GF_AUTH_PROXY_ENABLED=true
+      - GF_AUTH_PROXY_HEADER_NAME=Remote-User
+      - GF_AUTH_PROXY_HEADER_PROPERTY=username
+      - GF_AUTH_PROXY_AUTO_SIGN_UP=true
+      # Trust the Docker private network ranges (only nginx routes to grafana).
+      # Tighten this to the nginx container's /32 IP in a production deployment.
+      - GF_AUTH_PROXY_WHITELIST=172.16.0.0/12,192.168.0.0/16,10.0.0.0/8
+      # --- Elasticsearch datasource credentials (dedicated read-only user) ---
+      - GRAFANA_ES_PASSWORD=${GRAFANA_ES_PASSWORD}
     volumes:
       - geon_grafana_data:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
@@ -638,6 +613,10 @@ services:
     environment:
       - ES_HOST=elasticsearch
       - ES_SCHEME=http
+      # Dedicated ES user with geon_writer role; created by scripts/create_es_users.sh
+      - ES_USER=geon_ingestor
+      - GEON_INGESTOR_PASSWORD=${GEON_INGESTOR_PASSWORD}
+      # Fallback for dev / local runs where the dedicated user hasn't been created yet
       - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
       - OPENCTI_URL=http://opencti:8080/opencti
       - OPENCTI_ADMIN_TOKEN=${OPENCTI_ADMIN_TOKEN}

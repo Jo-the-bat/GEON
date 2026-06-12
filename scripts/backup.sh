@@ -47,8 +47,10 @@ mkdir -p "$BACKUP_PATH"
 # --- 1. Elasticsearch Snapshot ---
 info "Registering Elasticsearch snapshot repository..."
 
-# Register the snapshot repository (idempotent)
-REGISTER_RESULT=$(curl -s -o /dev/null -w "%{http_code}" \
+# Register the snapshot repository (idempotent — PUT on an existing repo with
+# the same settings returns 200). We rely on `set -e` to fail the whole backup
+# if this call errors, rather than swallowing the status into a string.
+REGISTER_RESULT=$(curl -sS -o /dev/null -w "%{http_code}" \
     -u "${ES_USER}:${ES_PASS}" \
     -X PUT "${ES_HOST}/_snapshot/${SNAPSHOT_REPO}" \
     -H "Content-Type: application/json" \
@@ -58,20 +60,21 @@ REGISTER_RESULT=$(curl -s -o /dev/null -w "%{http_code}" \
             \"location\": \"/usr/share/elasticsearch/backups\",
             \"compress\": true
         }
-    }" 2>/dev/null || echo "000")
+    }")
 
-if [ "$REGISTER_RESULT" = "200" ] || [ "$REGISTER_RESULT" = "201" ]; then
+if [[ "$REGISTER_RESULT" = "200" || "$REGISTER_RESULT" = "201" ]]; then
     ok "Snapshot repository registered."
 else
     fail "Could not register snapshot repository (HTTP ${REGISTER_RESULT})."
     echo "     Ensure path.repo is set in elasticsearch.yml and the directory exists."
+    exit 1
 fi
 
 # Create a snapshot of all geon-* indices
 SNAPSHOT_NAME="geon_${TIMESTAMP}"
 info "Creating Elasticsearch snapshot: ${SNAPSHOT_NAME}"
 
-SNAPSHOT_RESULT=$(curl -s -o /dev/null -w "%{http_code}" \
+SNAPSHOT_RESULT=$(curl -sS -o /dev/null -w "%{http_code}" \
     -u "${ES_USER}:${ES_PASS}" \
     -X PUT "${ES_HOST}/_snapshot/${SNAPSHOT_REPO}/${SNAPSHOT_NAME}?wait_for_completion=true" \
     -H "Content-Type: application/json" \
@@ -79,12 +82,13 @@ SNAPSHOT_RESULT=$(curl -s -o /dev/null -w "%{http_code}" \
         \"indices\": \"geon-*\",
         \"ignore_unavailable\": true,
         \"include_global_state\": false
-    }" 2>/dev/null || echo "000")
+    }")
 
-if [ "$SNAPSHOT_RESULT" = "200" ] || [ "$SNAPSHOT_RESULT" = "201" ]; then
+if [[ "$SNAPSHOT_RESULT" = "200" || "$SNAPSHOT_RESULT" = "201" ]]; then
     ok "Elasticsearch snapshot created: ${SNAPSHOT_NAME}"
 else
     fail "Elasticsearch snapshot failed (HTTP ${SNAPSHOT_RESULT})."
+    exit 1
 fi
 
 # Save snapshot metadata

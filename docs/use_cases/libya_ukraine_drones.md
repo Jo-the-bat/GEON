@@ -1,5 +1,9 @@
 # Use Case: Libya-Ukraine Drone Warfare and Cyber Operations
 
+> **Note** : This is an illustrative scenario constructed from public reporting.
+> The event tables below are representative, not extracted from live GEON ingestion.
+> The correlation output shows what GEON's engine would produce on equivalent data.
+
 ## Summary
 
 This use case illustrates how GEON would have detected the correlation between escalating drone warfare in Libya -- involving Turkish and UAE-supplied systems -- and concurrent cyber operations targeting Ukrainian defense and diplomatic networks. The connection runs through shared military-industrial supply chains and competing geopolitical alignments, a pattern invisible to tools that monitor only one domain.
@@ -8,7 +12,7 @@ This use case illustrates how GEON would have detected the correlation between e
 
 Since 2019, the Libyan civil conflict has served as a testing ground for military drone technology. Turkey provided Bayraktar TB2 drones to the Government of National Accord (GNA), while the UAE supplied Wing Loong II systems to the Libyan National Army (LNA) led by Khalifa Haftar. These same drone platforms and the geopolitical alignments they represent extend to the Ukraine theater, where Turkish Bayraktar drones became a prominent element of Ukrainian defense capabilities.
 
-This overlap creates a triangular dynamic: actors with stakes in the Libyan drone conflict also have interests in the Ukraine conflict, and cyber operations become a tool for intelligence gathering on drone capabilities, supply chains, and diplomatic geontiations.
+This overlap creates a triangular dynamic: actors with stakes in the Libyan drone conflict also have interests in the Ukraine conflict, and cyber operations become a tool for intelligence gathering on drone capabilities, supply chains, and diplomatic negotiations.
 
 ## Data Points
 
@@ -36,6 +40,19 @@ This overlap creates a triangular dynamic: actors with stakes in the Libyan dron
 | Date | Source | Target | Details |
 |------|--------|--------|---------|
 | 2024-11-14 | UN | Libyan arms embargo violators | Updated list of entities violating the Libya arms embargo |
+
+### Arms Transfers (SIPRI)
+
+| Year | Supplier | Recipient | Weapon | TIV (USD M) |
+|------|----------|-----------|--------|-------------|
+| 2022 | Turkey | Ukraine | Bayraktar TB2 UAV (50 units) | 350 |
+| 2020 | UAE | Libya (LNA) | Wing Loong II UAV (≈20 units, disputed) | ~300 |
+| 2024 | Turkey | Libya (GNA) | Bayraktar TB2 UAV (continuing deliveries) | n/a |
+
+These SIPRI-recorded transfers underpin the triangular dynamic: the same
+Turkish supplier arms both the Ukrainian defender and a Libyan faction the
+UAE (Wing Loong supplier) opposes. Arms-flow data is what makes the
+supply-chain motive visible alongside the diplomatic and cyber signals.
 
 ## Correlation Detected
 
@@ -96,7 +113,7 @@ Without GEON, an analyst would need to manually:
 3. Review OpenCTI for campaigns targeting defense contractors
 4. Notice the temporal and thematic correlation across all three
 
-GEON automates this cross-domain detection. The correlation engine identified the pattern within hours of the second cyber event appearing in OpenCTI, generating alerts that prompted human analysis of the connection between Libyan drone warfare and defense-sector cyber operations.
+GEON automates this cross-domain detection. On equivalent live data, the correlation engine would surface this pattern automatically within the hourly detection cycle, generating alerts that prompt human analysis of the connection between Libyan drone warfare and defense-sector cyber operations.
 
 A pure CTI platform would have flagged the phishing campaign but missed the geopolitical context. A pure geopolitical monitor would have tracked the diplomatic tensions but missed the cyber dimension. GEON bridges both.
 

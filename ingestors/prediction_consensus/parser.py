@@ -5,7 +5,6 @@ Filters for geopolitical markets and normalizes into a common schema.
 
 from __future__ import annotations
 
-import hashlib
 import logging
 import re
 from datetime import datetime, timezone

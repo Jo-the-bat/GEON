@@ -24,6 +24,8 @@ datasources:
 
   # ---------------------------------------------------------------------------
   # Elasticsearch — Event and intelligence data
+  # Uses the dedicated read-only user `geon_grafana_reader` (role `geon_reader`).
+  # Create this user with scripts/create_es_users.sh after the first boot.
   # ---------------------------------------------------------------------------
   - name: Elasticsearch
     uid: elasticsearch
@@ -33,7 +35,7 @@ datasources:
     isDefault: false
     editable: false
     basicAuth: true
-    basicAuthUser: elastic
+    basicAuthUser: geon_grafana_reader
     jsonData:
       index: 'geon-*'
       timeField: 'date'
@@ -42,5 +44,5 @@ datasources:
       logMessageField: 'description'
       logLevelField: 'severity'
     secureJsonData:
-      basicAuthPassword: $ELASTIC_PASSWORD
+      basicAuthPassword: $GRAFANA_ES_PASSWORD
     version: 2

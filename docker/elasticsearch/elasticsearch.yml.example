@@ -54,7 +54,14 @@ xpack.license.self_generated.type: basic
 bootstrap.memory_lock: true
 
 # Index defaults
-action.auto_create_index: "+geon-*,+.kibana*,+.security*,+.apm*,+opencti*,+.internal*,+.transform*,+.async*,+.reporting*"
+action.auto_create_index: "+geon-*,+.security*,+.apm*,+opencti*,+.internal*,+.transform*,+.async*,+.reporting*"
+
+# ---------------------------------------------------------------------------
+# Snapshot repository path — must match the geon_es_backups volume mount
+# declared in docker-compose.yml. scripts/backup.sh registers a 'geon_backup'
+# repository pointing at this directory.
+# ---------------------------------------------------------------------------
+path.repo: ["/usr/share/elasticsearch/backups"]
 
 # ---------------------------------------------------------------------------
 # ILM — Index Lifecycle Management

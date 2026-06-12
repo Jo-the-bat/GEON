@@ -1,11 +1,16 @@
-"""Tests for the ACLED event ingestor."""
+"""Tests for the ACLED event ingestor.
+
+We test the static helpers directly — _normalise_event and
+_index_name_for_date — so we don't have to stand up an ACLED account or an
+Elasticsearch cluster.
+"""
+
+from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
-from unittest.mock import MagicMock, patch
 
-import pytest
+from acled.ingestor import ACLEDIngestor
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 
@@ -16,143 +21,111 @@ def load_fixture(name: str) -> dict:
         return json.load(f)
 
 
-class TestAcledEventParsing:
-    """Tests for parsing ACLED API responses."""
+# ---------------------------------------------------------------------------
+# _normalise_event
+# ---------------------------------------------------------------------------
 
+
+class TestAcledNormalise:
     def setup_method(self) -> None:
-        self.sample_data = load_fixture("acled_sample.json")
+        self.sample = load_fixture("acled_sample.json")
 
-    def test_parse_single_event(self) -> None:
-        """Should parse a single ACLED event into the expected schema."""
-        # TODO: Import ingestor once implemented
-        # from ingestors.acled.ingestor import parse_event
-        #
-        # events = self.sample_data["data"]
-        # result = parse_event(events[0])
-        #
-        # assert result["event_id"] is not None
-        # assert isinstance(result["event_date"], str)
-        # assert result["event_type"] in (
-        #     "Battles", "Violence against civilians",
-        #     "Explosions/Remote violence", "Riots", "Protests",
-        #     "Strategic developments"
-        # )
-        pass
+    def test_normalise_event_complete(self) -> None:
+        """A complete ACLED record should round-trip into the ES schema with
+        all primary fields populated."""
+        raw = self.sample["data"][0]  # Libya battle event
+        doc = ACLEDIngestor._normalise_event(raw)
 
-    def test_parse_batch(self) -> None:
-        """Should parse a batch of events."""
-        # TODO: Import ingestor once implemented
-        # from ingestors.acled.ingestor import parse_events
-        #
-        # results = parse_events(self.sample_data)
-        # assert isinstance(results, list)
-        # assert len(results) == len(self.sample_data["data"])
-        pass
+        assert doc["event_id"] == str(raw["data_id"])
+        assert doc["event_type"] == "Battles"
+        assert doc["country"] == "Libya"
+        assert doc["fatalities"] == 8
+        assert doc["latitude"] == 31.2089
+        assert doc["longitude"] == 16.5887
+        assert doc["geo_location"] == {"lat": 31.2089, "lon": 16.5887}
+        assert doc["actor1"].startswith("Libyan National Army")
 
-    def test_fatalities_is_integer(self) -> None:
-        """Fatalities field should be a non-negative integer."""
-        # TODO: Import ingestor once implemented
-        # from ingestors.acled.ingestor import parse_events
-        #
-        # results = parse_events(self.sample_data)
-        # for event in results:
-        #     assert isinstance(event["fatalities"], int)
-        #     assert event["fatalities"] >= 0
-        pass
+    def test_normalise_event_missing_coords(self) -> None:
+        """An event without coordinates should still normalise; geo_location
+        is None rather than {"lat": None, "lon": None}."""
+        raw = {"data_id": 1, "event_date": "2025-01-01", "event_type": "Riots"}
+        doc = ACLEDIngestor._normalise_event(raw)
+        assert doc["latitude"] is None
+        assert doc["longitude"] is None
+        assert doc["geo_location"] is None
+        assert doc["fatalities"] == 0  # default
 
-    def test_geolocation_present(self) -> None:
-        """Each event should have valid latitude and longitude."""
-        # TODO: Import ingestor once implemented
-        # from ingestors.acled.ingestor import parse_events
-        #
-        # results = parse_events(self.sample_data)
-        # for event in results:
-        #     assert -90 <= event["latitude"] <= 90
-        #     assert -180 <= event["longitude"] <= 180
-        pass
-
-    def test_actor_extraction(self) -> None:
-        """Should extract actor1 and actor2 fields."""
-        # TODO: Import ingestor once implemented
-        # from ingestors.acled.ingestor import parse_event
-        #
-        # event = self.sample_data["data"][0]
-        # result = parse_event(event)
-        # assert "actor1" in result
-        # assert isinstance(result["actor1"], str)
-        pass
-
-    def test_empty_response(self) -> None:
-        """Should handle empty data array."""
-        # TODO: Import ingestor once implemented
-        # from ingestors.acled.ingestor import parse_events
-        #
-        # result = parse_events({"data": [], "count": 0, "status": 200})
-        # assert result == []
-        pass
+    def test_normalise_event_invalid_fatalities(self) -> None:
+        """Non-numeric ``fatalities`` should not raise — fall back to 0."""
+        raw = {
+            "data_id": 2,
+            "event_date": "2025-01-02",
+            "fatalities": "not-a-number",
+        }
+        doc = ACLEDIngestor._normalise_event(raw)
+        assert doc["fatalities"] == 0
 
 
-class TestAcledApiClient:
-    """Tests for the ACLED API client."""
-
-    def test_api_key_required(self) -> None:
-        """Should raise an error if ACLED_API_KEY is not set."""
-        # TODO: Import ingestor once implemented
-        # with patch.dict(os.environ, {}, clear=True):
-        #     from ingestors.acled.ingestor import get_api_key
-        #     with pytest.raises(ValueError):
-        #         get_api_key()
-        pass
-
-    @patch("requests.get")
-    def test_fetch_events_success(self, mock_get: MagicMock) -> None:
-        """Should fetch and return events on success."""
-        # TODO: Import ingestor once implemented
-        # mock_get.return_value.status_code = 200
-        # mock_get.return_value.json.return_value = load_fixture("acled_sample.json")
-        #
-        # from ingestors.acled.ingestor import fetch_events
-        # result = fetch_events()
-        # assert len(result) > 0
-        pass
-
-    @patch("requests.get")
-    def test_fetch_events_rate_limit(self, mock_get: MagicMock) -> None:
-        """Should handle rate limit responses with backoff."""
-        # TODO: Import ingestor once implemented
-        # mock_get.return_value.status_code = 429
-        #
-        # from ingestors.acled.ingestor import fetch_events
-        # result = fetch_events()
-        # assert result == []
-        pass
-
-    def test_date_range_construction(self) -> None:
-        """Should construct correct date range for daily ingestion."""
-        # TODO: Import ingestor once implemented
-        # from ingestors.acled.ingestor import build_date_range
-        #
-        # start, end = build_date_range(lookback_days=1)
-        # assert start < end
-        pass
+# ---------------------------------------------------------------------------
+# _index_name_for_date
+# ---------------------------------------------------------------------------
 
 
-class TestAcledElasticsearchIndexing:
-    """Tests for indexing ACLED events into Elasticsearch."""
+class TestAcledIndexNaming:
+    def test_index_name_for_date(self) -> None:
+        name = ACLEDIngestor._index_name_for_date("2025-06-15")
+        assert name == "geon-acled-events-2025.06"
 
-    def test_index_name_format(self) -> None:
-        """Index name should follow geon-acled-events-YYYY.MM pattern."""
-        # TODO: Import ingestor once implemented
-        # from ingestors.acled.ingestor import get_index_name
-        #
-        # name = get_index_name("2025-06-15")
-        # assert name == "geon-acled-events-2025.06"
-        pass
+    def test_index_name_for_malformed_date_falls_back(self) -> None:
+        name = ACLEDIngestor._index_name_for_date("not-a-date")
+        assert name.startswith("geon-acled-events-")
+        # 4-digit year + "." + 2-digit month
+        tail = name.split("-")[-1]
+        assert len(tail) == 7 and tail[4] == "."
 
+    def test_index_name_preserves_day_prefix(self) -> None:
+        """Index name is derived only from YYYY-MM; day is irrelevant."""
+        a = ACLEDIngestor._index_name_for_date("2026-04-16")
+        b = ACLEDIngestor._index_name_for_date("2026-04-01")
+        assert a == b == "geon-acled-events-2026.04"
+
+
+# ---------------------------------------------------------------------------
+# End-to-end normalisation of the fixture
+# ---------------------------------------------------------------------------
+
+
+class TestAcledBatchNormalise:
+    def test_normalise_empty_response(self) -> None:
+        """Nothing to normalise should produce nothing (and not crash)."""
+        payload = {"status": 200, "success": True, "count": 0, "data": []}
+        out = [ACLEDIngestor._normalise_event(e) for e in payload["data"]]
+        assert out == []
+
+    def test_normalise_all_sample_events(self) -> None:
+        sample = load_fixture("acled_sample.json")
+        normalised = [ACLEDIngestor._normalise_event(e) for e in sample["data"]]
+        assert len(normalised) == 3
+        # Fatalities sum across the sample = 8 + 12 + 5 = 25
+        assert sum(d["fatalities"] for d in normalised) == 25
+        # All events have a country set
+        assert all(d["country"] for d in normalised)
+
+
+# ---------------------------------------------------------------------------
+# Mapping file sanity
+# ---------------------------------------------------------------------------
+
+
+class TestAcledMapping:
     def test_mapping_valid_json(self) -> None:
-        """The ACLED mapping file should be valid JSON."""
-        mapping_path = Path(__file__).parent.parent / "ingestors" / "acled" / "mapping.json"
-        if mapping_path.exists():
-            with open(mapping_path) as f:
-                mapping = json.load(f)
-            assert "mappings" in mapping or "properties" in mapping
+        mapping_path = (
+            Path(__file__).resolve().parent.parent
+            / "ingestors"
+            / "acled"
+            / "mapping.json"
+        )
+        with open(mapping_path) as f:
+            mapping = json.load(f)
+        assert "mappings" in mapping
+        assert "properties" in mapping["mappings"]

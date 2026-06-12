@@ -141,7 +141,7 @@ location /n8n/ {
 }
 
 # -------------------------------------------------------------------
-# Grafana — /grafana (protected by Authelia)
+# Grafana — /grafana (protected by Authelia, SSO via auth proxy)
 # -------------------------------------------------------------------
 location /grafana {
     auth_request /auth/api/verify;
@@ -159,6 +159,12 @@ location /grafana {
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto $real_scheme;
     proxy_set_header X-Forwarded-Host $http_host;
+
+    # Forward Authelia identity to Grafana's auth proxy (GF_AUTH_PROXY_*).
+    proxy_set_header Remote-User $user;
+    proxy_set_header Remote-Name $name;
+    proxy_set_header Remote-Email $email;
+    proxy_set_header Remote-Groups $groups;
 
     proxy_http_version 1.1;
     proxy_set_header Upgrade $http_upgrade;

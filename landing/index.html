@@ -35,6 +35,58 @@
                 <div class="hero-actions">
                     <a href="/grafana" class="btn btn-primary">Open Dashboards</a>
                     <a href="/opencti" class="btn btn-secondary">Explore Threat Graph</a>
+                    <a href="/demo.html" class="btn btn-secondary">View Demo</a>
+                </div>
+            </div>
+        </section>
+
+        <section class="sample-correlation" id="sample-correlation">
+            <div class="container">
+                <h2 class="section-title">Sample Correlation Detected</h2>
+                <div class="correlation-card">
+                    <div class="correlation-header">
+                        <span class="severity-badge severity-high">HIGH</span>
+                        <span class="correlation-rule">Rule 1: Diplomatic Escalation + APT Activity</span>
+                    </div>
+                    <p class="correlation-countries">Turkey &lt;-&gt; UAE &lt;-&gt; Libya</p>
+
+                    <div class="correlation-timeline">
+                        <div class="timeline-event">
+                            <span class="timeline-date">Nov 05</span>
+                            <span class="timeline-tag tag-acled">ACLED</span>
+                            <span class="timeline-text">Drone strike near Sirte, Libya (LNA / Wing Loong II)</span>
+                        </div>
+                        <div class="timeline-event">
+                            <span class="timeline-date">Nov 08</span>
+                            <span class="timeline-tag tag-gdelt">GDELT</span>
+                            <span class="timeline-text">Turkey-UAE diplomatic tensions (Goldstein -6.2)</span>
+                        </div>
+                        <div class="timeline-event">
+                            <span class="timeline-date">Nov 10</span>
+                            <span class="timeline-tag tag-cti">CTI</span>
+                            <span class="timeline-text">Spear-phishing campaign targeting Turkish defense contractors</span>
+                        </div>
+                        <div class="timeline-event">
+                            <span class="timeline-date">Nov 14</span>
+                            <span class="timeline-tag tag-sanc">SANC</span>
+                            <span class="timeline-text">UN updates Libya arms embargo violator list</span>
+                        </div>
+                        <div class="timeline-event">
+                            <span class="timeline-date">Nov 18</span>
+                            <span class="timeline-tag tag-gdelt">GDELT</span>
+                            <span class="timeline-text">UAE condemns Turkish military buildup (Goldstein -7.4)</span>
+                        </div>
+                        <div class="timeline-event">
+                            <span class="timeline-date">Nov 22</span>
+                            <span class="timeline-tag tag-cti">CTI</span>
+                            <span class="timeline-text">Defense sector VPN vulnerability exploited (CISA KEV)</span>
+                        </div>
+                    </div>
+
+                    <p class="correlation-disclaimer">
+                        Illustrative example constructed from public reporting.
+                        See <a href="https://github.com/Jo-the-bat/GEON/blob/main/docs/use_cases/libya_ukraine_drones.md">use case documentation</a> for details.
+                    </p>
                 </div>
             </div>
         </section>

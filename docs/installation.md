@@ -166,6 +166,50 @@ curl -sk https://geon.example.com/opencti/health
 
 ---
 
+## Step 6bis: Create Dedicated Elasticsearch Users
+
+GEON uses three distinct Elasticsearch identities to enforce least-privilege:
+
+| User | Role | Privileges |
+|------|------|------------|
+| `elastic` | superuser | bootstrap only — do **not** embed in app configs |
+| `geon_grafana_reader` | `geon_reader` | read + view metadata on `geon-*` |
+| `geon_ingestor` | `geon_writer` | create/write + read on `geon-*` |
+
+Once Elasticsearch is healthy on first boot, run:
+
+```bash
+./scripts/create_es_users.sh
+```
+
+The script is idempotent — safe to re-run. It reads `GRAFANA_ES_PASSWORD` and
+`GEON_INGESTOR_PASSWORD` from `.env` and registers the two roles and users via
+the ES Security API.
+
+After it succeeds, restart the services that pick up the new credentials:
+
+```bash
+docker compose -f docker/docker-compose.yml restart grafana ingestor
+```
+
+---
+
+## Step 6ter: Install ILM policy + index templates
+
+GEON's volume-heavy indices (GDELT events, GDELT GKG, ACLED events) roll
+over monthly. To cap disk growth and keep queries snappy, install the
+`geon-monthly-rollover` ILM policy once:
+
+```bash
+./scripts/setup_ilm.sh
+```
+
+This attaches an `hot → warm (30d) → delete (90d)` policy to the matching
+index templates. The script is idempotent — existing policies and
+templates are replaced in place (ES returns 200 or 409, both accepted).
+
+---
+
 ## Step 7: Set Up Grafana Datasources
 
 Grafana datasources are provisioned automatically via `docker/grafana/datasources.yml`. If you need to verify or adjust them:

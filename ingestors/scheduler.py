@@ -5,8 +5,11 @@ Designed to run as PID 1 inside the geon-ingestor container.
 
 Usage::
 
-    # Normal cron mode (all jobs on their schedules)
+    # Normal cron mode (all jobs on their schedules, no immediate run)
     python scheduler.py
+
+    # Bootstrap mode: seed data sources once, then enter cron loop
+    python scheduler.py --bootstrap
 
     # One-shot seed (N days of GDELT + ACLED), then cron
     python scheduler.py --seed 1
@@ -18,7 +21,6 @@ import argparse
 import time
 
 import schedule
-
 from common.config import ACLED_API_KEY, setup_logging
 
 logger = setup_logging(name="scheduler")
@@ -188,6 +190,12 @@ def main() -> None:
         type=int,
         help="Seed N days of historical data before starting the cron.",
     )
+    parser.add_argument(
+        "--bootstrap",
+        action="store_true",
+        help="Run each data source once (GDELT, SIPRI, sanctions, etc.) "
+             "before entering the normal schedule loop.",
+    )
     args = parser.parse_args()
 
     # --- Optional seed phase ---
@@ -201,6 +209,8 @@ def main() -> None:
     schedule.every(1).hours.do(run_opencti_export)
     schedule.every(1).days.at("03:00").do(run_acled)
     schedule.every().sunday.at("04:00").do(run_sanctions)
+    # Correlation is delayed 15 minutes after boot to let data sources
+    # populate first (GDELT and OpenCTI export run every 15 min).
     schedule.every(30).minutes.do(run_correlation)
     schedule.every(1).hours.do(run_polymarket)
     schedule.every(2).hours.do(run_polymarket_enrich)
@@ -209,18 +219,22 @@ def main() -> None:
     schedule.every().monday.at("02:00").do(run_sipri)
     schedule.every(1).days.at("05:00").do(run_risk_scores)
 
-    # Run each once immediately.
-    run_gdelt()
-    run_gkg()
-    run_opencti_export()
-    run_acled()
-    run_sanctions()
-    run_correlation()
-    run_polymarket()
-    run_sipri()
-    run_cloudflare_radar()
-    run_prediction_consensus()
-    run_risk_scores()
+    # --- Optional bootstrap: run each source once (except correlation) ---
+    if args.bootstrap:
+        logger.info("Bootstrap mode: running each data source once.")
+        run_gdelt()
+        run_gkg()
+        run_opencti_export()
+        run_acled()
+        run_sanctions()
+        run_polymarket()
+        run_sipri()
+        run_cloudflare_radar()
+        run_prediction_consensus()
+        run_risk_scores()
+        # Now that data sources have populated, run correlation once.
+        run_correlation()
+        logger.info("Bootstrap complete. Entering scheduled loop.")
 
     logger.info(
         "Scheduler started. Jobs: GDELT/15min, OpenCTI export/1h, "

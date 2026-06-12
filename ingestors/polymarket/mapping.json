@@ -12,6 +12,7 @@
       "volume": { "type": "float" },
       "liquidity": { "type": "float" },
       "price_history": { "type": "object", "enabled": false },
+      "price_history_samples": { "type": "object", "enabled": false },
       "countries_involved": { "type": "keyword" },
       "keywords": { "type": "keyword" },
       "related_gdelt_events": { "type": "integer" },

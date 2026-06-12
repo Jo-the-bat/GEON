@@ -114,12 +114,15 @@ def build_workflow(name: str, sources: list[dict], category: str) -> dict:
         "position": [750, filter_y],
     })
 
-    # Index to ES (HTTP Request)
+    # Index to ES (HTTP Request) — auth via n8n credential "ElasticsearchGeonWriter"
+    # (see n8n/WORKFLOWS.md: user must create this credential before activation).
     es_name = "Index to ES"
     nodes.append({
         "parameters": {
             "method": "POST",
-            "url": "=http://elastic:{{ $env.ELASTIC_PASSWORD }}@elasticsearch:9200/geon-articles-{{ $now.format('yyyy.MM') }}/_doc",
+            "url": "=http://elasticsearch:9200/geon-articles-{{ $now.format('yyyy.MM') }}/_doc",
+            "authentication": "genericCredentialType",
+            "genericAuthType": "httpBasicAuth",
             "sendBody": True,
             "specifyBody": "json",
             "jsonBody": "={{ JSON.stringify($json) }}",
@@ -130,6 +133,12 @@ def build_workflow(name: str, sources: list[dict], category: str) -> dict:
         "type": "n8n-nodes-base.httpRequest",
         "typeVersion": 4.2,
         "position": [1000, filter_y],
+        "credentials": {
+            "httpBasicAuth": {
+                "id": "",
+                "name": "ElasticsearchGeonWriter",
+            }
+        },
     })
 
     # Wire connections

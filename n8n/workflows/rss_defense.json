@@ -289,7 +289,9 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "=http://elastic:{{ $env.ELASTIC_PASSWORD }}@elasticsearch:9200/geon-articles-{{ $now.format('yyyy.MM') }}/_doc",
+        "url": "=http://elasticsearch:9200/geon-articles-{{ $now.format('yyyy.MM') }}/_doc",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify($json) }}",
@@ -302,7 +304,13 @@
       "position": [
         1000,
         0
-      ]
+      ],
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "",
+          "name": "ElasticsearchGeonWriter"
+        }
+      }
     }
   ],
   "connections": {
