@@ -18,6 +18,7 @@ from typing import Any
 from common.config import INDEX_PREFIX
 from common.countries import normalize_country
 from common.opencti_client import get_campaigns_by_country
+from common.settings import setting
 from elasticsearch import Elasticsearch
 from pycti import OpenCTIApiClient
 
@@ -25,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 OUTAGES_INDEX = f"{INDEX_PREFIX}-outages"
 CTI_INDEX = f"{INDEX_PREFIX}-cti-threats"
-APT_WINDOW_DAYS: int = 30
+APT_WINDOW_DAYS: int = setting("correlation.outage_apt.apt_window_days", 30)
 
 _APT_MAPPING_PATH = (
     Path(__file__).resolve().parent.parent.parent / "common" / "country_apt_mapping.json"
@@ -108,13 +109,23 @@ class OutageAPTRule:
         if not known_apts:
             return []
 
-        # Check OpenCTI for recent campaigns
+        # Check OpenCTI for recent campaigns — validated against the
+        # known attribution map (same strict validation as Rules 1/3/6;
+        # unvalidated OpenCTI matches cross-contaminate attributions).
         if self.octi:
             try:
-                campaigns = get_campaigns_by_country(self.octi, country, days_back=APT_WINDOW_DAYS)
-                if campaigns:
+                campaigns = get_campaigns_by_country(
+                    self.octi, country, days_back=APT_WINDOW_DAYS
+                )
+                known_lower = {a.lower() for a in known_apts}
+                validated = [
+                    c for c in campaigns or []
+                    if c.get("name", "").lower() in known_lower
+                ]
+                if validated:
                     return [{"name": c.get("name", ""), "type": "offensive",
-                             "id": c.get("id", ""), "source": "opencti"} for c in campaigns]
+                             "id": c.get("id", ""), "source": "opencti"}
+                            for c in validated]
             except Exception:
                 pass
 

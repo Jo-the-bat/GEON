@@ -8,34 +8,52 @@ from the same geographic zone in OpenCTI.
 from __future__ import annotations
 
 import hashlib
+import json
 import logging
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Any
 
 from common.config import INDEX_PREFIX
 from common.countries import normalize_country
 from common.opencti_client import get_campaigns_by_country
+from common.settings import setting
 from elasticsearch import Elasticsearch
 from pycti import OpenCTIApiClient
 
 logger = logging.getLogger(__name__)
 
+# Country → APT attribution mapping, used to validate OpenCTI matches
+# (same strict validation as Rules 1 and 6 — see commit 6e88570; this
+# rule had been overlooked and accepted unvalidated matches).
+_MAPPING_PATH = (
+    Path(__file__).resolve().parent.parent.parent / "common" / "country_apt_mapping.json"
+)
+_COUNTRY_APT_MAP: dict[str, list[str]] = {}
+try:
+    with _MAPPING_PATH.open() as f:
+        _raw = json.load(f)
+    _COUNTRY_APT_MAP = {
+        k: [a.lower() for a in v] for k, v in _raw.items() if k != "_comment"
+    }
+except Exception:
+    pass  # Mapping file missing — validation degrades to reject-all below.
+
 # ---------------------------------------------------------------------------
 # Tunables
 # ---------------------------------------------------------------------------
-LOOKBACK_DAYS: int = 14
-CYBER_WINDOW_DAYS: int = 30
+LOOKBACK_DAYS: int = setting("correlation.conflict_cyber.lookback_days", 14)
+CYBER_WINDOW_DAYS: int = setting("correlation.conflict_cyber.cyber_window_days", 30)
 ACLED_INDEX_PATTERN = f"{INDEX_PREFIX}-acled-events-*"
 
 # ACLED event types that indicate active armed conflict.
 # "Strategic developments" was removed because it covers non-violent events
 # (treaty signings, hostage releases, disarmament announcements) that drown
 # the rule in false positives.
-CONFLICT_EVENT_TYPES = frozenset({
-    "Battles",
-    "Violence against civilians",
-    "Explosions/Remote violence",
-})
+CONFLICT_EVENT_TYPES = frozenset(setting(
+    "correlation.conflict_cyber.conflict_event_types",
+    ["Battles", "Violence against civilians", "Explosions/Remote violence"],
+))
 
 
 class ConflictCyberRule:
@@ -165,6 +183,22 @@ class ConflictCyberRule:
         campaigns = get_campaigns_by_country(
             self.octi, country, days_back=CYBER_WINDOW_DAYS
         )
+
+        # Strict validation against known country-APT attributions —
+        # without it, any campaign OpenCTI returns for the search is
+        # attributed to the conflict country (cross-contamination).
+        if campaigns and _COUNTRY_APT_MAP:
+            known_apts = set(_COUNTRY_APT_MAP.get(country.upper(), []))
+            validated = [
+                c for c in campaigns
+                if c.get("name", "").lower() in known_apts
+            ]
+            logger.debug(
+                "[%s] APT validation: %d/%d matches confirmed for %s.",
+                self.RULE_NAME, len(validated), len(campaigns), country,
+            )
+            campaigns = validated
+
         if campaigns:
             logger.info(
                 "[%s] Found %d cyber campaign(s) for %s.",
