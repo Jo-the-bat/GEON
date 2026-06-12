@@ -14,6 +14,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from common.config import INDEX_PREFIX
+from common.countries import CANONICAL_COUNTRIES
 from common.settings import setting
 from elasticsearch import Elasticsearch
 
@@ -217,6 +218,12 @@ class RhetoricShiftRule:
             for bucket in buckets:
                 src = bucket["key"]["src"]
                 tgt = bucket["key"]["tgt"]
+                # GDELT actor pseudo-codes (WST, EUR, GOV...) survive in
+                # the indexed country fields — a "rhetoric shift" toward
+                # a region code is noise, not intelligence.
+                if (src not in CANONICAL_COUNTRIES
+                        or tgt not in CANONICAL_COUNTRIES):
+                    continue
                 pair_key = self._pair_key(src, tgt)
 
                 stats = bucket.get("tone_stats", {})
