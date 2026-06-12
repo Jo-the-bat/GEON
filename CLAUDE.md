@@ -379,9 +379,11 @@ Index : `geon-risk-scores` (1 doc/pays, mis a jour quotidiennement a 05:00)
 C'est le coeur de la valeur ajoutee de GEON. Le moteur (`correlation/engine.py`) tourne toutes les 30 minutes dans le conteneur ingestor :
 
 1. Execute les 10 regles (chaque regle est isolee — une exception n'arrete pas les autres)
-2. Deduplique par `correlation_id` (mget contre l'index existant)
-3. Indexe les nouvelles correlations dans `geon-correlations`
-4. Alerte (Discord + email) pour les correlations de severite >= high
+2. Reconcilie les candidats avec les situations deja indexees : les `correlation_id` sont STABLES par situation (pas de composante date) — un id inconnu cree un document, un id connu met a jour le document existant (`last_seen`, `times_seen`, fusion de timeline plafonnee a 50 entrees, la severite ne redescend jamais)
+3. Indexe le tout dans `geon-correlations`
+4. Alerte (Discord + email, en UN batch par run) pour severite >= high, uniquement si : nouvelle situation, escalade de severite, ou reactivation apres >= 14 jours de dormance
+
+Identites par regle : 1 = paire triee, 2/3/10 = pays, 4 = paire, 5/9 = pays + start_time de la coupure, 6 = pays + annee SIPRI, 7 = destinataire + voisin + date du transfert, 8 = case_id + event_id GDELT. Les ecrivains directs (shift Polymarket : case + jour + direction ; divergence consensus : market_id) suivent la meme logique.
 
 CLI : `python -m correlation.engine [--rules 1 2 ...] [--dry-run]`
 
@@ -473,9 +475,9 @@ Les alertes Grafana interrogent directement Elasticsearch via la datasource conf
 
 ### Notifications (implementation principale)
 
-`correlation/alerting.py` envoie directement les alertes pour toute correlation de severite >= high :
-- **Discord webhook** — embeds colores par severite (retry avec backoff via tenacity)
-- **Email SMTP** — si les variables `ALERT_EMAIL_*` sont configurees
+`correlation/alerting.py` envoie les alertes (severite >= high) EN BATCH — un run du moteur produit au plus quelques messages, jamais un par correlation :
+- **Discord webhook** — embeds colores par severite, regroupes par messages (max 10 embeds ET ~5500 caracteres par message, limites Discord), retry avec backoff via tenacity. Le titre indique le contexte (New / Escalation / Reactivation)
+- **Email SMTP** — UN email digest par run (sujet recapitulatif, une carte HTML par correlation), si les variables `ALERT_EMAIL_*` sont configurees
 
 Format de notification :
 ```
@@ -582,10 +584,12 @@ geon/
 |   +-- Dockerfile                     # Image geon-ingestor (python:3.11-slim)
 |   +-- requirements.txt               # Dependances Python communes
 |   +-- scheduler.py                   # PID 1 du conteneur : ordonnance tous les jobs
+|   +-- migrate_countries.py           # Migration one-shot : normalise les pays des index existants
 |   +-- common/
 |   |   +-- config.py                  # Chargement .env, constantes
+|   |   +-- countries.py               # Dimension pays canonique (obligatoire pour tout champ pays)
 |   |   +-- es_client.py               # Client Elasticsearch partage
-|   |   +-- opencti_client.py          # Client OpenCTI GraphQL partage
+|   |   +-- opencti_client.py          # Client OpenCTI GraphQL partage (requests_timeout=60)
 |   |   +-- country_apt_mapping.json   # Attribution pays -> groupes APT
 |   |   +-- country_neighbors.json     # Pays -> voisins (regle 7)
 |   +-- gdelt/                         # ingestor.py, parser.py, mapping.json
@@ -651,6 +655,10 @@ geon/
     +-- test_gdelt_parser.py
     +-- test_acled_ingestor.py
     +-- test_correlation_engine.py
+    +-- test_countries.py              # Dimension pays canonique
+    +-- test_correlation_ids.py        # Stabilite des correlation_id par situation
+    +-- test_engine_reconcile.py       # Reconciliation moteur (update/escalade/reactivation)
+    +-- test_alerting_batch.py         # Batching Discord + digest email
     +-- fixtures/
         +-- gdelt_sample.json
         +-- acled_sample.json
@@ -777,6 +785,12 @@ Le projet est en phase d'exploitation : les evolutions typiques sont l'ajout de 
 - Mapping explicite (pas de dynamic mapping en production)
 - Shards : 1 primary, 0 replica (single node)
 
+### Dimension pays canonique
+- TOUT champ pays indexe DOIT passer par `common/countries.py` (`normalize_country` / `normalize_countries`) a l'ecriture — forme canonique = anglais majuscules style GDELT (`RUSSIA`, `UNITED STATES`, `CONGO (DRC)`)
+- Raison : les regles de correlation et le risk score joignent les sources par requetes `term` exactes ; toute divergence de forme casse silencieusement la jointure (le facteur ACLED du risk score a ete mort pendant des mois a cause de "Russia" vs "RUSSIA")
+- Le module resout : noms canoniques, ISO3/ISO2, codes CAMEO historiques (KOS, ROM, TMP, ZAR), formes longues officielles ("Russian Federation"), demonymes ONU ("Iraqi"), variantes orthographiques. Inconnu = uppercase passthrough (les codes acteurs GDELT comme GOV/MIL ne sont pas touches)
+- Migration des donnees existantes : `python -m migrate_countries [--dry-run]` dans le conteneur (a executer UNE fois apres deploiement de cette version)
+
 ### Git
 - Commits conventionnels : `feat:`, `fix:`, `docs:`, `infra:`, `ingest:`, `corr:`
 - Branches : `main` (stable), `dev` (developpement), `feature/<nom>`
@@ -810,6 +824,13 @@ docker exec geon-ingestor python -m gdelt.ingestor
 docker exec geon-ingestor python -m acled.ingestor
 docker exec geon-ingestor python -m sanctions.ingestor
 docker exec geon-ingestor python -m correlation.engine --dry-run
+
+# Migration pays canonique (une fois, apres rebuild de l'image)
+docker exec geon-ingestor python -m migrate_countries --dry-run
+docker exec geon-ingestor python -m migrate_countries
+
+# Tests (venv local avec les dependances de ingestors/requirements.txt)
+.venv/bin/python -m pytest tests/ -q
 
 # Voir les logs
 docker compose -f docker/docker-compose.yml logs -f --tail=100 ingestor
