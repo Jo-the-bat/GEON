@@ -581,7 +581,11 @@ services:
       # --- Elasticsearch datasource credentials (dedicated read-only user) ---
       - GRAFANA_ES_PASSWORD=${GRAFANA_ES_PASSWORD}
       # --- Provisioned alerting contact point (geon-alerting.yml) ---
-      - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL}
+      # Grafana refuses to start when the provisioned webhook URL is empty,
+      # so an unset DISCORD_WEBHOOK_URL falls back to a sentinel: alert
+      # rules still evaluate, deliveries fail visibly in the logs, and
+      # filling the variable + recreating grafana enables notifications.
+      - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL:-http://webhook-not-configured.invalid}
     volumes:
       - geon_grafana_data:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
