@@ -27,6 +27,16 @@ policies:
     group_interval: 5m
     repeat_interval: 12h
 
+# Purge our rules before (re)provisioning them — half-provisioned state
+# from an interrupted boot otherwise collides on rule titles.
+deleteRules:
+  - orgId: 1
+    uid: geon-gdelt-stalled
+  - orgId: 1
+    uid: geon-correlation-stalled
+  - orgId: 1
+    uid: geon-job-failures
+
 groups:
   - orgId: 1
     name: geon-operational
