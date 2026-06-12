@@ -163,7 +163,12 @@ def find_divergent_values(
             size=0,
             aggs={"vals": {"composite": composite}},
         )
-        agg = resp["aggregations"]["vals"]
+        try:
+            agg = resp["aggregations"]["vals"]
+        except (KeyError, TypeError):
+            # A wildcard matching zero indices passes the exists() check
+            # (allow_no_indices) but searches return no aggregations.
+            break
         for bucket in agg["buckets"]:
             value = bucket["key"]["v"]
             if not value:
