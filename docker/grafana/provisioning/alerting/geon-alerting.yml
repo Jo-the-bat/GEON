@@ -5,6 +5,14 @@
 # the domain alerts (new correlations) are sent directly by the
 # correlation engine. Notifications go to the GEON Discord webhook
 # (DISCORD_WEBHOOK_URL env var, injected by docker-compose).
+#
+# NOTE: a single combined rule on purpose. Grafana 10.4.15's file
+# provisioning has a broken uniqueness check: ANY second alert rule in
+# the provisioning files fails with a spurious "conflicting alert rule
+# found ... title should be unique" (verified empirically: positional,
+# regardless of titles/groups/folders). The `or` of bool comparisons
+# yields one alert INSTANCE per cause (labels keep the job), so the
+# granularity survives. Revisit after upgrading Grafana (>= 11).
 # =============================================================================
 
 apiVersion: 1
@@ -27,8 +35,8 @@ policies:
     group_interval: 5m
     repeat_interval: 12h
 
-# Purge our rules before (re)provisioning them — half-provisioned state
-# from an interrupted boot otherwise collides on rule titles.
+# Self-clean: remove the rules from earlier provisioning attempts (the
+# three-rule layout) and any half-provisioned state.
 deleteRules:
   - orgId: 1
     uid: geon-gdelt-stalled
@@ -44,86 +52,23 @@ groups:
     interval: 5m
     rules:
       # -----------------------------------------------------------------
-      # GDELT ingestion stalled — cadence is 15 min; alert after 1 h
-      # without a successful run. No data (ingestor down) also alerts.
+      # Pipeline health — one rule, one alert instance per cause:
+      #   {job="gdelt"}       no successful run for > 1 h (cadence 15 min)
+      #   {job="correlation"} no successful run for > 2 h (cadence 30 min)
+      #   {job=...}           any job failure during the last hour
+      # The ingestor being down entirely -> NoData -> also alerts.
       # -----------------------------------------------------------------
-      - uid: geon-gdelt-stalled
-        title: GDELT ingestion stalled
+      - uid: geon-pipeline-health
+        title: GEON pipeline stalled or failing
         condition: C
         for: 10m
         noDataState: Alerting
         execErrState: Alerting
         annotations:
           summary: >-
-            No successful GDELT ingestion for more than 1 hour
-            (normal cadence: every 15 minutes).
-        labels:
-          team: geon
-        data:
-          - refId: A
-            relativeTimeRange: { from: 600, to: 0 }
-            datasourceUid: prometheus
-            model:
-              expr: time() - geon_job_last_success_timestamp_seconds{job="gdelt"}
-              instant: true
-              refId: A
-          - refId: C
-            relativeTimeRange: { from: 0, to: 0 }
-            datasourceUid: __expr__
-            model:
-              type: threshold
-              refId: C
-              expression: A
-              conditions:
-                - evaluator: { type: gt, params: [3600] }
-
-      # -----------------------------------------------------------------
-      # Correlation engine stalled — cadence is 30 min; alert after 2 h.
-      # -----------------------------------------------------------------
-      - uid: geon-correlation-stalled
-        title: Correlation engine stalled
-        condition: C
-        for: 10m
-        noDataState: Alerting
-        execErrState: Alerting
-        annotations:
-          summary: >-
-            No successful correlation run for more than 2 hours
-            (normal cadence: every 30 minutes).
-        labels:
-          team: geon
-        data:
-          - refId: A
-            relativeTimeRange: { from: 600, to: 0 }
-            datasourceUid: prometheus
-            model:
-              expr: time() - geon_job_last_success_timestamp_seconds{job="correlation"}
-              instant: true
-              refId: A
-          - refId: C
-            relativeTimeRange: { from: 0, to: 0 }
-            datasourceUid: __expr__
-            model:
-              type: threshold
-              refId: C
-              expression: A
-              conditions:
-                - evaluator: { type: gt, params: [7200] }
-
-      # -----------------------------------------------------------------
-      # Job failures — any ingestion/correlation job failing in the last
-      # hour fires one alert per job label.
-      # -----------------------------------------------------------------
-      - uid: geon-job-failures
-        title: Ingestion job failures
-        condition: C
-        for: 5m
-        noDataState: OK
-        execErrState: Alerting
-        annotations:
-          summary: >-
-            One or more GEON jobs failed during the last hour
-            (job label identifies which).
+            GEON pipeline issue on {{ $labels.job }} — ingestion stalled
+            or job failures in the last hour. Check the ingestor logs and
+            the Prometheus geon_job_* metrics.
         labels:
           team: geon
         data:
@@ -131,7 +76,10 @@ groups:
             relativeTimeRange: { from: 3600, to: 0 }
             datasourceUid: prometheus
             model:
-              expr: sum by (job) (increase(geon_job_runs_total{status="failure"}[1h]))
+              expr: >-
+                ((time() - geon_job_last_success_timestamp_seconds{job="gdelt"}) > bool 3600)
+                or ((time() - geon_job_last_success_timestamp_seconds{job="correlation"}) > bool 7200)
+                or (sum by (job) (increase(geon_job_runs_total{status="failure"}[1h])) > bool 0)
               instant: true
               refId: A
           - refId: C
