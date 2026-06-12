@@ -63,6 +63,9 @@ correlation:
     long_window_days: 30
     stddev_threshold: 2.0
     min_articles: 10
+    # Tone-std floor (first backtest finding: syndicated articles give
+    # near-zero variance and z > 26000).
+    std_floor: 1.0
 
   # Rule 5 — internet outage + escalation
   internet_outage:

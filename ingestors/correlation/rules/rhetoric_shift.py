@@ -35,6 +35,9 @@ LONG_WINDOW_DAYS: int = setting("correlation.rhetoric_shift.long_window_days", 3
 STDDEV_THRESHOLD: float = setting("correlation.rhetoric_shift.stddev_threshold", 2.0)
 # Minimum articles in the short window for significance.
 MIN_ARTICLES: int = setting("correlation.rhetoric_shift.min_articles", 10)
+# Tone-std floor: syndicated copies of one article give a near-zero
+# baseline variance and explosive z-scores.
+STD_FLOOR: float = setting("correlation.rhetoric_shift.std_floor", 1.0)
 GDELT_INDEX_PATTERN = f"{INDEX_PREFIX}-gdelt-events-*"
 
 
@@ -292,6 +295,11 @@ class RhetoricShiftRule:
     ) -> float | None:
         """Compute how many standard deviations the current average deviates.
 
+        The std is floored: low-coverage pairs fed by syndicated copies
+        of one article have a near-zero tone variance, and dividing by
+        it produced absurd deviations (z > 26000 observed in the first
+        production backtest — the harness paying for itself).
+
         Args:
             current_avg: Short-window average tone.
             baseline_avg: Long-window average tone.
@@ -299,11 +307,11 @@ class RhetoricShiftRule:
 
         Returns:
             Number of standard deviations (signed), or ``None`` if the
-            baseline std is zero or NaN.
+            baseline std is NaN.
         """
-        if baseline_std == 0 or math.isnan(baseline_std):
+        if math.isnan(baseline_std):
             return None
-        return (current_avg - baseline_avg) / baseline_std
+        return (current_avg - baseline_avg) / max(baseline_std, STD_FLOOR)
 
     # ------------------------------------------------------------------
     # Build correlation

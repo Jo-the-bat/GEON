@@ -179,8 +179,11 @@ class TestAggregateTone:
 
 
 class TestComputeDeviation:
-    def test_zero_std_returns_none(self):
-        assert RhetoricShiftRule._compute_deviation(-5.0, -2.0, 0.0) is None
+    def test_zero_std_floored_not_none(self):
+        # std=0 (syndicated copies of one article) is floored, not skipped:
+        # the shift is still real, only its scale was untrustworthy.
+        assert RhetoricShiftRule._compute_deviation(
+            -5.0, -2.0, 0.0) == pytest.approx(-3.0)
 
     def test_nan_std_returns_none(self):
         assert RhetoricShiftRule._compute_deviation(-5.0, -2.0, float("nan")) is None
@@ -188,6 +191,18 @@ class TestComputeDeviation:
     def test_signed_sigmas(self):
         assert RhetoricShiftRule._compute_deviation(-5.0, -2.0, 1.5) == pytest.approx(-2.0)
         assert RhetoricShiftRule._compute_deviation(1.0, -2.0, 1.5) == pytest.approx(2.0)
+
+    def test_near_zero_std_no_blowup(self):
+        """First production backtest: NEW ZEALAND||VIETNAM at z=26301
+        because the baseline tone variance of a sparse, syndication-fed
+        pair was ~0.0001. The floor caps the scale at |Δtone| sigmas."""
+        dev = RhetoricShiftRule._compute_deviation(-5.0, -2.0, 0.0001)
+        assert abs(dev) == pytest.approx(3.0)
+        assert abs(dev) < 50
+
+    def test_floor_inactive_above_one(self):
+        assert RhetoricShiftRule._compute_deviation(
+            -5.0, -2.0, 3.0) == pytest.approx(-1.0)
 
 
 class TestSeverityTiers:
