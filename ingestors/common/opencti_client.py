@@ -26,6 +26,7 @@ from common.config import (
     RETRY_WAIT_MAX,
     RETRY_WAIT_MIN,
 )
+from common.countries import CANONICAL_COUNTRIES, normalize_country
 
 logger = logging.getLogger(__name__)
 
@@ -168,17 +169,54 @@ def _resolve_country_location(
     Returns:
         Location dict with at least ``id`` / ``standard_id``, or ``None``.
     """
+    canonical = normalize_country(country_name)
+    if canonical not in CANONICAL_COUNTRIES:
+        # GDELT actor pseudo-codes (SEA, AFR, GOV...) regularly reach the
+        # rules — not resolvable, not worth a warning per run.
+        logger.debug("'%s' is not a country — skipping Location lookup.", country_name)
+        return None
+
+    # OpenCTI's geography dataset stores names like "Iran" or "United
+    # States of America", not the GEON canonical uppercase form — try a
+    # few cheap exact reads first.
+    candidates = list(dict.fromkeys(
+        [country_name, canonical.title(), canonical]
+    ))
     try:
-        return client.location.read(
+        for candidate in candidates:
+            location = client.location.read(
+                filters={
+                    "mode": "and",
+                    "filters": [
+                        {"key": "name", "values": [candidate], "operator": "eq"},
+                        {"key": "entity_type", "values": ["Country"], "operator": "eq"},
+                    ],
+                    "filterGroups": [],
+                }
+            )
+            if location:
+                return location
+
+        # Fuzzy fallback: search, then compare name/aliases through the
+        # canonical dimension (handles "United States of America",
+        # "Russian Federation", accented forms, ...).
+        results = client.location.list(
+            search=canonical.title(),
+            first=10,
             filters={
                 "mode": "and",
                 "filters": [
-                    {"key": "name", "values": [country_name], "operator": "eq"},
                     {"key": "entity_type", "values": ["Country"], "operator": "eq"},
                 ],
                 "filterGroups": [],
-            }
+            },
         )
+        for location in results or []:
+            names = [location.get("name", "")]
+            names += location.get("x_opencti_aliases") or []
+            names += location.get("aliases") or []
+            if any(normalize_country(n) == canonical for n in names if n):
+                return location
     except Exception:
         logger.exception(
             "Failed to resolve Location for country '%s'.", country_name

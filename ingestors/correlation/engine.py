@@ -624,7 +624,9 @@ class CorrelationEngine:
 
 def main() -> None:
     """CLI entry point for the correlation engine."""
-    setup_logging("correlation.engine")
+    # Root logger: under ``python -m`` this module is "__main__" and the
+    # rules log under correlation.rules.* — a named setup hides them all.
+    setup_logging()
 
     parser = argparse.ArgumentParser(
         description="GEON correlation engine — detect cross-domain patterns"

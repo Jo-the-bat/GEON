@@ -18,12 +18,17 @@ Usage::
 from __future__ import annotations
 
 import argparse
+import logging
 import time
 
 import schedule
 from common.config import ACLED_API_KEY, setup_logging
 
-logger = setup_logging(name="scheduler")
+# Configure the ROOT logger so every module's INFO output (rules,
+# ingestors, opencti client) reaches the container logs — a named
+# setup_logging("scheduler") only made the scheduler's own lines visible.
+setup_logging()
+logger = logging.getLogger("scheduler")
 
 
 # ---------------------------------------------------------------------------
