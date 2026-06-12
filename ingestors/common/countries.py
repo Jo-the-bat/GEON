@@ -206,6 +206,7 @@ ALIASES: dict[str, str] = {
     "republic of congo": "CONGO (REPUBLIC)",
     "republic of the congo": "CONGO (REPUBLIC)",
     "congo republic of": "CONGO (REPUBLIC)",
+    "congo republic of the": "CONGO (REPUBLIC)",
     "congo brazzaville": "CONGO (REPUBLIC)",
     "congo": "CONGO (REPUBLIC)",
     # --- Cote d'Ivoire ---
@@ -276,6 +277,7 @@ ALIASES: dict[str, str] = {
     "kosovo republic of": "KOSOVO",
     "central african rep": "CENTRAL AFRICAN REPUBLIC",
     "gambia the": "GAMBIA",
+    "bahamas the": "BAHAMAS",
     "timor leste": "EAST TIMOR",
     "cabo verde": "CAPE VERDE",
     "federated states of micronesia": "MICRONESIA",

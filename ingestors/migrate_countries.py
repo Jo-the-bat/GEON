@@ -329,7 +329,10 @@ def migrate_reindex(
 
 def main() -> None:
     """CLI entry point."""
-    setup_logging("migrate_countries")
+    # Configure the ROOT logger: under ``python -m`` this module's logger is
+    # named "__main__", so a named setup_logging() call would leave every
+    # INFO line invisible (only the last-resort >=WARNING handler fires).
+    setup_logging()
     parser = argparse.ArgumentParser(
         description="Normalize country values in existing GEON indices."
     )
