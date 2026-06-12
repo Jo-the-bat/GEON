@@ -12,6 +12,8 @@ GEON automatically correlates diplomatic events, armed conflicts, and sanctions 
 
 The name is primarily an acronym of the core stack -- **n**8n, **E**lasticsearch, **G**DELT, **O**penCTI. As a second layer, *geontiation* is a neologism I coined for the project — a portmanteau of "geo" (geography, territory) and the French "énonciation" (the act of naming / making something speakable), to capture what the platform does: it names and surfaces latent patterns in geopolitics + cyber. It is not an established term in international relations; I flag it as a coinage here so the framing stays honest.
 
+> **📖 Operator's manual:** the [project wiki](https://github.com/Jo-the-bat/GEON/wiki) covers adding data sources, writing correlation rules, querying the data (Grafana, ES|QL, Query DSL), alert triage, and backtesting.
+
 ---
 
 ## Why GEON?
