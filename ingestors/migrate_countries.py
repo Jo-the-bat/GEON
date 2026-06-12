@@ -79,9 +79,13 @@ def _rebuild_spending(src: dict[str, Any]) -> tuple[dict[str, Any], str]:
 
 
 def _rebuild_risk_score(src: dict[str, Any]) -> tuple[dict[str, Any], str]:
-    """Recompute the geon-risk-scores document and its _id."""
+    """Recompute the geon-risk-scores document and its _id.
+
+    Mirrors risk_score/calculator.py: ``{country}:{YYYY-MM-DD}`` (daily
+    history scheme).
+    """
     src["country"] = normalize_country(src.get("country") or "") or src.get("country", "")
-    return src, src["country"]
+    return src, f"{src['country']}:{str(src.get('date', ''))[:10]}"
 
 
 def _rebuild_transfer(src: dict[str, Any]) -> tuple[dict[str, Any], str]:
