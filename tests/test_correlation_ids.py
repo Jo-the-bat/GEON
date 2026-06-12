@@ -12,7 +12,6 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "ingestors"))
 
 import pytest
-
 from correlation.rules.diplomatic_apt import DiplomaticAPTRule
 from correlation.rules.multi_signal_convergence import MultiSignalConvergenceRule
 from correlation.rules.prediction_validated import PredictionValidatedRule

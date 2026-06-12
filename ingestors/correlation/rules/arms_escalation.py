@@ -25,7 +25,9 @@ GOLDSTEIN_THRESHOLD: float = -3.0
 ESCALATION_WINDOW_DAYS: int = 90
 ESCALATION_THRESHOLD_PCT: float = 50.0
 
-_NEIGHBORS_PATH = Path(__file__).resolve().parent.parent.parent / "common" / "country_neighbors.json"
+_NEIGHBORS_PATH = (
+    Path(__file__).resolve().parent.parent.parent / "common" / "country_neighbors.json"
+)
 _NEIGHBORS: dict[str, list[str]] = {}
 try:
     with _NEIGHBORS_PATH.open() as f:
@@ -199,7 +201,8 @@ class ArmsEscalationRule:
             "description": (
                 f"Arms transfer escalation: {supplier} delivered {weapon} to {recipient}. "
                 f"Negative GDELT events between {recipient} and {neighbor} increased "
-                f"{pct_increase:.0f}% (before: {before}, after: {after}) within {ESCALATION_WINDOW_DAYS}d."
+                f"{pct_increase:.0f}% (before: {before}, after: {after}) "
+                f"within {ESCALATION_WINDOW_DAYS}d."
             ),
             "timeline": [
                 {"date": transfer.get("date", now), "type": "arms_transfer",

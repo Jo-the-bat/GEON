@@ -27,13 +27,6 @@ from email.mime.text import MIMEText
 from typing import Any
 
 import requests
-from tenacity import (
-    retry,
-    retry_if_exception_type,
-    stop_after_attempt,
-    wait_exponential,
-)
-
 from common.config import (
     ALERT_EMAIL_FROM,
     ALERT_EMAIL_PASSWORD,
@@ -46,6 +39,12 @@ from common.config import (
     RETRY_WAIT_MIN,
 )
 from common.es_client import get_es_client
+from tenacity import (
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -447,7 +446,8 @@ def _build_email_html(correlation: dict[str, Any]) -> str:
     )
 
     return f"""
-  <div style="max-width:600px;margin:0 auto 20px;background:#fff;border-radius:8px;overflow:hidden;">
+  <div style="max-width:600px;margin:0 auto 20px;background:#fff;
+              border-radius:8px;overflow:hidden;">
     <div style="background:{color};padding:16px 20px;color:#fff;">
       <h2 style="margin:0;">GEON Correlation — {context}</h2>
       <p style="margin:4px 0 0;">Severity: {severity.upper()}</p>
@@ -485,7 +485,8 @@ def _build_email_digest_html(correlations: list[dict[str, Any]]) -> str:
   {cards}
   <p style="max-width:600px;margin:0 auto;text-align:center;">
     <a href="{DASHBOARD_BASE_URL}"
-       style="background:#0066cc;color:#fff;padding:10px 20px;text-decoration:none;border-radius:4px;">
+       style="background:#0066cc;color:#fff;padding:10px 20px;
+              text-decoration:none;border-radius:4px;">
       View in Grafana
     </a>
   </p>

@@ -56,7 +56,8 @@ class MultiSignalConvergenceRule:
 
         high_risk_countries = self._get_high_risk_countries()
         if not high_risk_countries:
-            logger.info("[%s] No countries above risk threshold %.0f.", self.RULE_NAME, RISK_SCORE_THRESHOLD)
+            logger.info("[%s] No countries above risk threshold %.0f.",
+                        self.RULE_NAME, RISK_SCORE_THRESHOLD)
             return correlations
 
         logger.info(
@@ -358,7 +359,8 @@ class MultiSignalConvergenceRule:
             },
             "cyber_event": {
                 "campaign_id": "",
-                "apt_group": str(signals.get("apt_activity", "")) if signals.get("apt_activity") else "",
+                "apt_group": (str(signals.get("apt_activity", ""))
+                              if signals.get("apt_activity") else ""),
                 "techniques": [],
             },
             "description": narrative,
@@ -369,7 +371,10 @@ class MultiSignalConvergenceRule:
                 "gdelt_negative_events": signals["gdelt_negative_events"] or 0,
                 "sanctions_recent": bool(signals["sanctions_recent"]),
                 "internet_outage": bool(signals["internet_outage"]),
-                "prediction_market_movement": str(signals["prediction_market_movement"]) if signals["prediction_market_movement"] else "",
+                "prediction_market_movement": (
+                    str(signals["prediction_market_movement"])
+                    if signals["prediction_market_movement"] else ""
+                ),
                 "apt_activity": str(signals["apt_activity"]) if signals["apt_activity"] else "",
                 "acled_conflicts": signals["acled_conflicts"] or 0,
                 "military_spending_increase": bool(signals["military_spending_increase"]),

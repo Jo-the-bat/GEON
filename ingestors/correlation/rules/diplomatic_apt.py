@@ -20,7 +20,9 @@ from elasticsearch import Elasticsearch
 from pycti import OpenCTIApiClient
 
 # Load country → APT attribution mapping for validation.
-_MAPPING_PATH = Path(__file__).resolve().parent.parent.parent / "common" / "country_apt_mapping.json"
+_MAPPING_PATH = (
+    Path(__file__).resolve().parent.parent.parent / "common" / "country_apt_mapping.json"
+)
 _COUNTRY_APT_MAP: dict[str, list[str]] = {}
 try:
     with _MAPPING_PATH.open() as f:

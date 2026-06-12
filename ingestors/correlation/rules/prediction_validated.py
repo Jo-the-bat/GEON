@@ -41,7 +41,8 @@ class PredictionValidatedRule:
             logger.info("[%s] No significant Polymarket movers found.", self.RULE_NAME)
             return correlations
 
-        logger.info("[%s] Checking %d market(s) with significant movement.", self.RULE_NAME, len(movers))
+        logger.info("[%s] Checking %d market(s) with significant movement.",
+                    self.RULE_NAME, len(movers))
 
         for case in movers:
             countries = case.get("countries_involved", [])

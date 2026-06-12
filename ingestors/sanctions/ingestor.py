@@ -339,7 +339,9 @@ class SanctionsIngestor:
                 continue
 
             subject_type = entity.find(f".//{ns_match}subjectType")
-            etype = "person" if subject_type is not None and "person" in (subject_type.text or "").lower() else "organization"
+            is_person = (subject_type is not None
+                         and "person" in (subject_type.text or "").lower())
+            etype = "person" if is_person else "organization"
 
             # Country from citizenship or address
             country = ""

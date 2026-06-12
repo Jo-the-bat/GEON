@@ -43,11 +43,10 @@ import logging
 import sys
 from typing import Any, Callable
 
-from elasticsearch import Elasticsearch, helpers
-
 from common.config import INDEX_PREFIX, setup_logging
 from common.countries import normalize_country
 from common.es_client import get_es_client
+from elasticsearch import Elasticsearch, helpers
 
 logger = logging.getLogger(__name__)
 

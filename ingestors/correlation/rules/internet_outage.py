@@ -187,7 +187,8 @@ class InternetOutageRule:
             timeline.append({
                 "date": evt.get("date", now),
                 "type": "diplomatic",
-                "description": f"Goldstein {evt.get('goldstein_scale')}: {evt.get('cameo_description', '')}",
+                "description": (f"Goldstein {evt.get('goldstein_scale')}: "
+                                f"{evt.get('cameo_description', '')}"),
             })
         for evt in acled_hits[:3]:
             timeline.append({

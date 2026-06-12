@@ -7,7 +7,6 @@ from unittest.mock import MagicMock
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "ingestors"))
 
 import pytest
-
 from correlation import alerting
 
 

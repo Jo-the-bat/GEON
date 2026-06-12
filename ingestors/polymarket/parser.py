@@ -207,7 +207,8 @@ def normalize_market(market: dict[str, Any]) -> dict[str, Any]:
     now = datetime.now(tz=timezone.utc).isoformat()
     active = market.get("active", True) and not market.get("closed", False)
 
-    case_id = f"polymarket_{hashlib.sha256(market_id.encode()).hexdigest()[:16]}" if market_id else f"polymarket_{hashlib.sha256(question.encode()).hexdigest()[:16]}"
+    case_anchor = market_id if market_id else question
+    case_id = f"polymarket_{hashlib.sha256(case_anchor.encode()).hexdigest()[:16]}"
 
     return {
         "case_id": case_id,

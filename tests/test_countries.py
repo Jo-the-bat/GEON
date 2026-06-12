@@ -6,13 +6,12 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "ingestors"))
 
 import pytest
-
 from common.countries import (
     CANONICAL_COUNTRIES,
     ISO2_TO_ISO3,
     ISO3_TO_COUNTRY,
-    normalize_country,
     normalize_countries,
+    normalize_country,
 )
 
 

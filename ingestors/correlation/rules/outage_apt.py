@@ -27,7 +27,9 @@ OUTAGES_INDEX = f"{INDEX_PREFIX}-outages"
 CTI_INDEX = f"{INDEX_PREFIX}-cti-threats"
 APT_WINDOW_DAYS: int = 30
 
-_APT_MAPPING_PATH = Path(__file__).resolve().parent.parent.parent / "common" / "country_apt_mapping.json"
+_APT_MAPPING_PATH = (
+    Path(__file__).resolve().parent.parent.parent / "common" / "country_apt_mapping.json"
+)
 _COUNTRY_APT_MAP: dict[str, list[str]] = {}
 try:
     with _APT_MAPPING_PATH.open() as f:
@@ -136,7 +138,8 @@ class OutageAPTRule:
             pass
 
         # Fallback: return static attribution
-        return [{"name": apt, "type": "offensive", "id": "", "source": "static"} for apt in known_apts[:3]]
+        return [{"name": apt, "type": "offensive", "id": "", "source": "static"}
+                for apt in known_apts[:3]]
 
     def _find_targeting_apts(self, country: str) -> list[dict[str, Any]]:
         """Find APT groups known to target this country."""
@@ -186,11 +189,18 @@ class OutageAPTRule:
             f"{self.RULE_NAME}:{country}:{outage.get('start_time', '')}".encode()
         ).hexdigest()[:20]
 
-        desc_parts = [f"Internet outage in {country} ({outage.get('severity', 'unknown')}, {outage.get('type', '')})"]
+        desc_parts = [
+            f"Internet outage in {country} "
+            f"({outage.get('severity', 'unknown')}, {outage.get('type', '')})"
+        ]
         if offensive_apts:
-            desc_parts.append(f"coincides with APT groups attributed to {country}: {', '.join(a['name'] for a in offensive_apts[:3])}")
+            names = ", ".join(a["name"] for a in offensive_apts[:3])
+            desc_parts.append(
+                f"coincides with APT groups attributed to {country}: {names}"
+            )
         if targeting_apts:
-            desc_parts.append(f"APT groups targeting {country}: {', '.join(a['name'] for a in targeting_apts[:3])}")
+            names = ", ".join(a["name"] for a in targeting_apts[:3])
+            desc_parts.append(f"APT groups targeting {country}: {names}")
 
         return {
             "correlation_id": correlation_id,
@@ -201,7 +211,10 @@ class OutageAPTRule:
             "countries_involved": [country],
             "diplomatic_event": {
                 "event_id": outage.get("outage_id", ""),
-                "description": f"Internet outage: {outage.get('severity', '')} / {outage.get('duration_hours', 'unknown')}h",
+                "description": (
+                    f"Internet outage: {outage.get('severity', '')} / "
+                    f"{outage.get('duration_hours', 'unknown')}h"
+                ),
                 "goldstein": 0.0,
             },
             "cyber_event": {
@@ -212,7 +225,8 @@ class OutageAPTRule:
             "description": ". ".join(desc_parts) + ".",
             "timeline": [
                 {"date": outage.get("start_time", now), "type": "internet_outage",
-                 "description": f"Outage in {country}: {outage.get('severity', '')} / {outage.get('type', '')}"},
+                 "description": (f"Outage in {country}: "
+                                 f"{outage.get('severity', '')} / {outage.get('type', '')}")},
             ] + [
                 {"date": now, "type": "apt_activity",
                  "description": f"APT: {a['name']} ({a['type']})"} for a in all_apts[:3]

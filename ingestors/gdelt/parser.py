@@ -13,6 +13,11 @@ import logging
 from datetime import datetime, timezone
 from typing import Any
 
+# The authoritative country table lives in common.countries (single
+# canonical dimension shared by all ingestors); the historic name is kept
+# for backward compatibility.
+from common.countries import ISO3_TO_COUNTRY as COUNTRY_CODE_TO_NAME
+
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
@@ -173,13 +178,6 @@ GDELT_CSV_COLUMNS: list[str] = [
     "ActionGeo_Long", "ActionGeo_FeatureID",
     "DATEADDED", "SOURCEURL",
 ]
-
-# 3-letter CAMEO/ISO 3166-1 alpha-3 country codes used in Actor*CountryCode.
-# The authoritative table now lives in common.countries (single canonical
-# country dimension shared by all ingestors); kept under its historic name
-# for backward compatibility.
-from common.countries import ISO3_TO_COUNTRY as COUNTRY_CODE_TO_NAME
-
 
 # ---------------------------------------------------------------------------
 # CAMEO helpers

@@ -19,6 +19,9 @@ select = ["E", "F", "W", "I"]
 [tool.ruff.lint.per-file-ignores]
 # Tests often import without-using or shadow-imports.
 "tests/*" = ["F401"]
+# Embedded SIPRI seed rows are tabular data — wrapping them hurts more
+# than the long lines do.
+"ingestors/sipri/ingestor.py" = ["E501"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

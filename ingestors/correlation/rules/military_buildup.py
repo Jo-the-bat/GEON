@@ -24,7 +24,9 @@ logger = logging.getLogger(__name__)
 SPENDING_INDEX = f"{INDEX_PREFIX}-military-spending"
 YOY_THRESHOLD = 10.0  # Percent
 
-_APT_MAPPING_PATH = Path(__file__).resolve().parent.parent.parent / "common" / "country_apt_mapping.json"
+_APT_MAPPING_PATH = (
+    Path(__file__).resolve().parent.parent.parent / "common" / "country_apt_mapping.json"
+)
 _COUNTRY_APT_MAP: dict[str, list[str]] = {}
 try:
     with _APT_MAPPING_PATH.open() as f:
@@ -48,10 +50,12 @@ class MilitaryBuildupRule:
 
         high_spenders = self._find_high_increase_countries()
         if not high_spenders:
-            logger.info("[%s] No countries with >%.0f%% spending increase.", self.RULE_NAME, YOY_THRESHOLD)
+            logger.info("[%s] No countries with >%.0f%% spending increase.",
+                        self.RULE_NAME, YOY_THRESHOLD)
             return correlations
 
-        logger.info("[%s] Found %d countries with high spending increases.", self.RULE_NAME, len(high_spenders))
+        logger.info("[%s] Found %d countries with high spending increases.",
+                    self.RULE_NAME, len(high_spenders))
 
         for spending in high_spenders:
             country = spending["country"]

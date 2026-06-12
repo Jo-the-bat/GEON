@@ -62,7 +62,9 @@ class GKGIngestor:
         ensure_index(self.es, self.index_name, MAPPING_PATH)
 
     @retry(
-        retry=retry_if_exception_type((requests.ConnectionError, requests.Timeout, requests.HTTPError)),
+        retry=retry_if_exception_type(
+            (requests.ConnectionError, requests.Timeout, requests.HTTPError)
+        ),
         stop=stop_after_attempt(RETRY_MAX_ATTEMPTS),
         wait=wait_exponential(min=5, max=60),
         reraise=True,
