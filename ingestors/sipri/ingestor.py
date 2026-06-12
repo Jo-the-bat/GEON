@@ -3,7 +3,6 @@
 SIPRI does not provide a public REST API. This module:
 1. Seeds from embedded datasets (curated from SIPRI public databases)
 2. Optionally reads updated CSV files from ``data/`` directory
-3. Scrapes SIPRI Fact Sheets for latest spending data
 
 Usage::
 

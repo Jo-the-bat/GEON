@@ -35,6 +35,7 @@ from common.config import (
     RETRY_WAIT_MIN,
     setup_logging,
 )
+from common.countries import normalize_country
 from common.es_client import bulk_index, ensure_index, get_es_client
 from common.opencti_client import (
     create_organization,
@@ -172,7 +173,7 @@ class SanctionsIngestor:
             for addr in address_list.findall("sdn:address", NS):
                 c = self._text(addr, "sdn:country")
                 if c:
-                    country = c
+                    country = normalize_country(c)
                     break
 
         # Listed date — from dateOfBirth list or remarks.
@@ -340,7 +341,7 @@ class SanctionsIngestor:
             country = ""
             for cit in entity.iter(f"{ns_match}countryDescription"):
                 if cit.text:
-                    country = cit.text.strip()
+                    country = normalize_country(cit.text.strip())
                     break
 
             # Programmes
@@ -407,7 +408,8 @@ class SanctionsIngestor:
             for nat in individual.iter("NATIONALITY"):
                 val = nat.find("VALUE")
                 if val is not None and val.text:
-                    nationality = val.text.strip()
+                    # UN stores demonyms ("Iraqi") as often as country names.
+                    nationality = normalize_country(val.text.strip())
                     break
             entity_id = hashlib.sha256(f"UN-{ref or name}".encode()).hexdigest()[:24]
             now = datetime.now(tz=timezone.utc).isoformat()

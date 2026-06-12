@@ -35,6 +35,7 @@ from common.config import (
     RETRY_WAIT_MIN,
     setup_logging,
 )
+from common.countries import normalize_country
 from common.es_client import bulk_index, ensure_index, get_es_client, get_latest_timestamp
 
 logger = logging.getLogger(__name__)
@@ -169,7 +170,7 @@ class ACLEDIngestor:
             "sub_event_type": raw.get("sub_event_type", ""),
             "actor1": raw.get("actor1", ""),
             "actor2": raw.get("actor2", ""),
-            "country": raw.get("country", ""),
+            "country": normalize_country(raw.get("country", "")),
             "admin1": raw.get("admin1", ""),
             "location": raw.get("location", ""),
             "geo_location": geo_location,

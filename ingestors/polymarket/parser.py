@@ -13,6 +13,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from common.countries import normalize_country
+
 logger = logging.getLogger(__name__)
 
 # Keywords that strongly indicate international geopolitics.
@@ -79,9 +81,11 @@ COUNTRY_NAMES.update({
 })
 
 # Map short names to canonical names for matching.
+# "EU" must produce the same token as prediction_consensus ("EUROPEAN UNION")
+# so the cross-platform matcher's country-overlap boost works.
 SHORT_TO_CANONICAL: dict[str, str] = {
     "US": "UNITED STATES", "USA": "UNITED STATES",
-    "UK": "UNITED KINGDOM", "EU": "EUROPE",
+    "UK": "UNITED KINGDOM", "EU": "EUROPEAN UNION",
     "GAZA": "PALESTINE", "WEST BANK": "PALESTINE",
     "CRIMEA": "UKRAINE", "DONBAS": "UKRAINE",
     "KASHMIR": "INDIA", "TIBET": "CHINA",
@@ -144,13 +148,17 @@ def is_geopolitical(market: dict[str, Any]) -> bool:
 
 
 def extract_countries(text: str) -> list[str]:
-    """Extract country names from text using simple matching."""
+    """Extract country names from text using simple matching.
+
+    Real countries are passed through the shared canonical dimension;
+    org tokens (NATO, EUROPEAN UNION) pass through uppercased.
+    """
     text_upper = text.upper()
     found: set[str] = set()
     for name in COUNTRY_NAMES:
         if re.search(r'\b' + re.escape(name) + r'\b', text_upper):
             canonical = SHORT_TO_CANONICAL.get(name, name)
-            found.add(canonical)
+            found.add(normalize_country(canonical))
     return sorted(found)
 
 

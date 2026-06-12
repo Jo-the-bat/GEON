@@ -175,64 +175,10 @@ GDELT_CSV_COLUMNS: list[str] = [
 ]
 
 # 3-letter CAMEO/ISO 3166-1 alpha-3 country codes used in Actor*CountryCode.
-COUNTRY_CODE_TO_NAME: dict[str, str] = {
-    "AFG": "AFGHANISTAN", "ALB": "ALBANIA", "DZA": "ALGERIA",
-    "AGO": "ANGOLA", "ARG": "ARGENTINA", "ARM": "ARMENIA",
-    "AUS": "AUSTRALIA", "AUT": "AUSTRIA", "AZE": "AZERBAIJAN",
-    "BHR": "BAHRAIN", "BGD": "BANGLADESH", "BLR": "BELARUS",
-    "BEL": "BELGIUM", "BEN": "BENIN", "BTN": "BHUTAN",
-    "BOL": "BOLIVIA", "BIH": "BOSNIA AND HERZEGOVINA", "BWA": "BOTSWANA",
-    "BRA": "BRAZIL", "BRN": "BRUNEI", "BGR": "BULGARIA",
-    "BFA": "BURKINA FASO", "BDI": "BURUNDI", "KHM": "CAMBODIA",
-    "CMR": "CAMEROON", "CAN": "CANADA", "CAF": "CENTRAL AFRICAN REPUBLIC",
-    "TCD": "CHAD", "CHL": "CHILE", "CHN": "CHINA",
-    "COL": "COLOMBIA", "COD": "CONGO (DRC)", "COG": "CONGO (REPUBLIC)",
-    "CRI": "COSTA RICA", "CIV": "COTE D'IVOIRE", "HRV": "CROATIA",
-    "CUB": "CUBA", "CYP": "CYPRUS", "CZE": "CZECH REPUBLIC",
-    "DNK": "DENMARK", "DJI": "DJIBOUTI", "DOM": "DOMINICAN REPUBLIC",
-    "ECU": "ECUADOR", "EGY": "EGYPT", "SLV": "EL SALVADOR",
-    "GNQ": "EQUATORIAL GUINEA", "ERI": "ERITREA", "EST": "ESTONIA",
-    "SWZ": "ESWATINI", "ETH": "ETHIOPIA", "FIN": "FINLAND",
-    "FRA": "FRANCE", "GAB": "GABON", "GMB": "GAMBIA",
-    "GEO": "GEORGIA", "DEU": "GERMANY", "GHA": "GHANA",
-    "GRC": "GREECE", "GTM": "GUATEMALA", "GIN": "GUINEA",
-    "GUY": "GUYANA", "HTI": "HAITI", "HND": "HONDURAS",
-    "HUN": "HUNGARY", "ISL": "ICELAND", "IND": "INDIA",
-    "IDN": "INDONESIA", "IRN": "IRAN", "IRQ": "IRAQ",
-    "IRL": "IRELAND", "ISR": "ISRAEL", "ITA": "ITALY",
-    "JAM": "JAMAICA", "JPN": "JAPAN", "JOR": "JORDAN",
-    "KAZ": "KAZAKHSTAN", "KEN": "KENYA", "PRK": "NORTH KOREA",
-    "KOR": "SOUTH KOREA", "KWT": "KUWAIT", "KGZ": "KYRGYZSTAN",
-    "LAO": "LAOS", "LVA": "LATVIA", "LBN": "LEBANON",
-    "LSO": "LESOTHO", "LBR": "LIBERIA", "LBY": "LIBYA",
-    "LTU": "LITHUANIA", "LUX": "LUXEMBOURG", "MKD": "NORTH MACEDONIA",
-    "MDG": "MADAGASCAR", "MWI": "MALAWI", "MYS": "MALAYSIA",
-    "MLI": "MALI", "MLT": "MALTA", "MRT": "MAURITANIA",
-    "MUS": "MAURITIUS", "MEX": "MEXICO", "MDA": "MOLDOVA",
-    "MNG": "MONGOLIA", "MNE": "MONTENEGRO", "MAR": "MOROCCO",
-    "MOZ": "MOZAMBIQUE", "MMR": "MYANMAR", "NAM": "NAMIBIA",
-    "NPL": "NEPAL", "NLD": "NETHERLANDS", "NZL": "NEW ZEALAND",
-    "NIC": "NICARAGUA", "NER": "NIGER", "NGA": "NIGERIA",
-    "NOR": "NORWAY", "OMN": "OMAN", "PAK": "PAKISTAN",
-    "PAN": "PANAMA", "PNG": "PAPUA NEW GUINEA", "PRY": "PARAGUAY",
-    "PER": "PERU", "PHL": "PHILIPPINES", "POL": "POLAND",
-    "PRT": "PORTUGAL", "QAT": "QATAR", "ROU": "ROMANIA",
-    "RUS": "RUSSIA", "RWA": "RWANDA", "SAU": "SAUDI ARABIA",
-    "SEN": "SENEGAL", "SRB": "SERBIA", "SLE": "SIERRA LEONE",
-    "SGP": "SINGAPORE", "SVK": "SLOVAKIA", "SVN": "SLOVENIA",
-    "SOM": "SOMALIA", "ZAF": "SOUTH AFRICA", "SSD": "SOUTH SUDAN",
-    "ESP": "SPAIN", "LKA": "SRI LANKA", "SDN": "SUDAN",
-    "SUR": "SURINAME", "SWE": "SWEDEN", "CHE": "SWITZERLAND",
-    "SYR": "SYRIA", "TWN": "TAIWAN", "TJK": "TAJIKISTAN",
-    "TZA": "TANZANIA", "THA": "THAILAND", "TGO": "TOGO",
-    "TTO": "TRINIDAD AND TOBAGO", "TUN": "TUNISIA", "TUR": "TURKEY",
-    "TKM": "TURKMENISTAN", "UGA": "UGANDA", "UKR": "UKRAINE",
-    "ARE": "UNITED ARAB EMIRATES", "GBR": "UNITED KINGDOM",
-    "USA": "UNITED STATES", "URY": "URUGUAY", "UZB": "UZBEKISTAN",
-    "VEN": "VENEZUELA", "VNM": "VIETNAM", "YEM": "YEMEN",
-    "ZMB": "ZAMBIA", "ZWE": "ZIMBABWE", "PSE": "PALESTINE",
-    "XKX": "KOSOVO",
-}
+# The authoritative table now lives in common.countries (single canonical
+# country dimension shared by all ingestors); kept under its historic name
+# for backward compatibility.
+from common.countries import ISO3_TO_COUNTRY as COUNTRY_CODE_TO_NAME
 
 
 # ---------------------------------------------------------------------------

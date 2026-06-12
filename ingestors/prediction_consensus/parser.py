@@ -11,6 +11,8 @@ import re
 from datetime import datetime, timezone
 from typing import Any
 
+from common.countries import normalize_country
+
 logger = logging.getLogger(__name__)
 
 # Geopolitical keywords for filtering
@@ -42,7 +44,8 @@ _COUNTRY_RE = re.compile(
     re.IGNORECASE,
 )
 
-# Normalize short names
+# Normalize short names (org tokens only — real countries go through the
+# shared canonical dimension in extract_countries).
 _COUNTRY_NORMALIZE: dict[str, str] = {
     "us": "UNITED STATES", "usa": "UNITED STATES", "uk": "UNITED KINGDOM",
     "eu": "EUROPEAN UNION",
@@ -63,7 +66,7 @@ def extract_countries(question: str) -> list[str]:
     normalized = set()
     for m in matches:
         n = _COUNTRY_NORMALIZE.get(m.lower(), m.upper())
-        normalized.add(n)
+        normalized.add(normalize_country(n))
     return sorted(normalized)
 
 

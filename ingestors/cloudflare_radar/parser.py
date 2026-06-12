@@ -10,57 +10,19 @@ import logging
 from datetime import datetime, timezone
 from typing import Any
 
-logger = logging.getLogger(__name__)
+from common.countries import normalize_country
 
-# ISO-3166 alpha-2 → country name (common geopolitical actors).
-_CC_TO_NAME: dict[str, str] = {
-    "AF": "AFGHANISTAN", "AL": "ALBANIA", "DZ": "ALGERIA", "AO": "ANGOLA",
-    "AR": "ARGENTINA", "AM": "ARMENIA", "AU": "AUSTRALIA", "AT": "AUSTRIA",
-    "AZ": "AZERBAIJAN", "BH": "BAHRAIN", "BD": "BANGLADESH", "BY": "BELARUS",
-    "BE": "BELGIUM", "BO": "BOLIVIA", "BA": "BOSNIA AND HERZEGOVINA",
-    "BR": "BRAZIL", "BG": "BULGARIA", "MM": "MYANMAR", "KH": "CAMBODIA",
-    "CM": "CAMEROON", "CA": "CANADA", "CF": "CENTRAL AFRICAN REPUBLIC",
-    "TD": "CHAD", "CL": "CHILE", "CN": "CHINA", "CO": "COLOMBIA",
-    "CD": "DEMOCRATIC REPUBLIC OF THE CONGO", "CG": "REPUBLIC OF THE CONGO",
-    "CR": "COSTA RICA", "HR": "CROATIA", "CU": "CUBA", "CY": "CYPRUS",
-    "CZ": "CZECH REPUBLIC", "DK": "DENMARK", "DJ": "DJIBOUTI",
-    "DO": "DOMINICAN REPUBLIC", "EC": "ECUADOR", "EG": "EGYPT",
-    "SV": "EL SALVADOR", "GQ": "EQUATORIAL GUINEA", "ER": "ERITREA",
-    "EE": "ESTONIA", "ET": "ETHIOPIA", "FI": "FINLAND", "FR": "FRANCE",
-    "GA": "GABON", "GE": "GEORGIA", "DE": "GERMANY", "GH": "GHANA",
-    "GR": "GREECE", "GT": "GUATEMALA", "GN": "GUINEA", "HT": "HAITI",
-    "HN": "HONDURAS", "HU": "HUNGARY", "IS": "ICELAND", "IN": "INDIA",
-    "ID": "INDONESIA", "IR": "IRAN", "IQ": "IRAQ", "IE": "IRELAND",
-    "IL": "ISRAEL", "IT": "ITALY", "CI": "IVORY COAST", "JM": "JAMAICA",
-    "JP": "JAPAN", "JO": "JORDAN", "KZ": "KAZAKHSTAN", "KE": "KENYA",
-    "KW": "KUWAIT", "KG": "KYRGYZSTAN", "LA": "LAOS", "LV": "LATVIA",
-    "LB": "LEBANON", "LY": "LIBYA", "LT": "LITHUANIA", "LU": "LUXEMBOURG",
-    "MK": "NORTH MACEDONIA", "MG": "MADAGASCAR", "MW": "MALAWI",
-    "MY": "MALAYSIA", "ML": "MALI", "MR": "MAURITANIA", "MX": "MEXICO",
-    "MD": "MOLDOVA", "MN": "MONGOLIA", "ME": "MONTENEGRO", "MA": "MOROCCO",
-    "MZ": "MOZAMBIQUE", "NA": "NAMIBIA", "NP": "NEPAL", "NL": "NETHERLANDS",
-    "NZ": "NEW ZEALAND", "NI": "NICARAGUA", "NE": "NIGER", "NG": "NIGERIA",
-    "KP": "NORTH KOREA", "NO": "NORWAY", "OM": "OMAN", "PK": "PAKISTAN",
-    "PS": "PALESTINE", "PA": "PANAMA", "PG": "PAPUA NEW GUINEA",
-    "PY": "PARAGUAY", "PE": "PERU", "PH": "PHILIPPINES", "PL": "POLAND",
-    "PT": "PORTUGAL", "QA": "QATAR", "RO": "ROMANIA", "RU": "RUSSIA",
-    "RW": "RWANDA", "SA": "SAUDI ARABIA", "SN": "SENEGAL", "RS": "SERBIA",
-    "SL": "SIERRA LEONE", "SG": "SINGAPORE", "SK": "SLOVAKIA",
-    "SI": "SLOVENIA", "SO": "SOMALIA", "ZA": "SOUTH AFRICA",
-    "KR": "SOUTH KOREA", "SS": "SOUTH SUDAN", "ES": "SPAIN", "LK": "SRI LANKA",
-    "SD": "SUDAN", "SE": "SWEDEN", "CH": "SWITZERLAND", "SY": "SYRIA",
-    "TW": "TAIWAN", "TJ": "TAJIKISTAN", "TZ": "TANZANIA", "TH": "THAILAND",
-    "TG": "TOGO", "TN": "TUNISIA", "TR": "TURKEY", "TM": "TURKMENISTAN",
-    "UG": "UGANDA", "UA": "UKRAINE", "AE": "UNITED ARAB EMIRATES",
-    "GB": "UNITED KINGDOM", "US": "UNITED STATES", "UY": "URUGUAY",
-    "UZ": "UZBEKISTAN", "VE": "VENEZUELA", "VN": "VIETNAM", "YE": "YEMEN",
-    "ZM": "ZAMBIA", "ZW": "ZIMBABWE",
-}
+logger = logging.getLogger(__name__)
 
 
 def resolve_country(code: str) -> str:
-    """Resolve a 2-letter country code to an uppercase country name."""
-    return _CC_TO_NAME.get(code.upper(), code.upper())
+    """Resolve a 2-letter country code to the GEON canonical country name.
+
+    Delegates to the shared canonical dimension (the previous local map
+    diverged from GDELT naming on Cote d'Ivoire and the two Congos, and
+    was missing ~20 countries that surfaced as bare ISO2 codes).
+    """
+    return normalize_country(code)
 
 
 def classify_outage(annotation: dict[str, Any]) -> tuple[str, str, str]:

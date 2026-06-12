@@ -69,7 +69,7 @@
               "settings": { "interval": "1d", "min_doc_count": "0" }
             }
           ],
-          "timeField": "date"
+          "timeField": "event_date"
         }
       ],
       "fieldConfig": {

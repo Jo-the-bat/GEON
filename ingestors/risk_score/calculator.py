@@ -95,7 +95,7 @@ class RiskScoreCalculator:
                     "query": {
                         "bool": {
                             "filter": [
-                                {"range": {"date": {"gte": "now-30d"}}},
+                                {"range": {"event_date": {"gte": "now-30d"}}},
                                 {"term": {"country": country}},
                             ]
                         }

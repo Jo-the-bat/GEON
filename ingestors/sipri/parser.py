@@ -18,6 +18,8 @@ from io import StringIO
 from pathlib import Path
 from typing import Any
 
+from common.countries import normalize_country
+
 logger = logging.getLogger(__name__)
 
 
@@ -25,8 +27,9 @@ def normalize_transfer(row: dict[str, Any]) -> dict[str, Any]:
     """Normalize an arms transfer row into index schema."""
     now = datetime.now(timezone.utc).isoformat()
     year = int(row.get("year", 0) or 0)
-    supplier = str(row.get("supplier_country", row.get("supplier", ""))).upper()
-    recipient = str(row.get("recipient_country", row.get("recipient", ""))).upper()
+    # Raw SIPRI CSV exports use forms like "Korea, South" / "Viet Nam".
+    supplier = normalize_country(row.get("supplier_country", row.get("supplier", "")))
+    recipient = normalize_country(row.get("recipient_country", row.get("recipient", "")))
     weapon_type = str(row.get("weapon_type", row.get("armament_category", "")))
     weapon_desc = str(row.get("weapon_description", row.get("designation", "")))
     quantity = int(row.get("quantity", row.get("number_ordered", 0)) or 0)
@@ -60,7 +63,7 @@ def normalize_spending(row: dict[str, Any]) -> dict[str, Any]:
     """Normalize a military spending row into index schema."""
     now = datetime.now(timezone.utc).isoformat()
     year = int(row.get("year", 0) or 0)
-    country = str(row.get("country", "")).upper()
+    country = normalize_country(row.get("country", ""))
     cc = str(row.get("country_code", "")).upper()
     usd = float(row.get("spending_usd_millions", 0) or 0)
     pct_gdp = float(row.get("spending_pct_gdp", 0) or 0)
