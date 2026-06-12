@@ -39,6 +39,7 @@ from common.config import (
     RETRY_WAIT_MIN,
 )
 from common.es_client import get_es_client
+from common.settings import setting
 from tenacity import (
     retry,
     retry_if_exception_type,
@@ -74,7 +75,7 @@ ALERT_CONTEXT_LABEL: dict[str, str] = {
 DASHBOARD_BASE_URL = "https://geon.example.com/grafana/d/correlations"
 
 ALERTS_SENT_INDEX = "geon-alerts-sent"
-DEDUP_WINDOW_DAYS = 7
+DEDUP_WINDOW_DAYS: int = setting("alerting.dedup_window_days", 7)
 
 # Discord allows at most 10 embeds per webhook message AND at most 6000
 # characters across all embeds of one message.

@@ -45,6 +45,16 @@ scrape_configs:
         labels:
           service: 'rabbitmq'
 
+  # GEON ingestor — job metrics from scheduler.py (port 9108)
+  # geon_job_runs_total / geon_job_duration_seconds /
+  # geon_job_last_success_timestamp_seconds / geon_job_last_result_docs
+  - job_name: 'geon-ingestor'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['ingestor:9108']
+        labels:
+          service: 'ingestor'
+
   # Note: OpenCTI (/opencti/metrics) and n8n (/n8n/metrics) return HTML
   # instead of Prometheus exposition format. They would need dedicated
   # exporters or config changes to expose real metrics. Removed to avoid

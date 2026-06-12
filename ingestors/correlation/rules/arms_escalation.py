@@ -15,15 +15,19 @@ from pathlib import Path
 from typing import Any
 
 from common.config import INDEX_PREFIX
+from common.settings import setting
 from elasticsearch import Elasticsearch
 
 logger = logging.getLogger(__name__)
 
 TRANSFERS_INDEX = f"{INDEX_PREFIX}-arms-transfers"
 GDELT_INDEX_PATTERN = f"{INDEX_PREFIX}-gdelt-events-*"
-GOLDSTEIN_THRESHOLD: float = -3.0
-ESCALATION_WINDOW_DAYS: int = 90
-ESCALATION_THRESHOLD_PCT: float = 50.0
+GOLDSTEIN_THRESHOLD: float = setting(
+    "correlation.arms_escalation.goldstein_threshold", -3.0)
+ESCALATION_WINDOW_DAYS: int = setting(
+    "correlation.arms_escalation.escalation_window_days", 90)
+ESCALATION_THRESHOLD_PCT: float = setting(
+    "correlation.arms_escalation.escalation_threshold_pct", 50.0)
 
 _NEIGHBORS_PATH = (
     Path(__file__).resolve().parent.parent.parent / "common" / "country_neighbors.json"

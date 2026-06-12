@@ -30,7 +30,9 @@ from pathlib import Path
 from typing import Any
 
 from common.config import INDEX_PREFIX, setup_logging
+from common.countries import normalize_country
 from common.es_client import ensure_index, get_es_client
+from common.settings import setting
 
 logger = logging.getLogger(__name__)
 
@@ -47,8 +49,9 @@ try:
 except Exception:
     pass
 
-# Top countries to score (covers major geopolitical actors).
-TARGET_COUNTRIES: list[str] = [
+# Top countries to score (covers major geopolitical actors). The list is
+# tunable via risk_score.target_countries in ingestors/config.yaml.
+_DEFAULT_TARGETS: list[str] = [
     "UNITED STATES", "RUSSIA", "CHINA", "IRAN", "ISRAEL",
     "UKRAINE", "NORTH KOREA", "INDIA", "PAKISTAN", "TURKEY",
     "SAUDI ARABIA", "UNITED KINGDOM", "FRANCE", "GERMANY",
@@ -59,6 +62,36 @@ TARGET_COUNTRIES: list[str] = [
     "LIBYA", "TAIWAN", "PHILIPPINES", "INDONESIA", "THAILAND",
     "POLAND", "ROMANIA", "ITALY", "SPAIN", "NETHERLANDS",
 ]
+TARGET_COUNTRIES: list[str] = [
+    normalize_country(c)
+    for c in setting("risk_score.target_countries", _DEFAULT_TARGETS)
+]
+
+# Component weights / normalization anchors / level boundaries — tunable
+# via the risk_score section of ingestors/config.yaml.
+WEIGHTS: dict[str, float] = {
+    "gdelt": 0.25, "acled": 0.15, "sanctions": 0.10, "apt": 0.15,
+    "correlations": 0.20, "military_spending": 0.10, "arms_imports": 0.05,
+}
+WEIGHTS.update(setting("risk_score.weights", {}))
+
+_DEFAULT_NORMALIZATION: dict[str, tuple[int, int, int]] = {
+    "gdelt": (100, 1000, 5000),
+    "acled": (10, 100, 500),
+    "sanctions": (5, 50, 200),
+    "apt": (1, 3, 10),
+    "correlations": (1, 5, 20),
+    "military_spending": (5, 15, 30),
+    "arms_imports": (500, 3000, 10000),
+}
+NORMALIZATION: dict[str, tuple[int, int, int]] = {
+    key: tuple(setting(f"risk_score.normalization.{key}", list(default)))
+    for key, default in _DEFAULT_NORMALIZATION.items()
+}
+
+LEVEL_CRITICAL: float = float(setting("risk_score.levels.critical", 75))
+LEVEL_HIGH: float = float(setting("risk_score.levels.high", 50))
+LEVEL_MEDIUM: float = float(setting("risk_score.levels.medium", 25))
 
 
 class RiskScoreCalculator:
@@ -214,32 +247,33 @@ class RiskScoreCalculator:
         milex_yoy = self._get_military_spending_yoy(country)
         arms_tiv = self._count_arms_imports(country)
 
-        # Normalize each component to 0-100.
-        gdelt_score = self._normalize(gdelt_neg, (100, 1000, 5000))
-        acled_score = self._normalize(acled, (10, 100, 500))
-        sanctions_score = self._normalize(sanctions, (5, 50, 200))
-        apt_score = self._normalize(apt_count, (1, 3, 10))
-        corr_score = self._normalize(correlations, (1, 5, 20))
-        milex_score = self._normalize(int(max(milex_yoy, 0)), (5, 15, 30))
-        arms_score = self._normalize(int(arms_tiv), (500, 3000, 10000))
+        # Normalize each component to 0-100 (anchors from config.yaml).
+        gdelt_score = self._normalize(gdelt_neg, NORMALIZATION["gdelt"])
+        acled_score = self._normalize(acled, NORMALIZATION["acled"])
+        sanctions_score = self._normalize(sanctions, NORMALIZATION["sanctions"])
+        apt_score = self._normalize(apt_count, NORMALIZATION["apt"])
+        corr_score = self._normalize(correlations, NORMALIZATION["correlations"])
+        milex_score = self._normalize(
+            int(max(milex_yoy, 0)), NORMALIZATION["military_spending"])
+        arms_score = self._normalize(int(arms_tiv), NORMALIZATION["arms_imports"])
 
-        # Weighted composite (v2).
+        # Weighted composite (weights from config.yaml).
         risk_score = (
-            gdelt_score * 0.25
-            + acled_score * 0.15
-            + sanctions_score * 0.10
-            + apt_score * 0.15
-            + corr_score * 0.20
-            + milex_score * 0.10
-            + arms_score * 0.05
+            gdelt_score * WEIGHTS["gdelt"]
+            + acled_score * WEIGHTS["acled"]
+            + sanctions_score * WEIGHTS["sanctions"]
+            + apt_score * WEIGHTS["apt"]
+            + corr_score * WEIGHTS["correlations"]
+            + milex_score * WEIGHTS["military_spending"]
+            + arms_score * WEIGHTS["arms_imports"]
         )
         risk_score = min(100.0, max(0.0, round(risk_score, 1)))
 
-        if risk_score >= 75:
+        if risk_score >= LEVEL_CRITICAL:
             risk_level = "critical"
-        elif risk_score >= 50:
+        elif risk_score >= LEVEL_HIGH:
             risk_level = "high"
-        elif risk_score >= 25:
+        elif risk_score >= LEVEL_MEDIUM:
             risk_level = "medium"
         else:
             risk_level = "low"

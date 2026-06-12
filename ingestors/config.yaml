@@ -1,0 +1,167 @@
+# =============================================================================
+# GEON — Tunable analytics settings
+#
+# Correlation-rule thresholds, engine behaviour, alerting and risk-score
+# weights. Loaded by ingestors/common/settings.py; every value has the same
+# default in code, so removing a key falls back to the historical behaviour.
+#
+# After changing this file: rebuild + restart the ingestor container
+#   docker compose -f docker/docker-compose.yml build ingestor
+#   docker compose -f docker/docker-compose.yml up -d --no-deps ingestor
+# =============================================================================
+
+correlation:
+  engine:
+    # A situation dormant for this many days that fires again is treated
+    # as a reactivation and re-alerted.
+    reactivation_days: 14
+    # Cap on merged situation timelines (oldest half + newest half kept).
+    timeline_max_entries: 50
+    # Minimum severity that triggers notifications: low|medium|high|critical
+    min_alert_severity: high
+
+  # Rule 1 — diplomatic escalation + APT activity
+  diplomatic_apt:
+    goldstein_threshold: -5.0
+    lookback_days: 7
+    apt_window_days: 30
+
+  # Rule 2 — sanction + IoC spike
+  sanction_cyber:
+    lookback_days: 14
+    ioc_window_days: 60
+    ioc_spike_threshold: 2.0      # 2.0 = +200%
+    min_baseline_count: 10
+
+  # Rule 3 — armed conflict + cyber activity
+  conflict_cyber:
+    lookback_days: 14
+    cyber_window_days: 30
+    conflict_event_types:
+      - "Battles"
+      - "Violence against civilians"
+      - "Explosions/Remote violence"
+
+  # Rule 4 — rhetoric shift (weak signal)
+  rhetoric_shift:
+    short_window_days: 7
+    long_window_days: 30
+    stddev_threshold: 2.0
+    min_articles: 10
+
+  # Rule 5 — internet outage + escalation
+  internet_outage:
+    window_hours: 48
+    goldstein_threshold: -5.0
+
+  # Rule 6 — military spending surge + APT
+  military_buildup:
+    yoy_threshold: 10.0           # percent
+
+  # Rule 7 — arms transfer + regional escalation
+  arms_escalation:
+    goldstein_threshold: -3.0
+    escalation_window_days: 90
+    escalation_threshold_pct: 50.0
+
+  # Rule 8 — prediction market movement + real-world event
+  prediction_validated:
+    price_shift_threshold: 0.10   # 10%
+    goldstein_severity: 7.0
+    window_hours: 72
+
+  # Rule 9 — internet outage + APT activity
+  outage_apt:
+    apt_window_days: 30
+
+  # Rule 10 — multi-signal convergence (fusion)
+  multi_signal_convergence:
+    risk_score_threshold: 40.0
+    gdelt_negative_threshold: 100
+    goldstein_threshold: -3.0
+    prediction_shift_threshold: 0.05
+    spending_yoy_threshold: 10.0
+    min_signals: 3
+
+alerting:
+  # Suppress a re-notification for the same (rule, countries, severity)
+  # within this window.
+  dedup_window_days: 7
+
+ingestion:
+  gdelt:
+    # Catch-up ceiling when the ingestor was down: at most this many
+    # missed 15-minute windows are backfilled per run (96 = 24 hours).
+    max_backfill_windows: 96
+
+risk_score:
+  # Weighted composite (weights should sum to 1.0).
+  weights:
+    gdelt: 0.25
+    acled: 0.15
+    sanctions: 0.10
+    apt: 0.15
+    correlations: 0.20
+    military_spending: 0.10
+    arms_imports: 0.05
+  # Normalization anchors per component: [low, mid, high] raw counts
+  # mapping to scores of ~0 / 50 / 100.
+  normalization:
+    gdelt: [100, 1000, 5000]
+    acled: [10, 100, 500]
+    sanctions: [5, 50, 200]
+    apt: [1, 3, 10]
+    correlations: [1, 5, 20]
+    military_spending: [5, 15, 30]
+    arms_imports: [500, 3000, 10000]
+  # Score boundaries for risk levels.
+  levels:
+    critical: 75
+    high: 50
+    medium: 25
+  # Countries scored daily (GEON canonical names).
+  target_countries:
+    - "UNITED STATES"
+    - "RUSSIA"
+    - "CHINA"
+    - "IRAN"
+    - "ISRAEL"
+    - "UKRAINE"
+    - "NORTH KOREA"
+    - "INDIA"
+    - "PAKISTAN"
+    - "TURKEY"
+    - "SAUDI ARABIA"
+    - "UNITED KINGDOM"
+    - "FRANCE"
+    - "GERMANY"
+    - "JAPAN"
+    - "SOUTH KOREA"
+    - "AUSTRALIA"
+    - "CANADA"
+    - "BRAZIL"
+    - "NIGERIA"
+    - "SOUTH AFRICA"
+    - "EGYPT"
+    - "IRAQ"
+    - "SYRIA"
+    - "LEBANON"
+    - "YEMEN"
+    - "AFGHANISTAN"
+    - "MYANMAR"
+    - "VENEZUELA"
+    - "MEXICO"
+    - "COLOMBIA"
+    - "ETHIOPIA"
+    - "SOMALIA"
+    - "SUDAN"
+    - "LIBYA"
+    - "TAIWAN"
+    - "PHILIPPINES"
+    - "INDONESIA"
+    - "THAILAND"
+    - "POLAND"
+    - "ROMANIA"
+    - "ITALY"
+    - "SPAIN"
+    - "NETHERLANDS"

@@ -14,6 +14,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from common.config import INDEX_PREFIX
+from common.settings import setting
 from elasticsearch import Elasticsearch
 
 logger = logging.getLogger(__name__)
@@ -21,10 +22,11 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Tunables
 # ---------------------------------------------------------------------------
-SHORT_WINDOW_DAYS: int = 7
-LONG_WINDOW_DAYS: int = 30
-STDDEV_THRESHOLD: float = 2.0
-MIN_ARTICLES: int = 10  # Minimum articles in the short window for significance.
+SHORT_WINDOW_DAYS: int = setting("correlation.rhetoric_shift.short_window_days", 7)
+LONG_WINDOW_DAYS: int = setting("correlation.rhetoric_shift.long_window_days", 30)
+STDDEV_THRESHOLD: float = setting("correlation.rhetoric_shift.stddev_threshold", 2.0)
+# Minimum articles in the short window for significance.
+MIN_ARTICLES: int = setting("correlation.rhetoric_shift.min_articles", 10)
 GDELT_INDEX_PATTERN = f"{INDEX_PREFIX}-gdelt-events-*"
 
 

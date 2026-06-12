@@ -157,7 +157,13 @@ Tous les ingestors Python et le moteur de correlation tournent dans un conteneur
 | SIPRI | hebdomadaire, lundi 02:00 |
 | Risk scores | quotidien 05:00 |
 
-Chaque job (sauf l'enrichissement Polymarket) est aussi execute une fois au demarrage du conteneur. Mode seed : `python scheduler.py --seed N` ingere N jours d'historique GDELT + ACLED avant de demarrer le cron.
+Au demarrage le scheduler n'execute RIEN immediatement (les jobs attendent leur creneau) ; `--bootstrap` lance chaque source une fois puis la correlation, `--seed N` ingere N jours d'historique GDELT + ACLED avant le cron.
+
+**Metriques** : chaque job est instrumente (Prometheus, port 9108 du conteneur, scrape par geon-prometheus) — `geon_job_runs_total{job,status}`, `geon_job_duration_seconds`, `geon_job_last_success_timestamp_seconds`, `geon_job_last_result_docs`. Des regles d'alerte Grafana provisionnees (`docker/grafana/provisioning/alerting/geon-alerting.yml`) previennent sur Discord si l'ingestion GDELT (1h) ou le moteur de correlation (2h) s'arretent, ou si un job echoue.
+
+**Watermark GDELT** : l'ingestor persiste la derniere fenetre 15 min traitee dans `geon-meta` (doc `gdelt-events-watermark`) et rattrape au prochain run toutes les fenetres manquees pendant un downtime (cap configurable `ingestion.gdelt.max_backfill_windows`, 96 = 24h ; au-dela les plus anciennes sont abandonnees avec un log explicite).
+
+**Configuration des seuils** : tous les seuils des regles, le comportement du moteur (reactivation, cap timeline, severite minimale d'alerte), la fenetre anti-spam et les poids/normalisations/pays cibles du risk score vivent dans `ingestors/config.yaml` (charge par `common/settings.py`, defauts identiques dans le code). Tuner une regle = editer le YAML + rebuild/restart de l'ingestor, plus aucune constante a modifier dans le code.
 
 Apres toute modification du code Python, rebuilder l'image : `docker compose -f docker/docker-compose.yml build ingestor && docker compose -f docker/docker-compose.yml up -d ingestor`.
 
@@ -583,10 +589,12 @@ geon/
 +-- ingestors/
 |   +-- Dockerfile                     # Image geon-ingestor (python:3.11-slim)
 |   +-- requirements.txt               # Dependances Python communes
-|   +-- scheduler.py                   # PID 1 du conteneur : ordonnance tous les jobs
+|   +-- config.yaml                    # Seuils des regles, poids risk score, alerting (tunable)
+|   +-- scheduler.py                   # PID 1 : ordonnance les jobs + metriques Prometheus :9108
 |   +-- migrate_countries.py           # Migration one-shot : normalise les pays des index existants
 |   +-- common/
 |   |   +-- config.py                  # Chargement .env, constantes
+|   |   +-- settings.py                # Loader de config.yaml (seuils tunables)
 |   |   +-- countries.py               # Dimension pays canonique (obligatoire pour tout champ pays)
 |   |   +-- es_client.py               # Client Elasticsearch partage
 |   |   +-- opencti_client.py          # Client OpenCTI GraphQL partage (requests_timeout=60)

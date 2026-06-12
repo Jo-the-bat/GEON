@@ -14,12 +14,14 @@ from typing import Any
 
 from common.config import INDEX_PREFIX
 from common.countries import normalize_country
+from common.settings import setting
 from elasticsearch import Elasticsearch
 
 logger = logging.getLogger(__name__)
 
-WINDOW_HOURS: int = 48
-GOLDSTEIN_THRESHOLD: float = -5.0
+WINDOW_HOURS: int = setting("correlation.internet_outage.window_hours", 48)
+GOLDSTEIN_THRESHOLD: float = setting(
+    "correlation.internet_outage.goldstein_threshold", -5.0)
 OUTAGES_INDEX = f"{INDEX_PREFIX}-outages"
 GDELT_INDEX_PATTERN = f"{INDEX_PREFIX}-gdelt-events-*"
 ACLED_INDEX_PATTERN = f"{INDEX_PREFIX}-acled-*"

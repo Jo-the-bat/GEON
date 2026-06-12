@@ -16,6 +16,7 @@ from typing import Any
 
 from common.config import INDEX_PREFIX
 from common.opencti_client import get_campaigns_by_country
+from common.settings import setting
 from elasticsearch import Elasticsearch
 from pycti import OpenCTIApiClient
 
@@ -36,9 +37,10 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Tunables
 # ---------------------------------------------------------------------------
-GOLDSTEIN_THRESHOLD: float = -5.0
-LOOKBACK_DAYS: int = 7
-APT_WINDOW_DAYS: int = 30
+GOLDSTEIN_THRESHOLD: float = setting(
+    "correlation.diplomatic_apt.goldstein_threshold", -5.0)
+LOOKBACK_DAYS: int = setting("correlation.diplomatic_apt.lookback_days", 7)
+APT_WINDOW_DAYS: int = setting("correlation.diplomatic_apt.apt_window_days", 30)
 GDELT_INDEX_PATTERN = f"{INDEX_PREFIX}-gdelt-events-*"
 
 

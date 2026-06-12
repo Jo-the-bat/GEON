@@ -14,15 +14,18 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from common.config import INDEX_PREFIX
+from common.settings import setting
 from elasticsearch import Elasticsearch
 
 logger = logging.getLogger(__name__)
 
 POLYMARKET_INDEX = f"{INDEX_PREFIX}-polymarket-cases"
 GDELT_INDEX_PATTERN = f"{INDEX_PREFIX}-gdelt-events-*"
-PRICE_SHIFT_THRESHOLD: float = 0.10  # 10%
-GOLDSTEIN_SEVERITY: float = 7.0
-WINDOW_HOURS: int = 72
+PRICE_SHIFT_THRESHOLD: float = setting(
+    "correlation.prediction_validated.price_shift_threshold", 0.10)  # 10%
+GOLDSTEIN_SEVERITY: float = setting(
+    "correlation.prediction_validated.goldstein_severity", 7.0)
+WINDOW_HOURS: int = setting("correlation.prediction_validated.window_hours", 72)
 
 
 class PredictionValidatedRule:

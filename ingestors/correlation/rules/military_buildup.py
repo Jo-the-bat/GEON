@@ -16,13 +16,15 @@ from typing import Any
 
 from common.config import INDEX_PREFIX
 from common.opencti_client import get_campaigns_by_country
+from common.settings import setting
 from elasticsearch import Elasticsearch
 from pycti import OpenCTIApiClient
 
 logger = logging.getLogger(__name__)
 
 SPENDING_INDEX = f"{INDEX_PREFIX}-military-spending"
-YOY_THRESHOLD = 10.0  # Percent
+YOY_THRESHOLD: float = setting(
+    "correlation.military_buildup.yoy_threshold", 10.0)  # Percent
 
 _APT_MAPPING_PATH = (
     Path(__file__).resolve().parent.parent.parent / "common" / "country_apt_mapping.json"

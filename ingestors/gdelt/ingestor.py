@@ -31,6 +31,7 @@ from common.config import (
     setup_logging,
 )
 from common.es_client import bulk_index, ensure_index, get_es_client
+from common.settings import setting
 from tenacity import (
     retry,
     retry_if_exception_type,
@@ -62,6 +63,13 @@ REQUEST_TIMEOUT: int = 90
 
 # Delay between successive CSV downloads to respect rate limits.
 FETCH_DELAY_SECONDS: float = 2.0
+
+# Watermark: the last successfully processed 15-minute window is persisted
+# in Elasticsearch so windows missed during downtime are backfilled on the
+# next run instead of being silently lost.
+META_INDEX: str = f"{INDEX_PREFIX}-meta"
+WATERMARK_DOC_ID: str = "gdelt-events-watermark"
+MAX_BACKFILL_WINDOWS: int = setting("ingestion.gdelt.max_backfill_windows", 96)
 
 
 class GDELTIngestor:
@@ -104,9 +112,15 @@ class GDELTIngestor:
         reraise=True,
     )
     def _download_csv_zip(self, url: str) -> str:
-        """Download a GDELT Events Export ZIP and return the CSV text."""
+        """Download a GDELT Events Export ZIP and return the CSV text.
+
+        4xx responses (e.g. a 404 for a window GDELT skipped) raise
+        ``ValueError`` so tenacity does not retry them.
+        """
         self.logger.debug("Downloading %s", url)
         response = requests.get(url, timeout=REQUEST_TIMEOUT)
+        if 400 <= response.status_code < 500:
+            raise ValueError(f"GDELT returned {response.status_code} for {url}")
         response.raise_for_status()
         with zipfile.ZipFile(io.BytesIO(response.content)) as zf:
             csv_names = [n for n in zf.namelist() if n.upper().endswith(".CSV")]
@@ -114,14 +128,14 @@ class GDELTIngestor:
                 raise ValueError(f"No CSV found in {url}")
             return zf.read(csv_names[0]).decode("utf-8", errors="replace")
 
-    def fetch_latest_csv(self) -> list[dict[str, Any]]:
-        """Fetch the most recent GDELT Events Export CSV.
+    def latest_window(self) -> tuple[datetime, str]:
+        """Resolve the most recent available 15-minute export window.
 
-        Downloads ``lastupdate.txt``, finds the ``.export.CSV.zip`` URL,
-        downloads and parses it.
+        Downloads ``lastupdate.txt`` and parses the ``.export.CSV.zip``
+        URL plus its embedded timestamp.
 
         Returns:
-            List of raw event dicts from :func:`parse_events_csv`.
+            Tuple of (window datetime in UTC, CSV ZIP URL).
         """
         self.logger.info("Fetching GDELT lastupdate.txt …")
         resp = requests.get(GDELT_EVENTS_LASTUPDATE_URL, timeout=30)
@@ -137,6 +151,17 @@ class GDELTIngestor:
         if not csv_url:
             raise ValueError("No .export.CSV.zip URL in lastupdate.txt")
 
+        ts = csv_url.rsplit("/", 1)[-1].split(".")[0]
+        window = datetime.strptime(ts, "%Y%m%d%H%M%S").replace(tzinfo=timezone.utc)
+        return window, csv_url
+
+    def fetch_latest_csv(self) -> list[dict[str, Any]]:
+        """Fetch the most recent GDELT Events Export CSV.
+
+        Returns:
+            List of raw event dicts from :func:`parse_events_csv`.
+        """
+        _, csv_url = self.latest_window()
         self.logger.info("Latest export: %s", csv_url.rsplit("/", 1)[-1])
         csv_text = self._download_csv_zip(csv_url)
         return parse_events_csv(csv_text)
@@ -156,6 +181,50 @@ class GDELTIngestor:
         url = f"{GDELT_EVENTS_BASE_URL}/{ts}.export.CSV.zip"
         csv_text = self._download_csv_zip(url)
         return parse_events_csv(csv_text)
+
+    # ------------------------------------------------------------------
+    # Watermark (gap-free incremental ingestion)
+    # ------------------------------------------------------------------
+
+    def _read_watermark(self) -> datetime | None:
+        """Return the last successfully processed window, or ``None``."""
+        try:
+            doc = self.es.get(index=META_INDEX, id=WATERMARK_DOC_ID)
+            raw = doc["_source"].get("last_window", "")
+            return datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+        except Exception:
+            return None
+
+    def _write_watermark(self, window: datetime) -> None:
+        """Persist *window* as the last successfully processed window."""
+        try:
+            self.es.index(
+                index=META_INDEX,
+                id=WATERMARK_DOC_ID,
+                document={
+                    "last_window": window.isoformat(),
+                    "updated_at": datetime.now(tz=timezone.utc).isoformat(),
+                },
+            )
+        except Exception:
+            self.logger.warning("Could not persist GDELT watermark.", exc_info=True)
+
+    @staticmethod
+    def _missed_windows(watermark: datetime, latest: datetime) -> list[datetime]:
+        """All 15-minute windows after *watermark* up to *latest*, capped.
+
+        When the gap exceeds :data:`MAX_BACKFILL_WINDOWS`, only the most
+        recent windows are kept (the older ones are dropped explicitly —
+        better a logged loss than an unbounded catch-up run).
+        """
+        windows: list[datetime] = []
+        current = watermark + timedelta(minutes=15)
+        while current <= latest:
+            windows.append(current)
+            current += timedelta(minutes=15)
+        if len(windows) > MAX_BACKFILL_WINDOWS:
+            windows = windows[-MAX_BACKFILL_WINDOWS:]
+        return windows
 
     # ------------------------------------------------------------------
     # CAMEO filtering
@@ -220,13 +289,7 @@ class GDELTIngestor:
         total = 0
 
         if windows <= 1:
-            # Fast path: just the latest update.
-            try:
-                raw = self.fetch_latest_csv()
-                total += self._process_and_index(raw)
-            except Exception:
-                self.logger.exception("Failed to fetch/process latest GDELT CSV.")
-            return total
+            return self._ingest_incremental()
 
         # Historical / seed: iterate backwards through 15-min windows.
         now = datetime.now(tz=timezone.utc)
@@ -247,6 +310,82 @@ class GDELTIngestor:
                     "Seed progress: %d/%d windows, %d events indexed.",
                     i + 1, windows, total,
                 )
+
+        # Seeding walked back from "now": record now as the watermark.
+        minute = (now.minute // 15) * 15
+        self._write_watermark(now.replace(minute=minute, second=0, microsecond=0))
+        return total
+
+    def _ingest_incremental(self) -> int:
+        """Watermark-driven incremental ingestion.
+
+        Processes every 15-minute window published since the last
+        successful run (capped at :data:`MAX_BACKFILL_WINDOWS`), so
+        ingestor downtime no longer leaves silent gaps in the event
+        timeline. The watermark advances after EACH window — a crash
+        mid-backfill resumes where it stopped.
+
+        Returns:
+            Number of documents successfully indexed.
+        """
+        total = 0
+        try:
+            latest, latest_url = self.latest_window()
+        except Exception:
+            self.logger.exception("Could not resolve the latest GDELT window.")
+            return total
+
+        watermark = self._read_watermark()
+        if watermark is None:
+            # First run: process only the latest window and anchor there.
+            self.logger.info("No GDELT watermark yet — starting at %s.", latest)
+            try:
+                raw = parse_events_csv(self._download_csv_zip(latest_url))
+                total += self._process_and_index(raw)
+                self._write_watermark(latest)
+            except Exception:
+                self.logger.exception("Failed to process latest GDELT CSV.")
+            return total
+
+        missed = self._missed_windows(watermark, latest)
+        if not missed:
+            self.logger.info(
+                "GDELT up to date (watermark %s, latest %s).", watermark, latest
+            )
+            return total
+
+        gap = int((latest - watermark).total_seconds() // 900)
+        if gap > MAX_BACKFILL_WINDOWS:
+            self.logger.warning(
+                "GDELT gap of %d windows exceeds the backfill cap (%d) — "
+                "the oldest %d window(s) are dropped.",
+                gap, MAX_BACKFILL_WINDOWS, gap - MAX_BACKFILL_WINDOWS,
+            )
+        if len(missed) > 1:
+            self.logger.info(
+                "Backfilling %d missed GDELT window(s) since %s.",
+                len(missed), watermark,
+            )
+
+        for i, dt in enumerate(missed):
+            try:
+                raw = self.fetch_csv_for_timestamp(dt)
+                total += self._process_and_index(raw)
+            except ValueError:
+                # 4xx — GDELT occasionally skips a window; advance anyway.
+                self.logger.warning(
+                    "GDELT window %s unavailable (4xx) — skipping.",
+                    dt.strftime("%Y%m%d%H%M%S"),
+                )
+            except Exception:
+                self.logger.exception(
+                    "GDELT window %s failed — will retry next run.",
+                    dt.strftime("%Y%m%d%H%M%S"),
+                )
+                return total  # keep watermark before the failed window
+            self._write_watermark(dt)
+            if i < len(missed) - 1:
+                time.sleep(FETCH_DELAY_SECONDS)
 
         return total
 

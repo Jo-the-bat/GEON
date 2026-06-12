@@ -580,6 +580,8 @@ services:
       - GF_AUTH_PROXY_WHITELIST=172.16.0.0/12,192.168.0.0/16,10.0.0.0/8
       # --- Elasticsearch datasource credentials (dedicated read-only user) ---
       - GRAFANA_ES_PASSWORD=${GRAFANA_ES_PASSWORD}
+      # --- Provisioned alerting contact point (geon-alerting.yml) ---
+      - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL}
     volumes:
       - geon_grafana_data:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning:ro

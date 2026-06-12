@@ -15,6 +15,7 @@ from typing import Any
 from common.config import INDEX_PREFIX
 from common.countries import normalize_country
 from common.opencti_client import get_indicators_by_country
+from common.settings import setting
 from elasticsearch import Elasticsearch
 from pycti import OpenCTIApiClient
 
@@ -23,14 +24,16 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Tunables
 # ---------------------------------------------------------------------------
-LOOKBACK_DAYS: int = 14
-IOC_WINDOW_DAYS: int = 60
-IOC_SPIKE_THRESHOLD: float = 2.0  # 200% increase
+LOOKBACK_DAYS: int = setting("correlation.sanction_cyber.lookback_days", 14)
+IOC_WINDOW_DAYS: int = setting("correlation.sanction_cyber.ioc_window_days", 60)
+IOC_SPIKE_THRESHOLD: float = setting(
+    "correlation.sanction_cyber.ioc_spike_threshold", 2.0)  # 2.0 = +200%
 # Minimum indicator count in the baseline window for the spike ratio to be
 # statistically meaningful. Below this we skip the comparison instead of
 # treating a near-zero baseline as a massive "spike" (the former behaviour
 # produced constant false positives for quiet countries).
-MIN_BASELINE_COUNT: int = 10
+MIN_BASELINE_COUNT: int = setting(
+    "correlation.sanction_cyber.min_baseline_count", 10)
 SANCTIONS_INDEX = f"{INDEX_PREFIX}-sanctions"
 CTI_INDICATORS_PATTERN = f"{INDEX_PREFIX}-cti-indicators"
 

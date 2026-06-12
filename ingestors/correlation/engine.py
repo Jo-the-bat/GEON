@@ -27,6 +27,7 @@ from typing import Any
 from common.config import INDEX_PREFIX, setup_logging
 from common.es_client import bulk_index, ensure_index, get_es_client
 from common.opencti_client import get_opencti_client
+from common.settings import setting
 from elasticsearch import Elasticsearch
 from pycti import OpenCTIApiClient
 
@@ -122,14 +123,15 @@ ALERT_SEVERITY_THRESHOLD: dict[str, int] = {
     "high": 2,
     "critical": 3,
 }
-MIN_ALERT_SEVERITY: int = 2  # "high" and above
+MIN_ALERT_SEVERITY: int = ALERT_SEVERITY_THRESHOLD.get(
+    str(setting("correlation.engine.min_alert_severity", "high")), 2)
 
 # A situation dormant for this many days that fires again is treated as a
 # reactivation and re-alerted (instead of being silently refreshed).
-REACTIVATION_DAYS: int = 14
+REACTIVATION_DAYS: int = setting("correlation.engine.reactivation_days", 14)
 
 # Cap merged timelines so long-running situations don't grow unbounded.
-TIMELINE_MAX_ENTRIES: int = 50
+TIMELINE_MAX_ENTRIES: int = setting("correlation.engine.timeline_max_entries", 50)
 
 
 class CorrelationEngine:

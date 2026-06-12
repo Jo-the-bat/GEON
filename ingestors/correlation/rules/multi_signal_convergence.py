@@ -22,6 +22,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from common.config import INDEX_PREFIX
+from common.settings import setting
 from elasticsearch import Elasticsearch
 
 logger = logging.getLogger(__name__)
@@ -35,12 +36,17 @@ CORRELATIONS_INDEX = f"{INDEX_PREFIX}-correlations"
 ACLED_INDEX_PATTERN = f"{INDEX_PREFIX}-acled-*"
 SPENDING_INDEX = f"{INDEX_PREFIX}-military-spending"
 
-RISK_SCORE_THRESHOLD: float = 40.0
-GDELT_NEGATIVE_THRESHOLD: int = 100
-GOLDSTEIN_THRESHOLD: float = -3.0
-PREDICTION_SHIFT_THRESHOLD: float = 0.05
-SPENDING_YOY_THRESHOLD: float = 10.0
-MIN_SIGNALS: int = 3
+RISK_SCORE_THRESHOLD: float = setting(
+    "correlation.multi_signal_convergence.risk_score_threshold", 40.0)
+GDELT_NEGATIVE_THRESHOLD: int = setting(
+    "correlation.multi_signal_convergence.gdelt_negative_threshold", 100)
+GOLDSTEIN_THRESHOLD: float = setting(
+    "correlation.multi_signal_convergence.goldstein_threshold", -3.0)
+PREDICTION_SHIFT_THRESHOLD: float = setting(
+    "correlation.multi_signal_convergence.prediction_shift_threshold", 0.05)
+SPENDING_YOY_THRESHOLD: float = setting(
+    "correlation.multi_signal_convergence.spending_yoy_threshold", 10.0)
+MIN_SIGNALS: int = setting("correlation.multi_signal_convergence.min_signals", 3)
 
 
 class MultiSignalConvergenceRule:
