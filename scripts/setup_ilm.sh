@@ -162,10 +162,35 @@ adopt_existing "geon-gdelt-events-*" "geon-retention-gdelt"
 adopt_existing "geon-gkg-*"          "geon-retention-gkg"
 adopt_existing "geon-acled-events-*" "geon-retention-acled"
 
+# --- Snapshot repository + SLM (Snapshot Lifecycle Management) ---------------
+# Automated, self-retaining Elasticsearch backups: ES runs the schedule AND the
+# retention itself — no host cron needed. Requires path.repo set in
+# elasticsearch.yml and the geon_es_backups volume mounted + writable by the ES
+# uid (1000); see docker-compose.yml. scripts/backup.sh reuses the same repo for
+# on-demand snapshots (pruned separately, keeping the last 7 geon_* snapshots).
+info "Registering snapshot repository geon_backup ..."
+put_es "/_snapshot/geon_backup" \
+    '{"type":"fs","settings":{"location":"/usr/share/elasticsearch/backups","compress":true}}' \
+    "Snapshot repository geon_backup"
+
+info "Installing SLM policy geon-snapshots (daily 01:30, keep last 7) ..."
+put_es "/_slm/policy/geon-snapshots" '{
+    "schedule": "0 30 1 * * ?",
+    "name": "<geon-snap-{now/d}>",
+    "repository": "geon_backup",
+    "config": {
+        "indices": ["geon-*"],
+        "ignore_unavailable": true,
+        "include_global_state": false
+    },
+    "retention": { "expire_after": "30d", "min_count": 2, "max_count": 7 }
+}' "SLM policy geon-snapshots"
+
 echo ""
 ok "ILM retention policies + templates installed and existing indices adopted."
 echo ""
 echo "  Retention (from index creation date): GKG 90d · GDELT 180d · ACLED 365d."
 echo "  ILM re-evaluates every ~10 min. Indices already past delete min_age will"
 echo "  force-merge (warm), then be removed on the next delete check."
+echo "  Snapshots: SLM policy 'geon-snapshots' runs daily 01:30, keeps last 7."
 echo ""

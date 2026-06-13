@@ -22,10 +22,12 @@ TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 BACKUP_PATH="${BACKUP_DIR}/${TIMESTAMP}"
 RETENTION_DAYS=7
 
-ES_HOST="${ES_HOST:-http://localhost:9200}"
-ES_USER="${ES_USER:-elastic}"
-ES_PASS="${ELASTIC_PASSWORD:-changeme}"
+# Elasticsearch is reached through the container (see es_* helpers below), not
+# via a host port — on the shared host ES isn't published. Override the
+# container name with ES_CONTAINER if needed.
+ES_CONTAINER="${ES_CONTAINER:-geon-elasticsearch}"
 SNAPSHOT_REPO="geon_backup"
+SNAPSHOT_RETENTION="${SNAPSHOT_RETENTION:-7}"  # keep the last N manual (geon_*) snapshots
 
 OPENCTI_URL="${OPENCTI_URL:-http://localhost:8080}"
 OPENCTI_TOKEN="${OPENCTI_ADMIN_TOKEN:-}"
@@ -33,12 +35,32 @@ OPENCTI_TOKEN="${OPENCTI_ADMIN_TOKEN:-}"
 # --- Colors ---
 CYAN='\033[0;36m'
 GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m'
 
 info() { echo -e "${CYAN}[INFO]${NC}  $(date '+%Y-%m-%d %H:%M:%S') $*"; }
 ok()   { echo -e "${GREEN}[OK]${NC}    $(date '+%Y-%m-%d %H:%M:%S') $*"; }
+warn() { echo -e "${YELLOW}[WARN]${NC}  $(date '+%Y-%m-%d %H:%M:%S') $*"; }
 fail() { echo -e "${RED}[FAIL]${NC}  $(date '+%Y-%m-%d %H:%M:%S') $*"; }
+
+# --- Elasticsearch REST helpers (executed INSIDE the ES container) -----------
+# On the shared host ES isn't published, so a host-side curl to localhost:9200
+# can't reach it. The ES container always has curl + $ELASTIC_PASSWORD, and this
+# script already relies on docker (cp / volume inspect) — so route every ES REST
+# call through `docker exec`. Works on standalone and shared topologies alike.
+es_put_code() {  # <path> <json-body> -> prints HTTP status code
+    printf '%s' "$2" | docker exec -i "$ES_CONTAINER" sh -c \
+        "curl -sS -o /dev/null -w '%{http_code}' -u \"elastic:\$ELASTIC_PASSWORD\" -X PUT \"http://localhost:9200$1\" -H 'Content-Type: application/json' --data-binary @-"
+}
+es_get() {  # <path> -> prints response body
+    docker exec "$ES_CONTAINER" sh -c \
+        "curl -sS -u \"elastic:\$ELASTIC_PASSWORD\" \"http://localhost:9200$1\""
+}
+es_delete_code() {  # <path> -> prints HTTP status code
+    docker exec "$ES_CONTAINER" sh -c \
+        "curl -sS -o /dev/null -w '%{http_code}' -u \"elastic:\$ELASTIC_PASSWORD\" -X DELETE \"http://localhost:9200$1\""
+}
 
 info "Starting GEON backup: ${TIMESTAMP}"
 
@@ -48,25 +70,17 @@ mkdir -p "$BACKUP_PATH"
 info "Registering Elasticsearch snapshot repository..."
 
 # Register the snapshot repository (idempotent — PUT on an existing repo with
-# the same settings returns 200). We rely on `set -e` to fail the whole backup
-# if this call errors, rather than swallowing the status into a string.
-REGISTER_RESULT=$(curl -sS -o /dev/null -w "%{http_code}" \
-    -u "${ES_USER}:${ES_PASS}" \
-    -X PUT "${ES_HOST}/_snapshot/${SNAPSHOT_REPO}" \
-    -H "Content-Type: application/json" \
-    -d "{
-        \"type\": \"fs\",
-        \"settings\": {
-            \"location\": \"/usr/share/elasticsearch/backups\",
-            \"compress\": true
-        }
-    }")
+# the same settings returns 200). Requires path.repo set in elasticsearch.yml
+# and the geon_es_backups volume mounted + writable by the ES uid (1000).
+REGISTER_RESULT=$(es_put_code "/_snapshot/${SNAPSHOT_REPO}" \
+    '{"type":"fs","settings":{"location":"/usr/share/elasticsearch/backups","compress":true}}')
 
 if [[ "$REGISTER_RESULT" = "200" || "$REGISTER_RESULT" = "201" ]]; then
     ok "Snapshot repository registered."
 else
     fail "Could not register snapshot repository (HTTP ${REGISTER_RESULT})."
-    echo "     Ensure path.repo is set in elasticsearch.yml and the directory exists."
+    echo "     Ensure path.repo is set in elasticsearch.yml, the geon_es_backups"
+    echo "     volume is mounted, and its directory is writable by the ES uid."
     exit 1
 fi
 
@@ -74,15 +88,8 @@ fi
 SNAPSHOT_NAME="geon_${TIMESTAMP}"
 info "Creating Elasticsearch snapshot: ${SNAPSHOT_NAME}"
 
-SNAPSHOT_RESULT=$(curl -sS -o /dev/null -w "%{http_code}" \
-    -u "${ES_USER}:${ES_PASS}" \
-    -X PUT "${ES_HOST}/_snapshot/${SNAPSHOT_REPO}/${SNAPSHOT_NAME}?wait_for_completion=true" \
-    -H "Content-Type: application/json" \
-    -d "{
-        \"indices\": \"geon-*\",
-        \"ignore_unavailable\": true,
-        \"include_global_state\": false
-    }")
+SNAPSHOT_RESULT=$(es_put_code "/_snapshot/${SNAPSHOT_REPO}/${SNAPSHOT_NAME}?wait_for_completion=true" \
+    '{"indices":"geon-*","ignore_unavailable":true,"include_global_state":false}')
 
 if [[ "$SNAPSHOT_RESULT" = "200" || "$SNAPSHOT_RESULT" = "201" ]]; then
     ok "Elasticsearch snapshot created: ${SNAPSHOT_NAME}"
@@ -92,16 +99,32 @@ else
 fi
 
 # Save snapshot metadata
-curl -s -u "${ES_USER}:${ES_PASS}" \
-    "${ES_HOST}/_snapshot/${SNAPSHOT_REPO}/${SNAPSHOT_NAME}" \
-    2>/dev/null > "${BACKUP_PATH}/es_snapshot_info.json" || true
+es_get "/_snapshot/${SNAPSHOT_REPO}/${SNAPSHOT_NAME}" \
+    > "${BACKUP_PATH}/es_snapshot_info.json" 2>/dev/null || true
 
 # Export index list
-curl -s -u "${ES_USER}:${ES_PASS}" \
-    "${ES_HOST}/_cat/indices/geon-*?v&h=index,docs.count,store.size" \
-    2>/dev/null > "${BACKUP_PATH}/es_indices.txt" || true
+es_get "/_cat/indices/geon-*?v&h=index,docs.count,store.size" \
+    > "${BACKUP_PATH}/es_indices.txt" 2>/dev/null || true
 
 ok "Elasticsearch index metadata saved."
+
+# Prune old manual snapshots, keeping the most recent ${SNAPSHOT_RETENTION}.
+# (SLM-managed snapshots — geon-snap-* — are pruned by their own retention.)
+info "Pruning old ES snapshots (keeping last ${SNAPSHOT_RETENTION})..."
+TO_DELETE=$(es_get "/_cat/snapshots/${SNAPSHOT_REPO}?h=id&s=id" 2>/dev/null \
+    | grep '^geon_' | head -n "-${SNAPSHOT_RETENTION}" || true)
+if [ -n "$TO_DELETE" ]; then
+    while IFS= read -r SNAP; do
+        [ -z "$SNAP" ] && continue
+        DEL_CODE=$(es_delete_code "/_snapshot/${SNAPSHOT_REPO}/${SNAP}" 2>/dev/null || echo "000")
+        if [ "$DEL_CODE" = "200" ]; then
+            info "  Deleted old snapshot: ${SNAP}"
+        else
+            warn "  Could not delete snapshot ${SNAP} (HTTP ${DEL_CODE})."
+        fi
+    done <<< "$TO_DELETE"
+fi
+ok "ES snapshot retention applied."
 
 # --- 2. n8n Backup (SQLite database) ---
 info "Backing up n8n data..."
