@@ -29,8 +29,11 @@ ES_CONTAINER="${ES_CONTAINER:-geon-elasticsearch}"
 SNAPSHOT_REPO="geon_backup"
 SNAPSHOT_RETENTION="${SNAPSHOT_RETENTION:-7}"  # keep the last N manual (geon_*) snapshots
 
-OPENCTI_URL="${OPENCTI_URL:-http://localhost:8080}"
-OPENCTI_TOKEN="${OPENCTI_ADMIN_TOKEN:-}"
+# OpenCTI isn't published on the host either — reach its GraphQL from a
+# container on geon_net that already carries OPENCTI_URL + OPENCTI_ADMIN_TOKEN
+# (the ingestor; its OPENCTI_URL includes the /opencti base path). Override with
+# OCTI_NET_CONTAINER if needed.
+OCTI_NET_CONTAINER="${OCTI_NET_CONTAINER:-geon-ingestor}"
 
 # --- Colors ---
 CYAN='\033[0;36m'
@@ -60,6 +63,27 @@ es_get() {  # <path> -> prints response body
 es_delete_code() {  # <path> -> prints HTTP status code
     docker exec "$ES_CONTAINER" sh -c \
         "curl -sS -o /dev/null -w '%{http_code}' -u \"elastic:\$ELASTIC_PASSWORD\" -X DELETE \"http://localhost:9200$1\""
+}
+
+# Run an OpenCTI GraphQL query from inside the ingestor container (which holds
+# OPENCTI_URL + OPENCTI_ADMIN_TOKEN and can reach opencti:8080 on geon_net).
+# Reads the query JSON on stdin, writes the JSON response to stdout, exits
+# non-zero unless HTTP 200 — so the token never lands on a host command line.
+octi_graphql() {
+    docker exec -i "$OCTI_NET_CONTAINER" python3 -c '
+import os, sys, requests
+url = os.environ["OPENCTI_URL"].rstrip("/") + "/graphql"
+tok = os.environ.get("OPENCTI_ADMIN_TOKEN") or os.environ.get("OPENCTI_TOKEN", "")
+try:
+    r = requests.post(url, data=sys.stdin.buffer.read(), timeout=60,
+                      headers={"Authorization": "Bearer " + tok,
+                               "Content-Type": "application/json"})
+except Exception as exc:
+    sys.stderr.write("opencti request failed: %s\n" % exc)
+    sys.exit(2)
+sys.stdout.write(r.text)
+sys.exit(0 if r.status_code == 200 else 1)
+'
 }
 
 info "Starting GEON backup: ${TIMESTAMP}"
@@ -155,40 +179,24 @@ else
 fi
 
 # --- 3. OpenCTI Export ---
-info "Exporting OpenCTI data..."
+info "Exporting OpenCTI data (via ${OCTI_NET_CONTAINER})..."
 
-if [ -n "$OPENCTI_TOKEN" ]; then
-    # Export reports via GraphQL API
-    OPENCTI_EXPORT=$(curl -s -o /dev/null -w "%{http_code}" \
-        -X POST "${OPENCTI_URL}/graphql" \
-        -H "Authorization: Bearer ${OPENCTI_TOKEN}" \
-        -H "Content-Type: application/json" \
-        -d '{
-            "query": "{ reports(first: 1000) { edges { node { id name description created published } } } }"
-        }' \
-        --output "${BACKUP_PATH}/opencti_reports.json" \
-        2>/dev/null || echo "000")
-
-    if [ "$OPENCTI_EXPORT" = "200" ]; then
-        ok "OpenCTI reports exported."
-    else
-        fail "OpenCTI export failed (HTTP ${OPENCTI_EXPORT})."
-        echo "     For a complete export, use the OpenCTI web interface: Administration > Data > Export."
-    fi
-
-    # Export indicators
-    curl -s -X POST "${OPENCTI_URL}/graphql" \
-        -H "Authorization: Bearer ${OPENCTI_TOKEN}" \
-        -H "Content-Type: application/json" \
-        -d '{
-            "query": "{ indicators(first: 5000) { edges { node { id name pattern valid_from valid_until } } } }"
-        }' \
-        --output "${BACKUP_PATH}/opencti_indicators.json" \
-        2>/dev/null || true
+# Export reports via GraphQL (the helper sources URL + token from the container)
+if octi_graphql > "${BACKUP_PATH}/opencti_reports.json" <<'GQL'
+{"query": "{ reports(first: 1000) { edges { node { id name description created published } } } }"}
+GQL
+then
+    ok "OpenCTI reports exported."
 else
-    warn "OPENCTI_ADMIN_TOKEN not set. Skipping OpenCTI export."
-    echo "     Set the token in .env to enable automatic OpenCTI backups."
+    fail "OpenCTI export failed (reports query)."
+    echo "     Check ${OCTI_NET_CONTAINER} is running and OPENCTI_ADMIN_TOKEN is valid."
+    echo "     For a complete export, use the OpenCTI web UI: Administration > Data > Export."
 fi
+
+# Export indicators (best-effort)
+octi_graphql > "${BACKUP_PATH}/opencti_indicators.json" <<'GQL' || true
+{"query": "{ indicators(first: 5000) { edges { node { id name pattern valid_from valid_until } } } }"}
+GQL
 
 # --- 4. Compress ---
 info "Compressing backup..."
