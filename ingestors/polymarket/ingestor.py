@@ -24,6 +24,7 @@ from typing import Any
 import requests
 from common.config import INDEX_PREFIX, setup_logging
 from common.es_client import ensure_index, get_es_client
+from common.settings import setting
 from tenacity import (
     retry,
     retry_if_exception_type,
@@ -50,6 +51,11 @@ except Exception:
     pass
 
 PRICE_SHIFT_THRESHOLD = 0.10  # 10% shift triggers alert
+
+# Pagination safety net: the Gamma API returns HTTP 422 once `offset`
+# exceeds its cap, so we stop after this many pages of 100 (and also treat
+# a 422 as a clean end-of-results — see fetch_all_markets).
+MAX_PAGES: int = setting("ingestion.polymarket.max_pages", 120)
 
 # Max samples kept in the per-case price history (≈ 7.5 days at the hourly cron
 # frequency, enough to compute both 24h and 7d windows).
@@ -86,18 +92,41 @@ class PolymarketIngestor:
         return resp.json()
 
     def fetch_all_markets(self) -> list[dict[str, Any]]:
-        """Fetch all active markets, paginated."""
+        """Fetch all active markets, paginated.
+
+        The Gamma API rejects pagination past an offset cap with HTTP 422
+        (its active-market catalogue exceeds 10k), so a naive loop crashes
+        instead of terminating. We treat that 422 as a clean end-of-results
+        and bound the loop at ``MAX_PAGES`` as a belt-and-suspenders.
+        """
         all_markets: list[dict[str, Any]] = []
         offset = 0
         limit = 100
-        while True:
-            batch = self._fetch_markets(limit=limit, offset=offset)
+        for _ in range(MAX_PAGES):
+            try:
+                batch = self._fetch_markets(limit=limit, offset=offset)
+            except requests.HTTPError as exc:
+                status = exc.response.status_code if exc.response is not None else None
+                if status == 422:
+                    self.logger.info(
+                        "Gamma API offset cap reached at offset=%d (HTTP 422); "
+                        "treating as end of results.",
+                        offset,
+                    )
+                    break
+                raise
             if not batch:
                 break
             all_markets.extend(batch)
             if len(batch) < limit:
                 break
             offset += limit
+        else:
+            self.logger.warning(
+                "Polymarket pagination hit the %d-page cap; results may be "
+                "truncated.",
+                MAX_PAGES,
+            )
         self.logger.info("Fetched %d markets from Polymarket.", len(all_markets))
         return all_markets
 
