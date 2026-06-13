@@ -1,7 +1,10 @@
 # GEON Ingestors — Python dependencies
 elasticsearch[async]>=8.0.0,<9.0.0
 requests>=2.31.0,<3.0.0
-pycti>=6.0.0,<7.0.0
+# Pinned to the OpenCTI server's minor (platform 6.6.x): a newer pycti
+# queries Vulnerability fields (e.g. x_opencti_cvss_vector_string) absent
+# from the 6.6 GraphQL schema, breaking the vulnerabilities export.
+pycti>=6.6.0,<6.7.0
 python-dotenv>=1.0.0,<2.0.0
 tenacity>=8.2.0,<9.0.0
 schedule>=1.2.0,<2.0.0
