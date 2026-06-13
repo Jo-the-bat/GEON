@@ -51,6 +51,37 @@ def _location_search_terms(canonical: str) -> list[str]:
 # Client factory
 # ---------------------------------------------------------------------------
 
+# Per-request timeout (seconds) imposed on the pycti HTTP session. The
+# scheduler is single-threaded (one PID running every job in turn), so a hung
+# OpenCTI during the per-country correlation loops would stall every
+# downstream job. pycti 6.6 dropped the ``requests_timeout`` constructor kwarg
+# and hardcodes 300s per call, so we enforce the cap on the session itself —
+# which works regardless of the pycti version.
+OPENCTI_REQUEST_TIMEOUT = 60
+
+
+def _clamp_request_timeout(client: OpenCTIApiClient, seconds: int) -> None:
+    """Force a per-request timeout on pycti's underlying ``requests`` session.
+
+    pycti issues every GraphQL call as ``session.post(..., timeout=300)`` (and
+    file fetches as ``session.get(..., timeout=300)``). An explicit per-call
+    timeout overrides any session-level default, so the only version-stable way
+    to shorten it is to wrap the session verbs and override the kwarg.
+    """
+    session = getattr(client, "session", None)
+    if session is None:  # pragma: no cover - defensive, pycti always sets it
+        logger.warning("OpenCTI client exposes no .session; cannot clamp timeout.")
+        return
+    for verb in ("get", "post"):
+        original = getattr(session, verb)
+
+        def capped(*args, _original=original, **kwargs):
+            kwargs["timeout"] = seconds
+            return _original(*args, **kwargs)
+
+        setattr(session, verb, capped)
+
+
 def get_opencti_client() -> OpenCTIApiClient:
     """Create and return a configured OpenCTI API client.
 
@@ -74,11 +105,8 @@ def get_opencti_client() -> OpenCTIApiClient:
         url=OPENCTI_URL,
         token=OPENCTI_TOKEN,
         log_level="warning",
-        # pycti defaults to 300s per request; with per-country query loops
-        # in the correlation rules a hung OpenCTI would stall the whole
-        # single-threaded scheduler for hours.
-        requests_timeout=60,
     )
+    _clamp_request_timeout(client, OPENCTI_REQUEST_TIMEOUT)
     logger.info("Connected to OpenCTI.")
     return client
 
