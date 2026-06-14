@@ -34,6 +34,7 @@ from common.config import (
     ALERT_EMAIL_SMTP_PORT,
     ALERT_EMAIL_TO,
     DISCORD_WEBHOOK_URL,
+    GEON_DOMAIN,
     RETRY_MAX_ATTEMPTS,
     RETRY_WAIT_MAX,
     RETRY_WAIT_MIN,
@@ -72,7 +73,7 @@ ALERT_CONTEXT_LABEL: dict[str, str] = {
     "reactivation": "Reactivation",
 }
 
-DASHBOARD_BASE_URL = "https://geon.example.com/grafana/d/correlations"
+DASHBOARD_BASE_URL = f"https://{GEON_DOMAIN}/grafana/d/correlations"
 
 ALERTS_SENT_INDEX = "geon-alerts-sent"
 DEDUP_WINDOW_DAYS: int = setting("alerting.dedup_window_days", 7)

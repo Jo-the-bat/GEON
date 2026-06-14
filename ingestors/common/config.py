@@ -63,6 +63,11 @@ ALERT_EMAIL_TO: str = os.getenv("ALERT_EMAIL_TO", "")
 ALERT_EMAIL_PASSWORD: str = os.getenv("ALERT_EMAIL_PASSWORD", "")
 
 # ---------------------------------------------------------------------------
+# Public domain (used to build dashboard links embedded in alerts)
+# ---------------------------------------------------------------------------
+GEON_DOMAIN: str = os.getenv("GEON_DOMAIN", "geon.example.com")
+
+# ---------------------------------------------------------------------------
 # Index naming
 # ---------------------------------------------------------------------------
 INDEX_PREFIX: str = "geon"

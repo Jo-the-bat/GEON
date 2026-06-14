@@ -85,6 +85,10 @@ cd GEON
 ```bash
 cp .env.example .env
 nano .env
+
+# Nginx vhost carries the real domain + cert paths and is gitignored —
+# copy the template and replace geon.example.com with your GEON_DOMAIN.
+cp docker/nginx/conf.d/geon.conf.example docker/nginx/conf.d/geon.conf
 ```
 
 At minimum, set the following:

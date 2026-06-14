@@ -50,6 +50,8 @@ docker/authelia/users_database.yml
 docker/authelia/configuration.yml
 docker/elasticsearch/elasticsearch.yml
 docker/prometheus/prometheus.yml
+# nginx vhost carries the real domain + cert paths; ship only geon.conf.example
+docker/nginx/conf.d/geon.conf
 
 # === IDE ===
 .vscode/

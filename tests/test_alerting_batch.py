@@ -97,7 +97,7 @@ class TestEmailDigest:
 
         monkeypatch.setattr(alerting, "ALERT_EMAIL_SMTP_HOST", "smtp.test")
         monkeypatch.setattr(alerting, "ALERT_EMAIL_FROM", "geon@test")
-        monkeypatch.setattr(alerting, "ALERT_EMAIL_TO", "joran@test")
+        monkeypatch.setattr(alerting, "ALERT_EMAIL_TO", "alerts@test")
         monkeypatch.setattr(alerting, "ALERT_EMAIL_PASSWORD", "")
         monkeypatch.setattr(alerting.smtplib, "SMTP", FakeSMTP)
 

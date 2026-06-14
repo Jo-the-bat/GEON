@@ -178,7 +178,7 @@ This project is licensed under the MIT License. See [LICENSE](LICENSE) for detai
 
 ## Credits
 
-Built by [GEON](https://github.com/Jo-the-bat) as a portfolio project for a Master's candidacy in International Relations, demonstrating the convergence of technical cybersecurity skills and geopolitical analysis.
+GEON is an open-source portfolio project demonstrating the convergence of structured cyber threat intelligence (OpenCTI/STIX2) with geopolitical event data (GDELT/ACLED) — bridging technical cybersecurity and geopolitical analysis.
 
 ### Upstream Projects
 

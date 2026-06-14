@@ -6,7 +6,7 @@ GEON est une plateforme d'intelligence geopolitique et cyber qui correle automat
 
 **Positionnement** : Aucun outil open source existant ne fait la convergence entre CTI structuree (OpenCTI/STIX2) et donnees geopolitiques (GDELT/ACLED). World Monitor fait du geopolitique sans CTI. Les integrations OpenCTI/Elastic existantes font de la CTI sans geopolitique. GEON comble ce gap.
 
-**Contexte** : Projet personnel de GEON, professionnel en cybersecurite (analyste SOC, administration Linux/Docker), destine a servir de portfolio pour une candidature en Master Relations Internationales. Le projet doit demontrer la capacite a croiser analyse technique et comprehension geopolitique.
+**Contexte** : Projet portfolio en cybersecurite et analyse geopolitique (profil analyste SOC / administration Linux/Docker), destine a demontrer la capacite a croiser analyse technique et comprehension geopolitique.
 
 ---
 

@@ -3,6 +3,7 @@
 
 import json
 import uuid
+from pathlib import Path
 
 KEYWORDS_JS = """const keywords = [
   'war', 'conflict', 'sanctions', 'military', 'nato', 'ceasefire',
@@ -220,7 +221,7 @@ WORKFLOWS = {
 if __name__ == "__main__":
     for filename, (name, sources, category) in WORKFLOWS.items():
         wf = build_workflow(name, sources, category)
-        path = f"/opt/geon/n8n/workflows/{filename}"
+        path = Path(__file__).parent / filename
         with open(path, "w") as f:
             json.dump(wf, f, indent=2)
         print(f"Generated {filename}: {len(sources)} sources, {len(wf['nodes'])} nodes")

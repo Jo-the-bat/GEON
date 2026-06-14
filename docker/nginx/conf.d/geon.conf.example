@@ -1,5 +1,8 @@
 # =============================================================================
-# GEON — Nginx Configuration
+# GEON — Nginx Configuration (TEMPLATE)
+#
+# Copy this file to geon.conf and replace geon.example.com with your real
+# domain (geon.conf is gitignored — it carries the live domain + cert paths).
 #
 # GEON terminates its own TLS. Two entry modes:
 #

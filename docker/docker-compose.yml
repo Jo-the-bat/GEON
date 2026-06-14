@@ -629,6 +629,8 @@ services:
       - ACLED_API_KEY=${ACLED_API_KEY}
       - ACLED_EMAIL=${ACLED_EMAIL}
       - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL}
+      # Public domain used to build dashboard links in alerts (falls back to a placeholder)
+      - GEON_DOMAIN=${GEON_DOMAIN:-geon.example.com}
       - CLOUDFLARE_RADAR_TOKEN=${CLOUDFLARE_RADAR_TOKEN:-}
       - METACULUS_API_TOKEN=${METACULUS_API_TOKEN:-}
     networks:
